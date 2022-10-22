@@ -10,7 +10,7 @@ publish = false
 
 [lib]
 name = "scie_jump"
-path = "src/lib.rs"
+path = "src/scie_jump/mod.rs"
 
 [[bin]]
 name = "scie-jump"

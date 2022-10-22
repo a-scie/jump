@@ -1,4 +1,4 @@
-use scie_jump;
+mod scie_jump;
 
 fn main() {
     println!("{}", scie_jump::message());
