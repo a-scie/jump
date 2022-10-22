@@ -1,0 +1,21 @@
+[package]
+name = "scie-jump"
+version = "0.1.0"
+description = "The self contained interpreted executable launcher."
+authors = [
+  "John Sirois <john.sirois@gmail.com>",
+]
+edition = "2021"
+publish = false
+
+[profile.release]
+opt-level = "s"
+strip = "symbols"
+lto = "thin"
+
+[dependencies]
+async-compression = { version = "0.3", features = ["futures-io", "all-algorithms"] }
+fd-lock = "3.0"
+serde_yaml = "0.9"
+tar = "0.4"
+zip = "0.6"
