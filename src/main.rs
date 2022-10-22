@@ -1,3 +1,5 @@
+use scie_jump;
+
 fn main() {
-    println!("Hello, world!");
+    println!("{}", scie_jump::message());
 }

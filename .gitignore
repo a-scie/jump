@@ -1,1 +1,6 @@
-/target
+# Cargo output.
+/target/
+
+# IntelliJ project.
+/.idea/
+/scie.iml

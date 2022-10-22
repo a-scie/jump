@@ -8,6 +8,14 @@ authors = [
 edition = "2021"
 publish = false
 
+[lib]
+name = "scie_jump"
+path = "src/lib.rs"
+
+[[bin]]
+name = "scie-jump"
+path = "src/main.rs"
+
 [profile.release]
 opt-level = "s"
 strip = "symbols"
@@ -16,6 +24,7 @@ lto = "thin"
 [dependencies]
 async-compression = { version = "0.3", features = ["futures-io", "all-algorithms"] }
 fd-lock = "3.0"
-serde_yaml = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 tar = "0.4"
 zip = "0.6"
