@@ -1,11 +1,9 @@
 #[macro_use]
 extern crate structure;
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::File;
-use std::path::{Path, PathBuf};
-
-use expanduser::expanduser;
+use std::path::{Component, Path, PathBuf};
 
 mod jmp;
 
@@ -13,6 +11,28 @@ mod jmp;
 pub struct Cmd {
     pub exe: OsString,
     pub args: Vec<OsString>,
+}
+
+fn expanduser(path: &str) -> Result<PathBuf, String> {
+    let path_buf = PathBuf::from(path);
+    if !path.contains("~") {
+        return Ok(path_buf);
+    }
+
+    let home_dir =
+        dirs::home_dir().ok_or_else(|| format!("Failed to expand home dir in path {}", path))?;
+    let mut components = Vec::new();
+    for path_component in path_buf.components() {
+        match path_component {
+            Component::Normal(component) if OsStr::new("~") == component => {
+                for home_dir_component in home_dir.components() {
+                    components.push(home_dir_component)
+                }
+            }
+            component => components.push(component),
+        }
+    }
+    Ok(components.into_iter().collect())
 }
 
 pub fn prepare_command<P: AsRef<Path>>(current_exe: P) -> Result<Cmd, String> {
@@ -29,7 +49,7 @@ pub fn prepare_command<P: AsRef<Path>>(current_exe: P) -> Result<Cmd, String> {
     };
     let config = jmp::load(&data)?;
     // TODO(John Sirois): ensure the interpreter and app are extracted to the scie root.
-    let root = PathBuf::from(expanduser(config.scie.root).map_err(|e| format!("{}", e))?);
+    let root = expanduser(&config.scie.root)?;
     Ok(Cmd {
         exe: root.join(config.interpreter.executable).into_os_string(),
         args: vec![root.join(config.app.script).into_os_string()],

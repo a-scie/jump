@@ -36,18 +36,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrayref"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4c527152e37cf757a3f78aae5a06fbeefdb07ccc535c980a3208ee3060dd544"
-
-[[package]]
-name = "arrayvec"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
-
-[[package]]
 name = "async-compression"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -72,12 +60,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "base64"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
-
-[[package]]
 name = "base64ct"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -88,17 +70,6 @@ name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
-
-[[package]]
-name = "blake2b_simd"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afa748e348ad3be8263be728124b24a24f268266f6f5d58af9d75f6a40b5c587"
-dependencies = [
- "arrayref",
- "arrayvec",
- "constant_time_eq",
-]
 
 [[package]]
 name = "block-buffer"
@@ -237,9 +208,18 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "1.0.5"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"
+checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
 dependencies = [
  "libc",
  "redox_users",
@@ -274,17 +254,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "expanduser"
-version = "1.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14e0b79235da57db6b6c2beed9af6e5de867d63a973ae3e91910ddc33ba40bc0"
-dependencies = [
- "dirs",
- "lazy_static",
- "pwd",
-]
-
-[[package]]
 name = "fd-lock"
 version = "3.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -303,7 +272,7 @@ checksum = "4b9663d381d07ae25dc88dbdf27df458faa83a9b25336bcac83d5e452b5fc9d3"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall 0.2.16",
+ "redox_syscall",
  "windows-sys 0.42.0",
 ]
 
@@ -341,9 +310,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.1.16"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
+checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
 dependencies = [
  "cfg-if",
  "libc",
@@ -388,12 +357,6 @@ checksum = "068b1ee6743e4d11fb9c6a1e6064b3693a1b600e7f5f5988047d98b3dc9fb90b"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
@@ -562,16 +525,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pwd"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c71c0c79b9701efe4e1e4b563b2016dd4ee789eb99badcb09d61ac4b92e4a2"
-dependencies = [
- "libc",
- "thiserror",
-]
-
-[[package]]
 name = "quote"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -594,12 +547,6 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
 name = "redox_syscall"
-version = "0.1.57"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
-
-[[package]]
-name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
@@ -609,25 +556,13 @@ dependencies = [
 
 [[package]]
 name = "redox_users"
-version = "0.3.5"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de0737333e7a9502c789a36d7c7fa6092a49895d4faa31ca5df163857ded2e9d"
+checksum = "b033d837a7cf162d7993aded9304e30a83213c648b6e389db233191f891e5c2b"
 dependencies = [
  "getrandom",
- "redox_syscall 0.1.57",
- "rust-argon2",
-]
-
-[[package]]
-name = "rust-argon2"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b18820d944b33caa75a71378964ac46f58517c92b6ae5f762636247c09e78fb"
-dependencies = [
- "base64",
- "blake2b_simd",
- "constant_time_eq",
- "crossbeam-utils",
+ "redox_syscall",
+ "thiserror",
 ]
 
 [[package]]
@@ -655,7 +590,7 @@ name = "scie-jump"
 version = "0.1.0"
 dependencies = [
  "async-compression",
- "expanduser",
+ "dirs",
  "fd-lock",
  "itertools",
  "memmap",
@@ -839,9 +774,9 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "wasi"
-version = "0.9.0+wasi-snapshot-preview1"
+version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
+checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "winapi"

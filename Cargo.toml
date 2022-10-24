@@ -23,7 +23,7 @@ lto = "thin"
 
 [dependencies]
 async-compression = { version = "0.3", features = ["futures-io", "all-algorithms"] }
-expanduser = "1.2"
+dirs = "4.0"
 fd-lock = "3.0"
 itertools = "0.10"
 memmap = "0.7"
