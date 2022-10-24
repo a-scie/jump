@@ -15,7 +15,7 @@ pub struct Cmd {
 
 fn expanduser(path: &str) -> Result<PathBuf, String> {
     let path_buf = PathBuf::from(path);
-    if !path.contains("~") {
+    if !path.contains('~') {
         return Ok(path_buf);
     }
 

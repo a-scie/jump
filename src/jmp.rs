@@ -82,6 +82,6 @@ pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, Str
 }
 
 pub fn load(data: &[u8]) -> Result<Config, String> {
-    let end_of_zip = end_of_zip(&data, MAXIMUM_CONFIG_SIZE)?;
+    let end_of_zip = end_of_zip(data, MAXIMUM_CONFIG_SIZE)?;
     serde_json::from_slice(&data[end_of_zip..]).map_err(|e| format!("{}", e))
 }
