@@ -51,7 +51,9 @@ pub fn prepare_command<P: AsRef<Path>>(current_exe: P) -> Result<Cmd, String> {
     // TODO(John Sirois): ensure the interpreter and app are extracted to the scie root.
     let root = expanduser(&config.scie.root)?;
     Ok(Cmd {
-        exe: root.join(config.interpreter.executable).into_os_string(),
-        args: vec![root.join(config.app.script).into_os_string()],
+        exe: root
+            .join(PathBuf::from(config.interpreter.executable))
+            .into_os_string(),
+        args: vec![root.join(PathBuf::from(config.app.script)).into_os_string()],
     })
 }

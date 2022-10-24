@@ -1,5 +1,4 @@
 use std::env::current_exe;
-use std::ffi::CString;
 
 use proc_exit::{Code, Exit, ExitResult};
 
@@ -28,6 +27,7 @@ fn exec(cmd: Cmd) -> ExitResult {
 #[cfg(not(target_family = "windows"))]
 fn exec(cmd: Cmd) -> ExitResult {
     use nix::unistd::execv;
+    use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
 
     let exe = match CString::new(cmd.exe.as_bytes()) {
