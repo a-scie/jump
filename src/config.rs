@@ -5,26 +5,26 @@ use std::path::PathBuf;
 use serde::de::{self, Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum HashAlgorithm {
     Sha256,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Fingerprint {
     pub algorithm: HashAlgorithm,
     pub hash: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Locator {
     Size(usize),
     Entry(PathBuf),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
     Bzip2,
@@ -35,7 +35,7 @@ pub enum Compression {
     Zstd,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum ArchiveType {
     Zip,
     Tar,
@@ -108,7 +108,7 @@ pub struct Scie {
     pub root: PathBuf,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Blob {
     #[serde(flatten)]
     pub locator: Locator,
@@ -118,7 +118,7 @@ pub struct Blob {
     pub always_extract: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Archive {
     #[serde(flatten)]
     pub locator: Locator,
@@ -130,7 +130,7 @@ pub struct Archive {
     pub always_extract: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[serde(tag = "type")]
 pub enum File {

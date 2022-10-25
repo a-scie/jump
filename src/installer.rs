@@ -47,6 +47,7 @@ lazy_static! {
 struct FileIndex {
     root: PathBuf,
     files_by_name: HashMap<String, File>,
+    replacements: HashSet<File>,
     errors: HashSet<String>,
 }
 
@@ -69,6 +70,7 @@ impl FileIndex {
         Ok(FileIndex {
             root: expanduser(&scie.root)?,
             files_by_name,
+            replacements: HashSet::new(),
             errors: HashSet::new(),
         })
     }
@@ -93,7 +95,10 @@ impl Replacer for FileIndex {
             };
             match <[u8]>::from_path(&path) {
                 Some(path) => match std::str::from_utf8(path) {
-                    Ok(path) => dst.push_str(path),
+                    Ok(path) => {
+                        dst.push_str(path);
+                        self.replacements.insert(file.clone());
+                    }
                     Err(err) => {
                         self.errors.insert(format!(
                             "Failed to convert file {} to path. Not UTF-8: {:?}: {}",
@@ -131,7 +136,7 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
         };
 
     let mut file_index = FileIndex::new(&config.scie, &config.files)?;
-    let mut to_extract = vec![];
+    let mut to_extract = HashSet::new();
     for name in &command.additional_files {
         let file = file_index.get_file(name.as_str()).ok_or_else(|| {
             format!(
@@ -139,7 +144,7 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
                 name, command
             )
         })?;
-        to_extract.push(file);
+        to_extract.insert(file.clone());
     }
 
     let prepared_cmd = Cmd {
@@ -154,7 +159,7 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
             .into_iter()
             .map(|(key, value)| (key, file_index.reify_string(value)))
             .collect::<HashMap<_, _>>(),
-        additional_files: command.additional_files.clone(),
+        additional_files: command.additional_files,
     };
     if !file_index.errors.is_empty() {
         return Err(format!(
@@ -162,7 +167,11 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
             file_index.errors.iter().join(", ")
         ));
     }
+    for file in file_index.replacements {
+        to_extract.insert(file);
+    }
     eprintln!("Prepared command:\n{:#?}", prepared_cmd);
+    eprintln!("To extract:\n{:#?}", to_extract);
     // TODO(John Sirois): XXX: Extract!
     Ok(prepared_cmd)
 }
