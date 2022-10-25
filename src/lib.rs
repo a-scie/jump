@@ -1,3 +1,7 @@
+mod config;
+mod extract;
+mod jmp;
+
 #[macro_use]
 extern crate structure;
 
@@ -7,8 +11,8 @@ use std::path::{Component, Path, PathBuf};
 
 use bstr::ByteSlice;
 
-mod jmp;
-pub use jmp::Cmd;
+pub use crate::config::Cmd;
+use crate::extract::extract;
 
 fn expanduser(path: PathBuf) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(&path)
@@ -53,6 +57,7 @@ pub fn prepare_command<P: AsRef<Path>>(current_exe: P) -> Result<Cmd, String> {
     };
     let config = jmp::load(&data)?;
     // TODO(John Sirois): ensure the interpreter and app are extracted to the scie root.
-    let _root = expanduser(config.scie.root)?;
+    let root = expanduser(config.scie.root)?;
+    extract(&data, &root, &config.files)?;
     Ok(config.command)
 }
