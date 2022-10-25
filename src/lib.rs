@@ -1,28 +1,32 @@
 #[macro_use]
 extern crate structure;
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::path::{Component, Path, PathBuf};
 
+use bstr::ByteSlice;
+
 mod jmp;
+pub use jmp::Cmd;
 
-#[derive(Debug)]
-pub struct Cmd {
-    pub exe: OsString,
-    pub args: Vec<OsString>,
-}
-
-fn expanduser(path: &str) -> Result<PathBuf, String> {
-    let path_buf = PathBuf::from(path);
-    if !path.contains('~') {
-        return Ok(path_buf);
+fn expanduser(path: PathBuf) -> Result<PathBuf, String> {
+    if !<[u8]>::from_path(&path)
+        .ok_or_else(|| {
+            format!(
+                "Failed to decode the path {} as utf-8 bytes",
+                path.display()
+            )
+        })?
+        .contains(&b'~')
+    {
+        return Ok(path);
     }
 
-    let home_dir =
-        dirs::home_dir().ok_or_else(|| format!("Failed to expand home dir in path {}", path))?;
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| format!("Failed to expand home dir in path {}", path.display()))?;
     let mut components = Vec::new();
-    for path_component in path_buf.components() {
+    for path_component in path.components() {
         match path_component {
             Component::Normal(component) if OsStr::new("~") == component => {
                 for home_dir_component in home_dir.components() {
@@ -49,9 +53,6 @@ pub fn prepare_command<P: AsRef<Path>>(current_exe: P) -> Result<Cmd, String> {
     };
     let config = jmp::load(&data)?;
     // TODO(John Sirois): ensure the interpreter and app are extracted to the scie root.
-    let root = expanduser(&config.scie.root)?;
-    Ok(Cmd {
-        exe: root.join(config.interpreter.executable).into_os_string(),
-        args: vec![root.join(config.app.script).into_os_string()],
-    })
+    let _root = expanduser(config.scie.root)?;
+    Ok(config.command)
 }

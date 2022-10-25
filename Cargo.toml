@@ -23,12 +23,14 @@ lto = "thin"
 
 [dependencies]
 async-compression = { version = "0.3", features = ["futures-io", "all-algorithms"] }
+bstr = "1.0"
 dirs = "4.0"
 fd-lock = "3.0"
 itertools = "0.10"
 memmap = "0.7"
 nix = "0.25"
 proc-exit = "2.0"
+relative-path = "1.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 structure = "0.1"

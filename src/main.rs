@@ -28,7 +28,6 @@ fn exec(cmd: Cmd) -> ExitResult {
 fn exec(cmd: Cmd) -> ExitResult {
     use nix::unistd::execv;
     use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
 
     let exe = match CString::new(cmd.exe.as_bytes()) {
         Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
