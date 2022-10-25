@@ -44,11 +44,17 @@ pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, Str
         zip_comment_size,
     ) = eocd_struct
         .unpack(&data[eocd_start..eocd_end])
-        .map_err(|e| format!("{}", e))?;
+        .map_err(|e| {
+            format!(
+                "Invalid end of central directory record found starting at byte {}: {}",
+                eocd_start, e
+            )
+        })?;
     Ok(eocd_end + (zip_comment_size as usize))
 }
 
 pub fn load(data: &[u8]) -> Result<Config, String> {
     let end_of_zip = end_of_zip(data, MAXIMUM_CONFIG_SIZE)?;
-    serde_json::from_slice(&data[end_of_zip..]).map_err(|e| format!("{}", e))
+    serde_json::from_slice(&data[end_of_zip..])
+        .map_err(|e| format!("Failed to decode scie jmp config: {}", e))
 }
