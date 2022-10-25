@@ -87,11 +87,11 @@ impl Replacer for FileIndex {
         let name = caps.name("name").unwrap().as_str();
 
         if let Some(file) = self.files_by_name.get(name) {
-            let fingerprint = match file {
-                File::Archive(archive) => &archive.fingerprint,
-                File::Blob(blob) => &blob.fingerprint,
+            let path = match file {
+                File::Archive(archive) => self.root.join(&archive.fingerprint.hash),
+                File::Blob(blob) => self.root.join(&blob.fingerprint.hash).join(&blob.name),
             };
-            match <[u8]>::from_path(&self.root.join(&fingerprint.hash)) {
+            match <[u8]>::from_path(&path) {
                 Some(path) => match std::str::from_utf8(path) {
                     Ok(path) => dst.push_str(path),
                     Err(err) => {
@@ -162,6 +162,7 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
             file_index.errors.iter().join(", ")
         ));
     }
+    eprintln!("Prepared command:\n{:#?}", prepared_cmd);
     // TODO(John Sirois): XXX: Extract!
     Ok(prepared_cmd)
 }
