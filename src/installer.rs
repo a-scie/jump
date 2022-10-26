@@ -7,7 +7,7 @@ use std::path::{Component, Path, PathBuf};
 
 use regex::{Captures, Regex, Replacer};
 
-use crate::config::{Archive, Cmd, Config, File, Scie};
+use crate::config::{Archive, Blob, Cmd, Config, File, Locator, Scie};
 
 fn expanduser(path: &Path) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(path)
@@ -79,6 +79,13 @@ impl FileIndex {
         self.files_by_name.get(name)
     }
 
+    fn get_path(&self, file: &File) -> PathBuf {
+        match file {
+            File::Archive(archive) => self.root.join(&archive.fingerprint.hash),
+            File::Blob(blob) => self.root.join(&blob.fingerprint.hash).join(&blob.name),
+        }
+    }
+
     fn reify_string(&mut self, value: String) -> String {
         String::from(PARSER.replace_all(value.as_str(), self.by_ref()))
     }
@@ -89,10 +96,7 @@ impl Replacer for FileIndex {
         let name = caps.name("name").unwrap().as_str();
 
         if let Some(file) = self.files_by_name.get(name) {
-            let path = match file {
-                File::Archive(archive) => self.root.join(&archive.fingerprint.hash),
-                File::Blob(blob) => self.root.join(&blob.fingerprint.hash).join(&blob.name),
-            };
+            let path = self.get_path(file);
             match <[u8]>::from_path(&path) {
                 Some(path) => match std::str::from_utf8(path) {
                     Ok(path) => {
@@ -167,11 +171,86 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
             file_index.errors.iter().join(", ")
         ));
     }
-    for file in file_index.replacements {
-        to_extract.insert(file);
-    }
     eprintln!("Prepared command:\n{:#?}", prepared_cmd);
+
+    for file in &file_index.replacements {
+        to_extract.insert(file.clone());
+    }
     eprintln!("To extract:\n{:#?}", to_extract);
+
     // TODO(John Sirois): XXX: Extract!
+    // 1. rip through files in order -> if to_extract and Size extract and bump location.
+    // 2. if still to_extract, open final slice as zip -> rip through files in order -> if to_extract and Entry extract from zip.
+    let mut sized = vec![];
+    let mut entries = vec![];
+    if !to_extract.is_empty() {
+        for file in config.files.iter().filter(|f| to_extract.contains(f)) {
+            match file {
+                File::Archive(Archive {
+                    locator: Locator::Size(size),
+                    fingerprint,
+                    archive_type,
+                    ..
+                }) => sized.push((
+                    size,
+                    fingerprint,
+                    file_index.get_path(file),
+                    Some(archive_type),
+                )),
+                File::Blob(Blob {
+                    locator: Locator::Size(size),
+                    fingerprint,
+                    ..
+                }) => sized.push((size, fingerprint, file_index.get_path(file), None)),
+                File::Archive(Archive {
+                    locator: Locator::Entry(path),
+                    fingerprint,
+                    archive_type,
+                    ..
+                }) => entries.push((
+                    path,
+                    fingerprint,
+                    file_index.get_path(file),
+                    Some(archive_type),
+                )),
+                File::Blob(Blob {
+                    locator: Locator::Entry(path),
+                    fingerprint,
+                    ..
+                }) => entries.push((path, fingerprint, file_index.get_path(file), None)),
+            };
+        }
+    }
+    let mut step = 1;
+    let mut location = config.scie.size;
+    for (size, fingerprint, dst, archive_type) in sized {
+        if (archive_type.is_some() && dst.is_dir()) || dst.is_file() {
+            eprintln!("Step {}: already extracted: {}", step, dst.display());
+        } else {
+            eprintln!(
+                "Step {}: extract {} bytes with fingerprint {:?} starting at {} to {} of archive type {:?}",
+                step, size, fingerprint, location, dst.display(), archive_type
+            );
+        }
+        step += 1;
+        location += size;
+    }
+    for (path, fingerprint, dst, archive_type) in entries {
+        if (archive_type.is_some() && dst.is_dir()) || dst.is_file() {
+            eprintln!("Step {}: already extracted: {}", step, dst.display());
+        } else {
+            eprintln!(
+                "Step {}: extract {} with fingerprint {:?} from trailer zip at {} to {} with archive type {:?}",
+                step,
+                path.display(),
+                fingerprint,
+                location,
+                dst.display(),
+                archive_type
+            );
+        }
+        step += 1;
+    }
+
     Ok(prepared_cmd)
 }

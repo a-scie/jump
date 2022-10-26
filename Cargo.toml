@@ -19,7 +19,7 @@ path = "src/main.rs"
 [profile.release]
 opt-level = "s"
 strip = "symbols"
-lto = "thin"
+lto = "fat"
 
 [dependencies]
 async-compression = { version = "0.3", features = ["futures-io", "all-algorithms"] }

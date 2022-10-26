@@ -106,6 +106,7 @@ impl<'de> Deserialize<'de> for ArchiveType {
 pub struct Scie {
     pub version: String,
     pub root: PathBuf,
+    pub size: usize,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -172,6 +173,7 @@ mod tests {
             serde_json::to_string_pretty(&Config {
                 scie: Scie {
                     version: "0.1.0".to_string(),
+                    size: 37,
                     root: "~/.nce".into(),
                 },
                 files: vec![
@@ -226,6 +228,7 @@ mod tests {
             {
               "scie": {
                 "version": "0.1.0",
+                "size": 37,
                 "root": "~/.nce"
               },
               "files": [
