@@ -55,6 +55,9 @@ pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, Str
 
 pub fn load(data: &[u8]) -> Result<Config, String> {
     let end_of_zip = end_of_zip(data, MAXIMUM_CONFIG_SIZE)?;
-    serde_json::from_slice(&data[end_of_zip..])
-        .map_err(|e| format!("Failed to decode scie jmp config: {}", e))
+    let config_bytes = &data[end_of_zip..];
+    let mut config: Config = serde_json::from_slice(config_bytes)
+        .map_err(|e| format!("Failed to decode scie jmp config: {}", e))?;
+    config.size = config_bytes.len();
+    Ok(config)
 }

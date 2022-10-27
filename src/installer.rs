@@ -283,7 +283,7 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
         }
     }
 
-    let seekable_bytes = Cursor::new(&data[location..]);
+    let seekable_bytes = Cursor::new(&data[location..(data.len() - config.size)]);
     let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
     for (path, fingerprint, dst, archive_type) in entries {
         eprintln!(

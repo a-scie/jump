@@ -154,6 +154,8 @@ pub struct Config {
     pub command: Cmd,
     #[serde(default)]
     pub additional_commands: HashMap<String, Cmd>,
+    #[serde(default)]
+    pub size: usize,
 }
 
 #[cfg(test)]
