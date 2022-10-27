@@ -224,10 +224,8 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
             "Step {}: extract {} bytes with fingerprint {:?} starting at {} to {} of archive type {:?}",
             step, size, fingerprint, location, dst.display(), archive_type
         );
-        step += 1;
-        location += size;
-
-        let bytes = &data[location..location + size];
+        let bytes = &data[location..(location + size)];
+        // TODO(John Sirois): XXX: Use fingerprint - insert hasher in stream stack to compare against.
         match archive_type {
             None => {
                 let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
@@ -239,9 +237,9 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
                     .map_err(|e| format!("{}", e))?;
                 out.write_all(bytes).map_err(|e| format!("{}", e))?;
             }
-            Some(tar_archive) => {
+            Some(archive) => {
                 std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
-                match tar_archive {
+                match archive {
                     ArchiveType::Zip => {
                         let seekable_bytes = Cursor::new(bytes);
                         let mut zip =
@@ -281,24 +279,28 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
                 }
             }
         }
+        step += 1;
+        location += size;
     }
 
-    let seekable_bytes = Cursor::new(&data[location..(data.len() - config.size)]);
-    let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
-    for (path, fingerprint, dst, archive_type) in entries {
-        eprintln!(
-            "Step {}: extract {} with fingerprint {:?} from trailer zip at {} to {} with archive type {:?}",
-            step,
-            path.display(),
-            fingerprint,
-            location,
-            dst.display(),
-            archive_type
-        );
-        step += 1;
+    if !entries.is_empty() {
+        let seekable_bytes = Cursor::new(&data[location..(data.len() - config.size)]);
+        let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
+        for (path, fingerprint, dst, archive_type) in entries {
+            eprintln!(
+                "Step {}: extract {} with fingerprint {:?} from trailer zip at {} to {} with archive type {:?}",
+                step,
+                path.display(),
+                fingerprint,
+                location,
+                dst.display(),
+                archive_type
+            );
+            step += 1;
 
-        std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
-        zip.extract(dst).map_err(|e| format!("{}", e))?;
+            std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
+            zip.extract(dst).map_err(|e| format!("{}", e))?;
+        }
     }
 
     Ok(prepared_cmd)

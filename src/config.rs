@@ -212,7 +212,8 @@ mod tests {
                     env: Default::default(),
                     additional_files: Default::default()
                 },
-                additional_commands: Default::default()
+                additional_commands: Default::default(),
+                size: 37
             })
             .unwrap()
         )

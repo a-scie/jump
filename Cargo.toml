@@ -19,7 +19,7 @@ path = "src/main.rs"
 [profile.release]
 opt-level = "s"
 strip = "symbols"
-lto = "fat"
+lto = "thin"
 
 [dependencies]
 bstr = "1.0"
