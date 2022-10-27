@@ -9,6 +9,7 @@ fn exec(cmd: Cmd) -> ExitResult {
     use std::process::Command;
     let exit_status = Command::new(&cmd.exe)
         .args(&cmd.args)
+        .args(std::env::args().skip(1))
         .spawn()
         .map_err(|e| {
             Exit::new(Code::FAILURE)
@@ -28,6 +29,7 @@ fn exec(cmd: Cmd) -> ExitResult {
 fn exec(cmd: Cmd) -> ExitResult {
     use nix::unistd::execv;
     use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
 
     let exe = match CString::new(cmd.exe.as_bytes()) {
         Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
@@ -40,6 +42,15 @@ fn exec(cmd: Cmd) -> ExitResult {
     let mut args = vec![exe.clone()];
     for arg in cmd.args {
         args.push(match CString::new(arg.as_bytes()) {
+            Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
+                "Failed to convert argument {:?} to a C string: {}",
+                arg, e
+            )))),
+            Ok(arg) => arg,
+        });
+    }
+    for arg in std::env::args_os().skip(1) {
+        args.push(match CString::new(arg.as_os_str().as_bytes()) {
             Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
                 "Failed to convert argument {:?} to a C string: {}",
                 arg, e

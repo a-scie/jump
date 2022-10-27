@@ -173,12 +173,10 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
             file_index.errors.iter().join(", ")
         ));
     }
-    eprintln!("Prepared command:\n{:#?}", prepared_cmd);
 
     for file in &file_index.replacements {
         to_extract.insert(file.clone());
     }
-    eprintln!("To extract:\n{:#?}", to_extract);
 
     // TODO(John Sirois): XXX: Extract!
     // 1. rip through files in order -> if to_extract and Size extract and bump location.
@@ -211,19 +209,14 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
                     fingerprint,
                     ..
                 }) if !dst.is_file() => entries.push((path, fingerprint, dst, None)),
-                _ => eprintln!("Already extracted: {}", dst.display()),
+                _ => (),
             };
         }
     }
 
     // TODO(John Sirois): XXX: AtomicDirectory
-    let mut step = 1;
     let mut location = config.scie.size;
-    for (size, fingerprint, dst, archive_type) in sized {
-        eprintln!(
-            "Step {}: extract {} bytes with fingerprint {:?} starting at {} to {} of archive type {:?}",
-            step, size, fingerprint, location, dst.display(), archive_type
-        );
+    for (size, _fingerprint, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
         // TODO(John Sirois): XXX: Use fingerprint - insert hasher in stream stack to compare against.
         match archive_type {
@@ -279,27 +272,27 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
                 }
             }
         }
-        step += 1;
         location += size;
     }
 
     if !entries.is_empty() {
         let seekable_bytes = Cursor::new(&data[location..(data.len() - config.size)]);
         let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
-        for (path, fingerprint, dst, archive_type) in entries {
-            eprintln!(
-                "Step {}: extract {} with fingerprint {:?} from trailer zip at {} to {} with archive type {:?}",
-                step,
-                path.display(),
-                fingerprint,
-                location,
-                dst.display(),
-                archive_type
-            );
-            step += 1;
-
+        for (path, _fingerprint, dst, _archive_type) in entries {
             std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
-            zip.extract(dst).map_err(|e| format!("{}", e))?;
+            let name = std::str::from_utf8(<[u8]>::from_path(path).ok_or_else(|| {
+                format!(
+                    "Failed to decode {} to a utf-8 zip entry name",
+                    path.display()
+                )
+            })?)
+            .map_err(|e| format!("{}", e))?;
+            let zip_entry = zip.by_name(name).map_err(|e| format!("{}", e))?;
+            todo!(
+                "Use the extraction logic above to extract zip entry {} to {}",
+                zip_entry.name(),
+                dst.display()
+            )
         }
     }
 
