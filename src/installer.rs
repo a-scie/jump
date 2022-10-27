@@ -3,11 +3,13 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
+use std::io::Cursor;
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use regex::{Captures, Regex, Replacer};
 
-use crate::config::{Archive, Blob, Cmd, Config, File, Locator, Scie};
+use crate::config::{Archive, ArchiveType, Blob, Cmd, Compression, Config, File, Locator, Scie};
 
 fn expanduser(path: &Path) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(path)
@@ -122,7 +124,7 @@ impl Replacer for FileIndex {
     }
 }
 
-pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
+pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
     let command =
         match std::env::var_os("SCIE_CMD") {
             Some(cmd) => {
@@ -185,71 +187,118 @@ pub fn extract(_data: &[u8], mut config: Config) -> Result<Cmd, String> {
     let mut entries = vec![];
     if !to_extract.is_empty() {
         for file in config.files.iter().filter(|f| to_extract.contains(f)) {
+            let dst = file_index.get_path(file);
             match file {
                 File::Archive(Archive {
                     locator: Locator::Size(size),
                     fingerprint,
                     archive_type,
                     ..
-                }) => sized.push((
-                    size,
-                    fingerprint,
-                    file_index.get_path(file),
-                    Some(archive_type),
-                )),
+                }) if !dst.is_dir() => sized.push((size, fingerprint, dst, Some(archive_type))),
                 File::Blob(Blob {
                     locator: Locator::Size(size),
                     fingerprint,
                     ..
-                }) => sized.push((size, fingerprint, file_index.get_path(file), None)),
+                }) if !dst.is_file() => sized.push((size, fingerprint, dst, None)),
                 File::Archive(Archive {
                     locator: Locator::Entry(path),
                     fingerprint,
                     archive_type,
                     ..
-                }) => entries.push((
-                    path,
-                    fingerprint,
-                    file_index.get_path(file),
-                    Some(archive_type),
-                )),
+                }) if !dst.is_dir() => entries.push((path, fingerprint, dst, Some(archive_type))),
                 File::Blob(Blob {
                     locator: Locator::Entry(path),
                     fingerprint,
                     ..
-                }) => entries.push((path, fingerprint, file_index.get_path(file), None)),
+                }) if !dst.is_file() => entries.push((path, fingerprint, dst, None)),
+                _ => eprintln!("Already extracted: {}", dst.display()),
             };
         }
     }
+
+    // TODO(John Sirois): XXX: AtomicDirectory
     let mut step = 1;
     let mut location = config.scie.size;
     for (size, fingerprint, dst, archive_type) in sized {
-        if (archive_type.is_some() && dst.is_dir()) || dst.is_file() {
-            eprintln!("Step {}: already extracted: {}", step, dst.display());
-        } else {
-            eprintln!(
-                "Step {}: extract {} bytes with fingerprint {:?} starting at {} to {} of archive type {:?}",
-                step, size, fingerprint, location, dst.display(), archive_type
-            );
-        }
+        eprintln!(
+            "Step {}: extract {} bytes with fingerprint {:?} starting at {} to {} of archive type {:?}",
+            step, size, fingerprint, location, dst.display(), archive_type
+        );
         step += 1;
         location += size;
-    }
-    for (path, fingerprint, dst, archive_type) in entries {
-        if (archive_type.is_some() && dst.is_dir()) || dst.is_file() {
-            eprintln!("Step {}: already extracted: {}", step, dst.display());
-        } else {
-            eprintln!(
-                "Step {}: extract {} with fingerprint {:?} from trailer zip at {} to {} with archive type {:?}",
-                step,
-                path.display(),
-                fingerprint,
-                location,
-                dst.display(),
-                archive_type
-            );
+
+        let bytes = &data[location..location + size];
+        match archive_type {
+            None => {
+                let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
+                std::fs::create_dir_all(parent_dir).map_err(|e| format!("{}", e))?;
+                let mut out = std::fs::OpenOptions::new()
+                    .create_new(true)
+                    .write(true)
+                    .open(dst)
+                    .map_err(|e| format!("{}", e))?;
+                out.write_all(bytes).map_err(|e| format!("{}", e))?;
+            }
+            Some(tar_archive) => {
+                std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
+                match tar_archive {
+                    ArchiveType::Zip => {
+                        let seekable_bytes = Cursor::new(bytes);
+                        let mut zip =
+                            zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
+                        zip.extract(dst).map_err(|e| format!("{}", e))?;
+                    }
+                    ArchiveType::Tar => {
+                        let mut tar = tar::Archive::new(bytes);
+                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                    }
+                    ArchiveType::CompressedTar(Compression::Bzip2) => {
+                        let bzip2_decoder = bzip2::read::BzDecoder::new(bytes);
+                        let mut tar = tar::Archive::new(bzip2_decoder);
+                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                    }
+                    ArchiveType::CompressedTar(Compression::Gzip) => {
+                        let gz_decoder = flate2::read::GzDecoder::new(bytes);
+                        let mut tar = tar::Archive::new(gz_decoder);
+                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                    }
+                    ArchiveType::CompressedTar(Compression::Xz) => {
+                        let xz_decoder = xz2::read::XzDecoder::new(bytes);
+                        let mut tar = tar::Archive::new(xz_decoder);
+                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                    }
+                    ArchiveType::CompressedTar(Compression::Zlib) => {
+                        let zlib_decoder = flate2::read::ZlibDecoder::new(bytes);
+                        let mut tar = tar::Archive::new(zlib_decoder);
+                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                    }
+                    ArchiveType::CompressedTar(Compression::Zstd) => {
+                        let zstd_decoder =
+                            zstd::stream::Decoder::new(bytes).map_err(|e| format!("{}", e))?;
+                        let mut tar = tar::Archive::new(zstd_decoder);
+                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                    }
+                }
+            }
         }
+    }
+
+    let seekable_bytes = Cursor::new(&data[location..]);
+    let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
+    for (path, fingerprint, dst, archive_type) in entries {
+        eprintln!(
+            "Step {}: extract {} with fingerprint {:?} from trailer zip at {} to {} with archive type {:?}",
+            step,
+            path.display(),
+            fingerprint,
+            location,
+            dst.display(),
+            archive_type
+        );
         step += 1;
+
+        std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
+        zip.extract(dst).map_err(|e| format!("{}", e))?;
     }
 
     Ok(prepared_cmd)
