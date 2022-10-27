@@ -10,6 +10,8 @@ fn exec(cmd: Cmd) -> ExitResult {
     let exit_status = Command::new(&cmd.exe)
         .args(&cmd.args)
         .args(std::env::args().skip(1))
+        .envs(&cmd.env)
+        .envs(std::env::vars())
         .spawn()
         .map_err(|e| {
             Exit::new(Code::FAILURE)
@@ -27,7 +29,7 @@ fn exec(cmd: Cmd) -> ExitResult {
 
 #[cfg(not(target_family = "windows"))]
 fn exec(cmd: Cmd) -> ExitResult {
-    use nix::unistd::execv;
+    use nix::unistd::execve;
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
 
@@ -59,7 +61,23 @@ fn exec(cmd: Cmd) -> ExitResult {
         });
     }
 
-    execv(&exe, &args).map_err(|e| {
+    for (k, v) in cmd.env {
+        if std::env::var_os(&k).is_none() {
+            std::env::set_var(k, v);
+        }
+    }
+    let env = match std::env::vars()
+        .map(|(k, v)| CString::new(format!("{}={}", k, v).as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
+            "Failed to convert env {:?} into C strings: {}",
+            std::env::vars(),
+            e
+        )))),
+        Ok(env) => env,
+    };
+    execve(&exe, &args, &env).map_err(|e| {
         Exit::new(Code::FAILURE).with_message(format!("Failed to exec {:?}: {}", args, e))
     })?;
     Code::FAILURE.ok()
