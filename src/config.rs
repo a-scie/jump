@@ -66,8 +66,8 @@ impl<'de> Visitor<'de> for ArchiveTypeVisitor {
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
         write!(
             formatter,
-            "one of: zip, tar, tbz2, tar.bz2, tgz, tar.gz, tlz, tar.lzma, tar.xz, tar.Z, tzst or \
-            tar.zst"
+            "one of: zip, tar, tar.bz2, tbz2, tar.gz, tgz, tar.xz, tar.lzma, tlz, tar.Z, \
+            tar.zst or tzst"
         )
     }
 
@@ -80,11 +80,11 @@ impl<'de> Visitor<'de> for ArchiveTypeVisitor {
         match value {
             "zip" => Ok(ArchiveType::Zip),
             "tar" => Ok(ArchiveType::Tar),
-            "tbz2" | "tar.bz2" => Ok(ArchiveType::CompressedTar(Compression::Bzip2)),
-            "tgz" | "tar.gz" => Ok(ArchiveType::CompressedTar(Compression::Gzip)),
-            "tar.xz" | "tlz" | "tar.lzma" => Ok(ArchiveType::CompressedTar(Compression::Xz)),
+            "tar.bz2" | "tbz2" => Ok(ArchiveType::CompressedTar(Compression::Bzip2)),
+            "tar.gz" | "tgz" => Ok(ArchiveType::CompressedTar(Compression::Gzip)),
+            "tar.xz" | "tar.lzma" | "tlz" => Ok(ArchiveType::CompressedTar(Compression::Xz)),
             "tar.Z" => Ok(ArchiveType::CompressedTar(Compression::Zlib)),
-            "tzst" | "tar.zst" => Ok(ArchiveType::CompressedTar(Compression::Zstd)),
+            "tar.zst" | "tzst" => Ok(ArchiveType::CompressedTar(Compression::Zstd)),
             _ => Err(de::Error::invalid_value(Unexpected::Str(value), &self)),
         }
     }
