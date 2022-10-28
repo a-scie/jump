@@ -51,6 +51,11 @@ pub fn prepare_action<P: AsRef<Path>>(current_exe: P) -> Result<Action, String> 
                 exe = current_exe.as_ref().display(),
             )
         })?;
+        let actual_size = u32::try_from(data.len())
+            .map_err(|e| format!("Expected the scie-jump launcher size to fit in 32 bits: {e}"))?;
+        if actual_size != size {
+            return Err(format!("The scie-jump launcher at {path} has size {actual_size} but the expected size is {size}.", path=current_exe.as_ref().display()));
+        }
         return Ok(Action::BootPack(size));
     }
 
