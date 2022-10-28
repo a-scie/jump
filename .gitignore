@@ -2,5 +2,5 @@
 /target/
 
 # IntelliJ project.
-/.idea/
-/scie.iml
+.idea/
+*.iml
