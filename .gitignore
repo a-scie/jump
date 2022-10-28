@@ -1,5 +1,5 @@
 # Cargo output.
-/target/
+target/
 
 # IntelliJ project.
 .idea/

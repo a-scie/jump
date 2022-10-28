@@ -1,0 +1,30 @@
+[package]
+name = "jump"
+version = "0.1.0"
+description = "Packages the scie-jump binary into its final form."
+authors = [
+    "John Sirois <john.sirois@gmail.com>",
+]
+edition = "2021"
+publish = false
+
+[dependencies]
+bstr = "1.0"
+byteorder = "1.4"
+bzip2 = "0.4"
+dirs = "4.0"
+fd-lock = "3.0"
+flate2 = "1.0"
+itertools = "0.10"
+lazy_static = "1.4"
+memmap = "0.7"
+regex = "1.6"
+relative-path = "1.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+structure = "0.1"
+tar = "0.4"
+tuple = "0.5"
+xz2 = "0.1"
+zip = "0.6"
+zstd = "0.11"

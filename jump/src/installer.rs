@@ -42,7 +42,7 @@ fn expanduser(path: &Path) -> Result<PathBuf, String> {
 
 lazy_static! {
     static ref PARSER: Regex = Regex::new(r"\$\{(?P<name>[^}]+)}")
-        .map_err(|e| format!("Invalid regex for replacing ${{name}}: {}", e))
+        .map_err(|e| format!("Invalid regex for replacing ${{name}}: {e}"))
         .unwrap();
 }
 
@@ -107,14 +107,13 @@ impl Replacer for FileIndex {
                     }
                     Err(err) => {
                         self.errors.insert(format!(
-                            "Failed to convert file {} to path. Not UTF-8: {:?}: {}",
-                            name, path, err
+                            "Failed to convert file {name} to path. Not UTF-8: {path:?}: {err}",
                         ));
                     }
                 },
                 None => {
                     self.errors
-                        .insert(format!("Failed to convert file {} to a path.", name));
+                        .insert(format!("Failed to convert file {name} to a path."));
                 }
             }
         } else {
@@ -125,29 +124,29 @@ impl Replacer for FileIndex {
 }
 
 pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
-    let command =
-        match std::env::var_os("SCIE_CMD") {
-            Some(cmd) => {
-                let name = cmd.into_string().map_err(|e| {
-                    format!("Failed to decode environment variable SCIE_CMD: {:?}", e)
-                })?;
-                config.additional_commands.remove(&name).ok_or_else(|| {
-                    format!(
-                    "The custom command specified by SCIE_CMD={} is not a configured command in \
-                    this binary. The following named commands are available: {}",
-                    name, config.additional_commands.keys().join(", "))
-                })?
-            }
-            None => config.command,
-        };
+    let command = match std::env::var_os("SCIE_CMD") {
+        Some(cmd) => {
+            let name = cmd.into_string().map_err(|value| {
+                format!("Failed to decode environment variable SCIE_CMD: {value:?}")
+            })?;
+            config.additional_commands.remove(&name).ok_or_else(|| {
+                format!(
+                    "The custom command specified by SCIE_CMD={name} is not a configured command \
+                    in this binary. The following named commands are available: {commands}",
+                    commands = config.additional_commands.keys().join(", ")
+                )
+            })?
+        }
+        None => config.command,
+    };
 
     let mut file_index = FileIndex::new(&config.scie, &config.files)?;
     let mut to_extract = HashSet::new();
     for name in &command.additional_files {
         let file = file_index.get_file(name.as_str()).ok_or_else(|| {
             format!(
-                "The additional file {} requested by {:#?} was not found in this executable.",
-                name, command
+                "The additional file {name} requested by {command:#?} was not found in this \
+                executable.",
             )
         })?;
         to_extract.insert(file.clone());
@@ -222,52 +221,52 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
         match archive_type {
             None => {
                 let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
-                std::fs::create_dir_all(parent_dir).map_err(|e| format!("{}", e))?;
+                std::fs::create_dir_all(parent_dir).map_err(|e| format!("{e}"))?;
                 let mut out = std::fs::OpenOptions::new()
                     .create_new(true)
                     .write(true)
                     .open(dst)
-                    .map_err(|e| format!("{}", e))?;
-                out.write_all(bytes).map_err(|e| format!("{}", e))?;
+                    .map_err(|e| format!("{e}"))?;
+                out.write_all(bytes).map_err(|e| format!("{e}"))?;
             }
             Some(archive) => {
-                std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
+                std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;
                 match archive {
                     ArchiveType::Zip => {
                         let seekable_bytes = Cursor::new(bytes);
                         let mut zip =
-                            zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
-                        zip.extract(dst).map_err(|e| format!("{}", e))?;
+                            zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{e}"))?;
+                        zip.extract(dst).map_err(|e| format!("{e}"))?;
                     }
                     ArchiveType::Tar => {
                         let mut tar = tar::Archive::new(bytes);
-                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Bzip2) => {
                         let bzip2_decoder = bzip2::read::BzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(bzip2_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Gzip) => {
                         let gz_decoder = flate2::read::GzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(gz_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Xz) => {
                         let xz_decoder = xz2::read::XzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(xz_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Zlib) => {
                         let zlib_decoder = flate2::read::ZlibDecoder::new(bytes);
                         let mut tar = tar::Archive::new(zlib_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Zstd) => {
                         let zstd_decoder =
-                            zstd::stream::Decoder::new(bytes).map_err(|e| format!("{}", e))?;
+                            zstd::stream::Decoder::new(bytes).map_err(|e| format!("{e}"))?;
                         let mut tar = tar::Archive::new(zstd_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{}", e))?;
+                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
                     }
                 }
             }
@@ -277,17 +276,17 @@ pub fn extract(data: &[u8], mut config: Config) -> Result<Cmd, String> {
 
     if !entries.is_empty() {
         let seekable_bytes = Cursor::new(&data[location..(data.len() - config.size)]);
-        let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{}", e))?;
+        let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{e}"))?;
         for (path, _fingerprint, dst, _archive_type) in entries {
-            std::fs::create_dir_all(&dst).map_err(|e| format!("{}", e))?;
+            std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;
             let name = std::str::from_utf8(<[u8]>::from_path(path).ok_or_else(|| {
                 format!(
                     "Failed to decode {} to a utf-8 zip entry name",
                     path.display()
                 )
             })?)
-            .map_err(|e| format!("{}", e))?;
-            let zip_entry = zip.by_name(name).map_err(|e| format!("{}", e))?;
+            .map_err(|e| format!("{e}"))?;
+            let zip_entry = zip.by_name(name).map_err(|e| format!("{e}"))?;
             todo!(
                 "Use the extraction logic above to extract zip entry {} to {}",
                 zip_entry.name(),
