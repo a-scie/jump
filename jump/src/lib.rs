@@ -11,7 +11,7 @@ use std::path::Path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-pub use crate::config::Cmd;
+pub use crate::config::{Cmd, EnvVar};
 
 pub const EOF_MAGIC: u32 = 0x534a7219;
 

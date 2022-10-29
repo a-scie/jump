@@ -1,8 +1,20 @@
+use std::collections::HashMap;
 use std::env::current_exe;
+use std::ffi::OsString;
 
 use proc_exit::{Code, Exit, ExitResult};
 
-use jump::{Action, Cmd};
+use jump::{Action, Cmd, EnvVar};
+
+fn into_env_vars(env: HashMap<EnvVar, String>) -> impl Iterator<Item = (String, OsString)> {
+    env.into_iter().map(|(env_var, value)| match env_var {
+        EnvVar::Default(name) => {
+            let value = std::env::var_os(&name).unwrap_or_else(|| value.to_owned().into());
+            (name, value)
+        }
+        EnvVar::Replace(name) => (name, value.into()),
+    })
+}
 
 #[cfg(target_family = "windows")]
 fn exec(cmd: Cmd) -> ExitResult {
@@ -10,14 +22,22 @@ fn exec(cmd: Cmd) -> ExitResult {
     let exit_status = Command::new(&cmd.exe)
         .args(&cmd.args)
         .args(std::env::args().skip(1))
-        .envs(&cmd.env)
         .envs(std::env::vars())
+        .envs(into_env_vars(cmd.env))
         .spawn()
-        .map_err(|e| Code::FAILURE.with_message(format!("Failed to spawn command {cmd:?}: {e}")))?
+        .map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to spawn {exe:?} {args:?}: {e}",
+                exe = cmd.exe,
+                args = cmd.args
+            ))
+        })?
         .wait()
         .map_err(|e| {
             Code::FAILURE.with_message(format!(
-                "Spawned command {cmd:?} but failed to gather its exit status: {e}"
+                "Spawned {exe:?} {args:?} but failed to gather its exit status: {e}",
+                exe = cmd.exe,
+                args = cmd.args,
             ))
         })?;
     Code::from_status(exit_status).ok()
@@ -44,10 +64,8 @@ fn exec(cmd: Cmd) -> ExitResult {
         })?);
     }
 
-    for (name, value) in cmd.env {
-        if std::env::var_os(&name).is_none() {
-            std::env::set_var(name, value);
-        }
+    for (name, value) in into_env_vars(cmd.env) {
+        std::env::set_var(name, value);
     }
     let env = std::env::vars()
         .map(|(k, v)| CString::new(format!("{k}={v}").as_bytes()))

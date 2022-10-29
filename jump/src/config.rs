@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::path::PathBuf;
 
-use serde::de::{self, Error, Unexpected, Visitor};
+use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ impl<'de> Visitor<'de> for ArchiveTypeVisitor {
             "tar.xz" | "tar.lzma" | "tlz" => Ok(ArchiveType::CompressedTar(Compression::Xz)),
             "tar.Z" => Ok(ArchiveType::CompressedTar(Compression::Zlib)),
             "tar.zst" | "tzst" => Ok(ArchiveType::CompressedTar(Compression::Zstd)),
-            _ => Err(de::Error::invalid_value(Unexpected::Str(value), &self)),
+            _ => Err(E::invalid_value(Unexpected::Str(value), &self)),
         }
     }
 }
@@ -136,13 +136,72 @@ pub enum File {
     Blob(Blob),
 }
 
+#[derive(Hash, Eq, PartialEq, Debug)]
+pub enum EnvVar {
+    Default(String),
+    Replace(String),
+}
+
+impl Serialize for EnvVar {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            EnvVar::Default(name) => serializer.serialize_str(name),
+            EnvVar::Replace(name) => serializer.serialize_str(format!("={name}").as_str()),
+        }
+    }
+}
+
+struct EnvVarVisitor;
+
+impl<'de> Visitor<'de> for EnvVarVisitor {
+    type Value = EnvVar;
+
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        write!(
+            formatter,
+            "a valid environment variable name: \
+            https://pubs.opengroup.org/onlinepubs/009696899/basedefs/xbd_chap08.html"
+        )
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        // We use an = prefix to indicate the env var should replace any current env var since an =
+        // prefix presents an obvious parsing challenge to OSes; so people likely avoid it and this
+        // fact is encoded here:
+        // https://pubs.opengroup.org/onlinepubs/009696899/basedefs/xbd_chap08.html
+        match value.as_bytes() {
+            [b'=', name @ ..] => {
+                let env_var_name = std::str::from_utf8(name)
+                    .map_err(|_| E::invalid_value(Unexpected::Str(value), &self))?;
+                Ok(EnvVar::Replace(env_var_name.into()))
+            }
+            _ => Ok(EnvVar::Default(value.into())),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EnvVar {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_string(EnvVarVisitor)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cmd {
     pub exe: String,
     #[serde(default)]
     pub args: Vec<String>,
     #[serde(default)]
-    pub env: HashMap<String, String>,
+    pub env: HashMap<EnvVar, String>,
     #[serde(default)]
     pub additional_files: Vec<String>,
 }
@@ -164,6 +223,7 @@ mod tests {
         Archive, ArchiveType, Blob, Cmd, Compression, Config, File, Fingerprint, HashAlgorithm,
         Locator, Scie,
     };
+    use crate::config::EnvVar;
 
     #[test]
     fn test_serialized_form() {
@@ -209,7 +269,18 @@ mod tests {
                 command: Cmd {
                     exe: "bob/exe".into(),
                     args: Default::default(),
-                    env: Default::default(),
+                    env: [
+                        (
+                            EnvVar::Default("DEFAULT".to_string()),
+                            "default".to_string()
+                        ),
+                        (
+                            EnvVar::Replace("REPLACE".to_string()),
+                            "replace".to_string()
+                        )
+                    ]
+                    .into_iter()
+                    .collect(),
                     additional_files: Default::default()
                 },
                 additional_commands: Default::default(),
@@ -263,7 +334,8 @@ mod tests {
               ],
               "command": {
                   "env": {
-                    "PEX_VERBOSE": "1"
+                    "PEX_VERBOSE": "1",
+                    "=PATH": ".:${scie.env.PATH}"
                   },
                   "exe":"{python}/bin/python",
                   "args": [
