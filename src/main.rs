@@ -13,12 +13,10 @@ fn exec(cmd: Cmd) -> ExitResult {
         .envs(&cmd.env)
         .envs(std::env::vars())
         .spawn()
-        .map_err(|e| {
-            Exit::new(Code::FAILURE).with_message(format!("Failed to spawn command {cmd:?}: {e}"))
-        })?
+        .map_err(|e| Code::FAILURE.with_message(format!("Failed to spawn command {cmd:?}: {e}")))?
         .wait()
         .map_err(|e| {
-            Exit::new(Code::FAILURE).with_message(format!(
+            Code::FAILURE.with_message(format!(
                 "Spawned command {cmd:?} but failed to gather its exit status: {e}"
             ))
         })?;
@@ -29,32 +27,21 @@ fn exec(cmd: Cmd) -> ExitResult {
 fn exec(cmd: Cmd) -> ExitResult {
     use nix::unistd::execve;
     use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
 
-    let exe = match CString::new(cmd.exe.as_bytes()) {
-        Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
+    let exe = CString::new(cmd.exe.as_bytes()).map_err(|e| {
+        Code::FAILURE.with_message(format!(
             "Failed to convert executable {exe:?} to a C string: {e}",
             exe = cmd.exe
-        )))),
-        Ok(exe) => exe,
-    };
+        ))
+    })?;
 
     let mut args = vec![exe.clone()];
-    for arg in cmd.args {
-        args.push(match CString::new(arg.as_bytes()) {
-            Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
+    for arg in cmd.args.into_iter().chain(std::env::args().skip(1)) {
+        args.push(CString::new(arg.as_bytes()).map_err(|e| {
+            Code::FAILURE.with_message(format!(
                 "Failed to convert argument {arg:?} to a C string: {e}",
-            )))),
-            Ok(arg) => arg,
-        });
-    }
-    for arg in std::env::args_os().skip(1) {
-        args.push(match CString::new(arg.as_os_str().as_bytes()) {
-            Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
-                "Failed to convert argument {arg:?} to a C string: {e}",
-            )))),
-            Ok(arg) => arg,
-        });
+            ))
+        })?);
     }
 
     for (name, value) in cmd.env {
@@ -62,44 +49,37 @@ fn exec(cmd: Cmd) -> ExitResult {
             std::env::set_var(name, value);
         }
     }
-    let env = match std::env::vars()
+    let env = std::env::vars()
         .map(|(k, v)| CString::new(format!("{k}={v}").as_bytes()))
         .collect::<Result<Vec<_>, _>>()
-    {
-        Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
-            "Failed to convert env {env_vars:?} into C strings: {e}",
-            env_vars = std::env::vars()
-        )))),
-        Ok(env) => env,
-    };
-    execve(&exe, &args, &env).map_err(|e| {
-        Exit::new(Code::FAILURE).with_message(format!("Failed to exec {args:?}: {e}"))
-    })?;
-    Code::FAILURE.ok()
+        .map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to convert env {env_vars:?} into C strings: {e}",
+                env_vars = std::env::vars()
+            ))
+        })?;
+
+    execve(&exe, &args, &env)
+        .map_err(|e| Exit::new(Code::FAILURE).with_message(format!("Failed to exec {args:?}: {e}")))
+        .map(|_| ())
 }
 
-fn main() {
-    let current_exe = match current_exe() {
-        Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
+fn main() -> ExitResult {
+    let current_exe = current_exe().map_err(|e| {
+        Code::FAILURE.with_message(format!(
             "Failed to find path of the current executable: {e}"
-        )))),
-        Ok(current_exe) => current_exe,
-    };
-    let action = match jump::prepare_action(&current_exe) {
-        Err(e) => proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
+        ))
+    })?;
+    let action = jump::prepare_action(&current_exe).map_err(|e| {
+        Code::FAILURE.with_message(format!(
             "Failed to prepare a scie jump action from executable {exe}: {e}",
             exe = current_exe.display(),
-        )))),
-        Ok(action) => action,
-    };
+        ))
+    })?;
     match action {
-        Action::BootPack(size) => {
-            proc_exit::exit(Err(Exit::new(Code::FAILURE).with_message(format!(
-                "TODO(John Sirois): Implement boot-pack (self size should be {size})"
-            ))));
-        }
-        Action::Cmd(cmd) => {
-            proc_exit::exit(exec(cmd));
-        }
+        Action::BootPack(size) => Err(Exit::new(Code::FAILURE).with_message(format!(
+            "TODO(John Sirois): Implement boot-pack (self size should be {size})"
+        ))),
+        Action::Cmd(cmd) => exec(cmd),
     }
 }
