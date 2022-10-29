@@ -12,28 +12,30 @@ const EOCD_SIGNATURE: (&u8, &u8, &u8, &u8) = (&0x06, &0x05, &0x4b, &0x50);
 
 pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String> {
     #[allow(clippy::too_many_arguments)]
-    let eocd_struct = structure!("<HHHHIIH");
+    let eocd_struct = structure!("<4sHHHHIIH");
 
     let eocd_size = eocd_struct.size();
-    // N.B.: The variable length comment field can be up to 0xFFFF big.
-    let maximum_eocd_size = eocd_size + 0xFFFF;
+    let maximum_eocd_size = eocd_size + u16::MAX as usize;
     let max_scan = maximum_eocd_size + maximum_trailer_size;
+    let max_signature_position = data.len() - eocd_size + 4;
 
-    let offset_from_eof = data
-        .iter()
-        .rev()
-        .take(max_scan)
-        .tuple_windows::<(_, _, _, _)>()
-        .position(|chunk| EOCD_SIGNATURE == chunk)
-        .ok_or_else(|| {
-            format!(
+    let offset_from_eof = eocd_size
+        + data[..max_signature_position]
+            .iter()
+            .rev()
+            .take(max_scan)
+            .tuple_windows::<(_, _, _, _)>()
+            .position(|chunk| EOCD_SIGNATURE == chunk)
+            .ok_or_else(|| {
+                format!(
                 "Failed to find application zip end of central directory record within the last \
                 {max_scan} bytes of the file. Invalid NCE."
             )
-        })?;
+            })?;
     let eocd_start = data.len() - offset_from_eof;
     let eocd_end = eocd_start + eocd_size;
     let (
+        _signature,
         _disk_no,
         _cd_disk_no,
         _disk_cd_record_count,

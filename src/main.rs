@@ -83,6 +83,6 @@ fn main() -> ExitResult {
         Action::Cmd(cmd) => {
             std::env::set_var("SCIE", current_exe.as_os_str());
             exec(cmd)
-        },
+        }
     }
 }
