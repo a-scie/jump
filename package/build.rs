@@ -1,5 +1,4 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Seek, SeekFrom};
+use byteorder::{LittleEndian, WriteBytesExt};
 use std::path::PathBuf;
 
 use jump::EOF_MAGIC;
@@ -20,26 +19,14 @@ fn main() -> Result<(), String> {
     .map_err(|e| format!("{e}"))?;
 
     let mut binary = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
+        .append(true)
         .open(&path)
         .map_err(|e| format!("{e}"))?;
 
-    binary.seek(SeekFrom::End(-4)).map_err(|e| format!("{e}"))?;
-    if EOF_MAGIC
-        != binary.read_u32::<LittleEndian>().map_err(|e| {
-            format!(
-                "Failed to read last 4 bytes of {path}: {e}",
-                path = &path.display()
-            )
-        })?
-    {
-        binary.seek(SeekFrom::End(0)).map_err(|e| format!("{e}"))?;
-        binary
-            .write_u32::<LittleEndian>(size + 8)
-            .and_then(|()| binary.write_u32::<LittleEndian>(EOF_MAGIC))
-            .map_err(|e| format!("{e}"))?;
-    }
+    binary
+        .write_u32::<LittleEndian>(size + 8)
+        .and_then(|()| binary.write_u32::<LittleEndian>(EOF_MAGIC))
+        .map_err(|e| format!("{e}"))?;
 
     let dest = std::env::var("OUT_DIR")
         .map(|path| PathBuf::from(path).join(SCIE_JUMP_BINARY))

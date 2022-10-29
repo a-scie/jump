@@ -12,3 +12,6 @@ publish = false
 byteorder = "1.4"
 jump = { path="../jump" }
 scie-jump = { path="..", artifact="bin" }
+
+[dependencies]
+proc-exit = "2.0"

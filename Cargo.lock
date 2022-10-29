@@ -451,6 +451,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "jump",
+ "proc-exit",
  "scie-jump",
 ]
 
