@@ -80,6 +80,9 @@ fn main() -> ExitResult {
         Action::BootPack(size) => Err(Exit::new(Code::FAILURE).with_message(format!(
             "TODO(John Sirois): Implement boot-pack (self size should be {size})"
         ))),
-        Action::Cmd(cmd) => exec(cmd),
+        Action::Cmd(cmd) => {
+            std::env::set_var("SCIE", current_exe.as_os_str());
+            exec(cmd)
+        },
     }
 }
