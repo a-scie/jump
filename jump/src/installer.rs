@@ -1,9 +1,9 @@
+use crate::atomic::atomic_directory;
 use bstr::ByteSlice;
 use logging_timer::{time, timer};
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::io::Cursor;
-use std::io::Write;
 
 use crate::config::{
     Archive, ArchiveType, Blob, Compression, EnvVar as ConfigEnvVar, File, Locator,
@@ -129,70 +129,76 @@ pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, Stri
         }
     }
 
-    // TODO(John Sirois): XXX: AtomicDirectory
     let mut location = context.scie_jump_size;
     for (size, _fingerprint, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
         // TODO(John Sirois): XXX: Use fingerprint - insert hasher in stream stack to compare against.
         match archive_type {
             None => {
-                let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
-                std::fs::create_dir_all(parent_dir).map_err(|e| format!("{e}"))?;
-                let mut out = std::fs::OpenOptions::new()
-                    .create_new(true)
-                    .write(true)
-                    .open(dst)
-                    .map_err(|e| format!("{e}"))?;
-                out.write_all(bytes).map_err(|e| format!("{e}"))?;
+                let _timer = timer!("debug", "Unpacking {size} byte blob.");
+                let parent_dir = dst.parent().ok_or_else(|| ".".to_owned())?;
+                atomic_directory(parent_dir, |work_dir| {
+                    let blob_dst = work_dir.join(dst.file_name().ok_or_else(|| {
+                        format!(
+                            "Blob destination {dst} has o file name.",
+                            dst = dst.display()
+                        )
+                    })?);
+                    std::fs::write(&blob_dst, bytes).map_err(|e| {
+                        format!(
+                            "Failed to open blob destination {blob_dst} for writing: {e}",
+                            blob_dst = blob_dst.display()
+                        )
+                    })
+                })?
             }
             Some(archive) => {
-                std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;
-                let _timer = timer!("debug", "Unpacking {size} byte {archive:?}");
-                match archive {
+                let _timer = timer!("debug", "Unpacking {size} byte {archive:?}.");
+                atomic_directory(&dst, |work_dir| match archive {
                     ArchiveType::Zip => {
                         let seekable_bytes = Cursor::new(bytes);
                         let mut zip = zip::ZipArchive::new(seekable_bytes)
                             .map_err(|e| format!("Failed to open {archive:?}: {e}"))?;
-                        zip.extract(dst)
-                            .map_err(|e| format!("Failed to extract {archive:?}: {e}"))?;
+                        zip.extract(work_dir)
+                            .map_err(|e| format!("Failed to extract {archive:?}: {e}"))
                     }
                     ArchiveType::Tar => {
                         let mut tar = tar::Archive::new(bytes);
-                        tar.unpack(dst)
-                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
+                        tar.unpack(work_dir)
+                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))
                     }
                     ArchiveType::CompressedTar(Compression::Bzip2) => {
                         let bzip2_decoder = bzip2::read::BzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(bzip2_decoder);
-                        tar.unpack(dst)
-                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
+                        tar.unpack(work_dir)
+                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))
                     }
                     ArchiveType::CompressedTar(Compression::Gzip) => {
                         let gz_decoder = flate2::read::GzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(gz_decoder);
-                        tar.unpack(dst)
-                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
+                        tar.unpack(work_dir)
+                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))
                     }
                     ArchiveType::CompressedTar(Compression::Xz) => {
                         let xz_decoder = xz2::read::XzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(xz_decoder);
-                        tar.unpack(dst)
-                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
+                        tar.unpack(work_dir)
+                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))
                     }
                     ArchiveType::CompressedTar(Compression::Zlib) => {
                         let zlib_decoder = flate2::read::ZlibDecoder::new(bytes);
                         let mut tar = tar::Archive::new(zlib_decoder);
-                        tar.unpack(dst)
-                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
+                        tar.unpack(work_dir)
+                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))
                     }
                     ArchiveType::CompressedTar(Compression::Zstd) => {
                         let zstd_decoder =
                             zstd::stream::Decoder::new(bytes).map_err(|e| format!("{e}"))?;
                         let mut tar = tar::Archive::new(zstd_decoder);
-                        tar.unpack(dst)
-                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
+                        tar.unpack(work_dir)
+                            .map_err(|e| format!("Failed to unpack {archive:?}: {e}"))
                     }
-                }
+                })?
             }
         }
         location += size;

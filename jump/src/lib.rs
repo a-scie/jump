@@ -4,6 +4,7 @@ extern crate log;
 #[macro_use]
 extern crate structure;
 
+mod atomic;
 mod config;
 mod context;
 mod installer;
