@@ -132,15 +132,16 @@ pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, Stri
     let mut location = context.scie_jump_size;
     for (size, _fingerprint, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
-        // TODO(John Sirois): XXX: Use fingerprint - insert hasher in stream stack to compare against.
+        // TODO(John Sirois): XXX: Use fingerprint - insert hasher in stream stack to compare
+        //  against.
         match archive_type {
             None => {
                 let _timer = timer!("debug", "Unpacking {size} byte blob.");
-                let parent_dir = dst.parent().ok_or_else(|| ".".to_owned())?;
+                let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
                 atomic_directory(parent_dir, |work_dir| {
                     let blob_dst = work_dir.join(dst.file_name().ok_or_else(|| {
                         format!(
-                            "Blob destination {dst} has o file name.",
+                            "Blob destination {dst} has no file name.",
                             dst = dst.display()
                         )
                     })?);
