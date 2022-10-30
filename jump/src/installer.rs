@@ -28,7 +28,7 @@ pub struct EnvVars {
 }
 
 impl EnvVars {
-    pub fn into_env_vars(self) -> impl Iterator<Item = (OsString, OsString)> {
+    fn into_env_vars(self) -> impl Iterator<Item = (OsString, OsString)> {
         self.vars.into_iter().map(|(env_var, value)| match env_var {
             EnvVar::Default(name) => {
                 let value = std::env::var_os(&name).unwrap_or(value);
@@ -36,6 +36,12 @@ impl EnvVars {
             }
             EnvVar::Replace(name) => (name, value),
         })
+    }
+
+    pub fn export(self) {
+        for (name, value) in self.into_env_vars() {
+            std::env::set_var(name, value);
+        }
     }
 }
 
