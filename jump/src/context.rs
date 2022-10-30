@@ -6,10 +6,9 @@ use std::env;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
-use placeholders::{Item, Placeholder};
-
-use crate::config::{Archive, Config, File};
-use crate::Cmd;
+use crate::config::{Archive, Cmd, Config, File};
+use crate::placeholders;
+use crate::placeholders::{Item, Placeholder};
 
 fn expanduser(path: PathBuf) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(&path)

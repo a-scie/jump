@@ -1,9 +1,0 @@
-[package]
-name = "placeholders"
-version = "0.1.0"
-description = "The placeholder parsing support for scie-jump commands."
-authors = [
-    "John Sirois <john.sirois@gmail.com>",
-]
-edition = "2021"
-publish = false

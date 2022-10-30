@@ -1,6 +1,6 @@
 #[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Debug)]
-pub enum Placeholder<'a> {
+pub(crate) enum Placeholder<'a> {
     FileName(&'a str),
     Scie,
     ScieBoot,
@@ -10,7 +10,7 @@ pub enum Placeholder<'a> {
 
 #[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Debug)]
-pub enum Item<'a> {
+pub(crate) enum Item<'a> {
     Text(&'a str),
     LeftBrace,
     Placeholder(Placeholder<'a>),
@@ -18,11 +18,11 @@ pub enum Item<'a> {
 
 #[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Debug)]
-pub struct Parsed<'a> {
+pub(crate) struct Parsed<'a> {
     pub items: Vec<Item<'a>>,
 }
 
-pub fn parse(text: &str) -> Result<Parsed, String> {
+pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
     let mut items = vec![];
 
     let mut previous_char: Option<char> = None;
@@ -94,7 +94,7 @@ pub fn parse(text: &str) -> Result<Parsed, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, Item, Placeholder};
+    use crate::placeholders::{parse, Item, Placeholder};
 
     #[test]
     fn no_placeholders() {

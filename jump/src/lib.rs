@@ -8,6 +8,7 @@ mod config;
 mod context;
 mod installer;
 mod jmp;
+mod placeholders;
 
 use std::fs::File;
 use std::io::{Cursor, Seek, SeekFrom};
@@ -15,8 +16,6 @@ use std::path::PathBuf;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use logging_timer::time;
-
-use crate::config::Cmd;
 
 pub use crate::installer::{EnvVars, Process};
 

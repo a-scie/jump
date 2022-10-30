@@ -337,7 +337,6 @@ dependencies = [
  "log",
  "logging_timer",
  "memmap",
- "placeholders",
  "regex",
  "relative-path",
  "serde",
@@ -532,10 +531,6 @@ name = "pkg-config"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ac9a59f73473f1b8d852421e59e64809f025994837ef743615c6d0c5b305160"
-
-[[package]]
-name = "placeholders"
-version = "0.1.0"
 
 [[package]]
 name = "proc-exit"
