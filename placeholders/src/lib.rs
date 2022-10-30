@@ -26,7 +26,7 @@ pub fn parse(text: &str) -> Result<Parsed, String> {
     let mut items = vec![];
 
     let mut previous_char: Option<char> = None;
-    let mut placeholder = false;
+    let mut inside_placeholder = false;
     let mut start = 0_usize;
 
     if "{" == text {
@@ -37,20 +37,29 @@ pub fn parse(text: &str) -> Result<Parsed, String> {
     }
     for (index, current_char) in text.chars().enumerate() {
         match current_char {
-            '{' if !placeholder => {
+            '{' if !inside_placeholder => {
                 if index - start > 0 {
                     items.push(Item::Text(&text[start..index]))
                 }
                 previous_char = Some('{');
-                placeholder = true;
+                inside_placeholder = true;
                 start = index + 1;
             }
-            '{' if placeholder && Some('{') == previous_char => {
+            '{' if inside_placeholder && Some('{') == previous_char => {
                 items.push(Item::LeftBrace);
-                placeholder = false;
+                inside_placeholder = false;
                 start = index + 1;
             }
-            '}' if placeholder => {
+            '{' if inside_placeholder => {
+                return Err(format!(
+                    "Encountered '{{' at character {pos} inside placeholder starting at character \
+                    {placeholder_pos} in {text}'. Placeholders symbols cannot include the '{{' or \
+                    '}}' characters",
+                    pos = index + 1,
+                    placeholder_pos = start,
+                ));
+            }
+            '}' if inside_placeholder => {
                 let symbol = &text[start..index];
                 if symbol.is_empty() {
                     return Err(format!(
@@ -70,7 +79,7 @@ pub fn parse(text: &str) -> Result<Parsed, String> {
                     _ => items.push(Item::Placeholder(Placeholder::FileName(symbol))),
                 }
                 previous_char = Some('}');
-                placeholder = false;
+                inside_placeholder = false;
                 start = index + 1;
             }
             c => previous_char = Some(c)
@@ -98,6 +107,7 @@ mod tests {
     fn invalid_placeholder() {
         assert!(parse("{").is_err());
         assert!(parse("{}").is_err());
+        assert!(parse("{placeholder.cannot.include.'{'}").is_err());
         assert_eq!(vec![Item::Text("}")], parse("}").unwrap().items);
     }
 
@@ -149,10 +159,10 @@ mod tests {
         );
         assert_eq!(
             vec![
-                Item::Placeholder(Placeholder::ScieBootCmd("difficult.cmd{name")),
+                Item::Placeholder(Placeholder::ScieBootCmd("dotted.cmd.name")),
                 Item::Text("/venv/pex"),
             ],
-            parse("{scie.boot.difficult.cmd{name}/venv/pex").unwrap().items
+            parse("{scie.boot.dotted.cmd.name}/venv/pex").unwrap().items
         );
     }
 
@@ -178,8 +188,8 @@ mod tests {
             parse("{python}/bin/python").unwrap().items
         );
         assert_eq!(
-            vec![Item::Placeholder(Placeholder::FileName("difficult.file{name"))],
-            parse("{difficult.file{name}").unwrap().items
+            vec![Item::Placeholder(Placeholder::FileName("dotted.file.name"))],
+            parse("{dotted.file.name}").unwrap().items
         );
     }
 
