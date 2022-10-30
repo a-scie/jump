@@ -5,8 +5,8 @@ use proc_exit::{Code, Exit, ExitResult};
 
 use jump::Action;
 
-#[cfg(target_family = "unix")]
-fn _exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
+#[cfg(target_family = "windows")]
+fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
     use std::process::Command;
     let exit_status = Command::new(&exe)
         .args(&args)
@@ -48,12 +48,14 @@ fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
     execv(&c_exe, &c_args)
         .map_err(|e| {
             Exit::new(Code::new(e as i32))
-                .with_message(format!("Failed to execv({c_exe:?}, {c_args:?}): {e}"))
+                .with_message(format!("Failed to exec {c_exe:?} with argv {c_args:?}: {e}"))
         })
         .map(|_| ())
 }
 
 fn main() -> ExitResult {
+    env_logger::init();
+
     let current_exe = current_exe().map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to find path of the current executable: {e}"

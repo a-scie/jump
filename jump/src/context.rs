@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
+use logging_timer::time;
 
 use placeholders::{Item, Placeholder};
 
@@ -156,6 +157,7 @@ impl Context {
     }
 }
 
+#[time("debug")]
 pub(crate) fn determine(current_exe: PathBuf, config: Config) -> Result<Context, String> {
     Context::new(current_exe, config)
 }

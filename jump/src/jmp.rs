@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use logging_timer::time;
 
 use crate::config::Config;
 
@@ -53,6 +54,7 @@ pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, Str
     Ok(eocd_end + (zip_comment_size as usize))
 }
 
+#[time("debug")]
 pub fn load(data: &[u8]) -> Result<Config, String> {
     let end_of_zip = end_of_zip(data, MAXIMUM_CONFIG_SIZE)?;
     let config_bytes = &data[end_of_zip..];

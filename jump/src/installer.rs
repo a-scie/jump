@@ -3,12 +3,14 @@ use std::collections::HashSet;
 use std::ffi::OsString;
 use std::io::Cursor;
 use std::io::Write;
+use logging_timer::{time, timer};
 
 use crate::config::{
     Archive, ArchiveType, Blob, Compression, EnvVar as ConfigEnvVar, File, Locator,
 };
 use crate::context::Context;
 
+#[derive(Debug)]
 enum EnvVar {
     Default(OsString),
     Replace(OsString),
@@ -23,6 +25,7 @@ impl From<&ConfigEnvVar> for EnvVar {
     }
 }
 
+#[derive(Debug)]
 pub struct EnvVars {
     vars: Vec<(EnvVar, OsString)>,
 }
@@ -45,12 +48,14 @@ impl EnvVars {
     }
 }
 
+#[derive(Debug)]
 pub struct Process {
     pub env: EnvVars,
     pub exe: OsString,
     pub args: Vec<OsString>,
 }
 
+#[time("debug")]
 pub fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
     let command = context.command()?.clone();
     let mut to_extract = HashSet::new();
@@ -142,6 +147,7 @@ pub fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
             }
             Some(archive) => {
                 std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;
+                let _timer = timer!("debug", "Unpacking {size} byte {archive:?}");
                 match archive {
                     ArchiveType::Zip => {
                         let seekable_bytes = Cursor::new(bytes);

@@ -1,4 +1,7 @@
 #[macro_use]
+extern crate log;
+
+#[macro_use]
 extern crate structure;
 
 mod config;
@@ -11,6 +14,7 @@ use std::io::{Cursor, Seek, SeekFrom};
 use std::path::PathBuf;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use logging_timer::time;
 
 use crate::config::Cmd;
 
@@ -24,6 +28,7 @@ pub enum Action {
     Execute(Process),
 }
 
+#[time("debug")]
 pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     let file = File::open(&current_exe).map_err(|e| {
         format!(
@@ -64,7 +69,12 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     }
 
     let config = jmp::load(&data)?;
+    trace!("Loaded {config:#?}");
+
     let context = context::determine(current_exe, config)?;
+
     let process = installer::prepare(&data, context)?;
+    trace!("Prepared {process:#?}");
+
     Ok(Action::Execute(process))
 }

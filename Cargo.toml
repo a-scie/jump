@@ -31,6 +31,7 @@ opt-level = "s"
 strip = "symbols"
 
 [dependencies]
+env_logger = { version = "0.9", default-features = false }
 jump = { path = "jump" }
 nix = "0.25"
 proc-exit = "2.0"
