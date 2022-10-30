@@ -3,17 +3,7 @@ use std::ffi::OsString;
 
 use proc_exit::{Code, Exit, ExitResult};
 
-use jump::{Action, EnvVar, Process};
-
-fn into_env_vars(env: Vec<(EnvVar, OsString)>) -> impl Iterator<Item = (OsString, OsString)> {
-    env.into_iter().map(|(env_var, value)| match env_var {
-        EnvVar::Default(name) => {
-            let value = std::env::var_os(&name).unwrap_or_else(|| value.to_owned());
-            (name, value)
-        }
-        EnvVar::Replace(name) => (name, value),
-    })
-}
+use jump::{Action, Process};
 
 #[cfg(target_family = "windows")]
 fn exec(process: Process) -> ExitResult {
@@ -22,7 +12,7 @@ fn exec(process: Process) -> ExitResult {
         .args(&process.args)
         .args(std::env::args().skip(1))
         .envs(std::env::vars())
-        .envs(into_env_vars(process.env))
+        .envs(process.env.into_env_vars())
         .spawn()
         .map_err(|e| {
             Code::FAILURE.with_message(format!(
@@ -68,7 +58,7 @@ fn exec(process: Process) -> ExitResult {
         })?);
     }
 
-    for (name, value) in into_env_vars(process.env) {
+    for (name, value) in process.env.into_env_vars() {
         std::env::set_var(name, value);
     }
     let env = std::env::vars()

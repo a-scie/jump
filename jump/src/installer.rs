@@ -9,7 +9,7 @@ use crate::config::{
 };
 use crate::context::Context;
 
-pub enum EnvVar {
+enum EnvVar {
     Default(OsString),
     Replace(OsString),
 }
@@ -23,8 +23,24 @@ impl From<&ConfigEnvVar> for EnvVar {
     }
 }
 
+pub struct EnvVars {
+    vars: Vec<(EnvVar, OsString)>,
+}
+
+impl EnvVars {
+    pub fn into_env_vars(self) -> impl Iterator<Item = (OsString, OsString)> {
+        self.vars.into_iter().map(|(env_var, value)| match env_var {
+            EnvVar::Default(name) => {
+                let value = std::env::var_os(&name).unwrap_or(value);
+                (name, value)
+            }
+            EnvVar::Replace(name) => (name, value),
+        })
+    }
+}
+
 pub struct Process {
-    pub env: Vec<(EnvVar, OsString)>,
+    pub env: EnvVars,
     pub exe: OsString,
     pub args: Vec<OsString>,
 }
@@ -184,5 +200,9 @@ pub fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
         }
     }
 
-    Ok(Process { exe, args, env })
+    Ok(Process {
+        exe,
+        args,
+        env: EnvVars { vars: env },
+    })
 }

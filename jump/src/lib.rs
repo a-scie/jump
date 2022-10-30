@@ -14,7 +14,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::config::Cmd;
 
-pub use crate::installer::{EnvVar, Process};
+pub use crate::installer::{EnvVars, Process};
 
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub const EOF_MAGIC: u32 = 0x534a7219;
