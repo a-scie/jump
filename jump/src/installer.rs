@@ -158,33 +158,33 @@ pub fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
                     }
                     ArchiveType::Tar => {
                         let mut tar = tar::Archive::new(bytes);
-                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
+                        tar.unpack(dst).map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Bzip2) => {
                         let bzip2_decoder = bzip2::read::BzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(bzip2_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
+                        tar.unpack(dst).map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Gzip) => {
                         let gz_decoder = flate2::read::GzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(gz_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
+                        tar.unpack(dst).map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Xz) => {
                         let xz_decoder = xz2::read::XzDecoder::new(bytes);
                         let mut tar = tar::Archive::new(xz_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
+                        tar.unpack(dst).map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Zlib) => {
                         let zlib_decoder = flate2::read::ZlibDecoder::new(bytes);
                         let mut tar = tar::Archive::new(zlib_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
+                        tar.unpack(dst).map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
                     }
                     ArchiveType::CompressedTar(Compression::Zstd) => {
                         let zstd_decoder =
                             zstd::stream::Decoder::new(bytes).map_err(|e| format!("{e}"))?;
                         let mut tar = tar::Archive::new(zstd_decoder);
-                        tar.unpack(dst).map_err(|e| format!("{e}"))?;
+                        tar.unpack(dst).map_err(|e| format!("Failed to unpack {archive:?}: {e}"))?;
                     }
                 }
             }
