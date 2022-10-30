@@ -2,38 +2,38 @@
 extern crate structure;
 
 mod config;
+mod context;
 mod installer;
 mod jmp;
 
 use std::fs::File;
 use std::io::{Cursor, Seek, SeekFrom};
-use std::path::Path;
+use std::path::PathBuf;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-pub use crate::config::{Cmd, EnvVar};
+use crate::config::Cmd;
 
+pub use crate::installer::{EnvVar, Process};
+
+// Exposed for the package crate post-processing of the scie-jump binary.
 pub const EOF_MAGIC: u32 = 0x534a7219;
 
 pub enum Action {
     BootPack(u32),
-    Cmd(Cmd),
+    Execute(Process),
 }
 
-pub fn prepare_action<P: AsRef<Path>>(current_exe: P) -> Result<Action, String> {
+pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     let file = File::open(&current_exe).map_err(|e| {
         format!(
             "Failed to open current exe at {exe} for reading: {e}",
-            exe = current_exe.as_ref().display(),
+            exe = current_exe.display(),
         )
     })?;
     let data = unsafe {
-        memmap::Mmap::map(&file).map_err(|e| {
-            format!(
-                "Failed to mmap {exe}: {e}",
-                exe = current_exe.as_ref().display()
-            )
-        })?
+        memmap::Mmap::map(&file)
+            .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.display()))?
     };
 
     let mut magic = Cursor::new(&data[data.len() - 8..]);
@@ -42,13 +42,13 @@ pub fn prepare_action<P: AsRef<Path>>(current_exe: P) -> Result<Action, String> 
         magic.seek(SeekFrom::End(-8)).map_err(|e| {
             format!(
                 "Failed to read scie-jump size from {exe}: {e}",
-                exe = current_exe.as_ref().display()
+                exe = current_exe.display()
             )
         })?;
         let size = magic.read_u32::<LittleEndian>().map_err(|e| {
             format!(
                 "The scie-jump size of {exe} is malformed: {e}",
-                exe = current_exe.as_ref().display(),
+                exe = current_exe.display(),
             )
         })?;
         let actual_size = u32::try_from(data.len())
@@ -57,13 +57,14 @@ pub fn prepare_action<P: AsRef<Path>>(current_exe: P) -> Result<Action, String> 
             return Err(format!(
                 "The scie-jump launcher at {path} has size {actual_size} but the expected \
                     size is {size}.",
-                path = current_exe.as_ref().display()
+                path = current_exe.display()
             ));
         }
         return Ok(Action::BootPack(size));
     }
 
     let config = jmp::load(&data)?;
-    let command = installer::extract(&data, config)?;
-    Ok(Action::Cmd(command))
+    let context = context::determine(current_exe, config)?;
+    let process = installer::prepare(&data, context)?;
+    Ok(Action::Execute(process))
 }

@@ -18,6 +18,7 @@ flate2 = "1.0"
 itertools = "0.10"
 lazy_static = "1.4"
 memmap = "0.7"
+placeholders = { path = "../placeholders" }
 regex = "1.6"
 relative-path = "1.7"
 serde = { version = "1.0", features = ["derive"] }

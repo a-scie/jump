@@ -82,7 +82,7 @@ pub fn parse(text: &str) -> Result<Parsed, String> {
                 inside_placeholder = false;
                 start = index + 1;
             }
-            c => previous_char = Some(c)
+            c => previous_char = Some(c),
         }
     }
     if items.is_empty() || text.len() - start > 0 {

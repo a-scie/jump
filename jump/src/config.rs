@@ -136,7 +136,7 @@ pub enum File {
     Blob(Blob),
 }
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum EnvVar {
     Default(String),
     Replace(String),
@@ -195,7 +195,7 @@ impl<'de> Deserialize<'de> for EnvVar {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Cmd {
     pub exe: String,
     #[serde(default)]
