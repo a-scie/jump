@@ -94,7 +94,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::placeholders::{parse, Item, Placeholder};
+    use super::{parse, Item, Placeholder};
 
     #[test]
     fn no_placeholders() {

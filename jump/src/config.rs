@@ -7,26 +7,26 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum HashAlgorithm {
+pub(crate) enum HashAlgorithm {
     Sha256,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Fingerprint {
-    pub algorithm: HashAlgorithm,
-    pub hash: String,
+pub(crate) struct Fingerprint {
+    pub(crate) algorithm: HashAlgorithm,
+    pub(crate) hash: String,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Locator {
+pub(crate) enum Locator {
     Size(usize),
     Entry(PathBuf),
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Compression {
+pub(crate) enum Compression {
     Bzip2,
     Gzip,
     Xz,
@@ -35,7 +35,7 @@ pub enum Compression {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub enum ArchiveType {
+pub(crate) enum ArchiveType {
     Zip,
     Tar,
     CompressedTar(Compression),
@@ -100,44 +100,44 @@ impl<'de> Deserialize<'de> for ArchiveType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Scie {
-    pub version: String,
-    pub root: PathBuf,
-    pub size: usize,
+pub(crate) struct Scie {
+    pub(crate) version: String,
+    pub(crate) root: PathBuf,
+    pub(crate) size: usize,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Blob {
+pub(crate) struct Blob {
     #[serde(flatten)]
-    pub locator: Locator,
-    pub fingerprint: Fingerprint,
-    pub name: String,
+    pub(crate) locator: Locator,
+    pub(crate) fingerprint: Fingerprint,
+    pub(crate) name: String,
     #[serde(default)]
-    pub always_extract: bool,
+    pub(crate) always_extract: bool,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Archive {
+pub(crate) struct Archive {
     #[serde(flatten)]
-    pub locator: Locator,
-    pub fingerprint: Fingerprint,
-    pub archive_type: ArchiveType,
+    pub(crate) locator: Locator,
+    pub(crate) fingerprint: Fingerprint,
+    pub(crate) archive_type: ArchiveType,
     #[serde(default)]
-    pub name: Option<String>,
+    pub(crate) name: Option<String>,
     #[serde(default)]
-    pub always_extract: bool,
+    pub(crate) always_extract: bool,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[serde(tag = "type")]
-pub enum File {
+pub(crate) enum File {
     Archive(Archive),
     Blob(Blob),
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub enum EnvVar {
+pub(crate) enum EnvVar {
     Default(String),
     Replace(String),
 }
@@ -196,34 +196,33 @@ impl<'de> Deserialize<'de> for EnvVar {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Cmd {
-    pub exe: String,
+pub(crate) struct Cmd {
+    pub(crate) exe: String,
     #[serde(default)]
-    pub args: Vec<String>,
+    pub(crate) args: Vec<String>,
     #[serde(default)]
-    pub env: HashMap<EnvVar, String>,
+    pub(crate) env: HashMap<EnvVar, String>,
     #[serde(default)]
-    pub additional_files: Vec<String>,
+    pub(crate) additional_files: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub scie: Scie,
-    pub files: Vec<File>,
-    pub command: Cmd,
+pub(crate) struct Config {
+    pub(crate) scie: Scie,
+    pub(crate) files: Vec<File>,
+    pub(crate) command: Cmd,
     #[serde(default)]
-    pub additional_commands: HashMap<String, Cmd>,
+    pub(crate) additional_commands: HashMap<String, Cmd>,
     #[serde(default)]
-    pub size: usize,
+    pub(crate) size: usize,
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        Archive, ArchiveType, Blob, Cmd, Compression, Config, File, Fingerprint, HashAlgorithm,
-        Locator, Scie,
+        Archive, ArchiveType, Blob, Cmd, Compression, Config, EnvVar, File, Fingerprint,
+        HashAlgorithm, Locator, Scie,
     };
-    use crate::config::EnvVar;
 
     #[test]
     fn test_serialized_form() {

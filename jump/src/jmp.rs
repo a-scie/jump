@@ -11,7 +11,7 @@ const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
 
 const EOCD_SIGNATURE: (&u8, &u8, &u8, &u8) = (&0x06, &0x05, &0x4b, &0x50);
 
-pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String> {
+fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String> {
     #[allow(clippy::too_many_arguments)]
     let eocd_struct = structure!("<4sHHHHIIH");
 
@@ -55,7 +55,7 @@ pub fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, Str
 }
 
 #[time("debug")]
-pub fn load(data: &[u8]) -> Result<Config, String> {
+pub(crate) fn load(data: &[u8]) -> Result<Config, String> {
     let end_of_zip = end_of_zip(data, MAXIMUM_CONFIG_SIZE)?;
     let config_bytes = &data[end_of_zip..];
     let mut config: Config = serde_json::from_slice(config_bytes)

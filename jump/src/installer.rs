@@ -56,7 +56,7 @@ pub struct Process {
 }
 
 #[time("debug")]
-pub fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
+pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
     let command = context.command()?.clone();
     let mut to_extract = HashSet::new();
     for name in &command.additional_files {

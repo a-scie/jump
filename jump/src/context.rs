@@ -46,19 +46,19 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
         .map_err(|e| format!("{e}"))
 }
 
-pub struct Context {
-    pub scie: PathBuf,
-    pub scie_jump_size: usize,
-    pub config_size: usize,
-    pub cmd: Cmd,
-    pub additional_commands: HashMap<String, Cmd>,
-    pub root: PathBuf,
-    pub files_by_name: HashMap<String, File>,
-    pub replacements: HashSet<File>,
+pub(crate) struct Context {
+    pub(crate) scie: PathBuf,
+    pub(crate) scie_jump_size: usize,
+    pub(crate) config_size: usize,
+    pub(crate) cmd: Cmd,
+    pub(crate) additional_commands: HashMap<String, Cmd>,
+    pub(crate) root: PathBuf,
+    pub(crate) files_by_name: HashMap<String, File>,
+    pub(crate) replacements: HashSet<File>,
 }
 
 impl Context {
-    pub fn new(scie: PathBuf, config: Config) -> Result<Self, String> {
+    pub(crate) fn new(scie: PathBuf, config: Config) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
         for file in config.files {
             match file {
@@ -86,7 +86,7 @@ impl Context {
         })
     }
 
-    pub fn command(&self) -> Result<&Cmd, String> {
+    pub(crate) fn command(&self) -> Result<&Cmd, String> {
         if let Some(cmd) = env::var_os("SCIE_CMD") {
             let name = cmd.into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_CMD: {value:?}")
@@ -101,18 +101,18 @@ impl Context {
         }
         Ok(&self.cmd)
     }
-    pub fn get_file(&self, name: &str) -> Option<&File> {
+    pub(crate) fn get_file(&self, name: &str) -> Option<&File> {
         self.files_by_name.get(name)
     }
 
-    pub fn get_path(&self, file: &File) -> PathBuf {
+    pub(crate) fn get_path(&self, file: &File) -> PathBuf {
         match file {
             File::Archive(archive) => self.root.join(&archive.fingerprint.hash),
             File::Blob(blob) => self.root.join(&blob.fingerprint.hash).join(&blob.name),
         }
     }
 
-    pub fn reify_string(&mut self, value: &str) -> Result<String, String> {
+    pub(crate) fn reify_string(&mut self, value: &str) -> Result<String, String> {
         let mut reified = String::with_capacity(value.len());
 
         // let path_to_str = |path| {
