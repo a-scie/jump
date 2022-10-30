@@ -47,8 +47,9 @@ fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
 
     execv(&c_exe, &c_args)
         .map_err(|e| {
-            Exit::new(Code::new(e as i32))
-                .with_message(format!("Failed to exec {c_exe:?} with argv {c_args:?}: {e}"))
+            Exit::new(Code::new(e as i32)).with_message(format!(
+                "Failed to exec {c_exe:?} with argv {c_args:?}: {e}"
+            ))
         })
         .map(|_| ())
 }

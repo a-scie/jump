@@ -1,10 +1,10 @@
 use bstr::ByteSlice;
 use itertools::Itertools;
+use logging_timer::time;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
-use logging_timer::time;
 
 use placeholders::{Item, Placeholder};
 

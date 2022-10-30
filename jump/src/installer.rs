@@ -1,9 +1,9 @@
 use bstr::ByteSlice;
+use logging_timer::{time, timer};
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::io::Cursor;
 use std::io::Write;
-use logging_timer::{time, timer};
 
 use crate::config::{
     Archive, ArchiveType, Blob, Compression, EnvVar as ConfigEnvVar, File, Locator,
@@ -151,9 +151,10 @@ pub fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
                 match archive {
                     ArchiveType::Zip => {
                         let seekable_bytes = Cursor::new(bytes);
-                        let mut zip =
-                            zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{e}"))?;
-                        zip.extract(dst).map_err(|e| format!("{e}"))?;
+                        let mut zip = zip::ZipArchive::new(seekable_bytes)
+                            .map_err(|e| format!("Failed to open {archive:?}: {e}"))?;
+                        zip.extract(dst)
+                            .map_err(|e| format!("Failed to extract {archive:?}: {e}"))?;
                     }
                     ArchiveType::Tar => {
                         let mut tar = tar::Archive::new(bytes);
