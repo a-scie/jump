@@ -32,9 +32,9 @@ pub struct SelectBoot {
 }
 
 pub enum Action {
-    BootPack(Jump),
+    BootPack((Jump, PathBuf)),
     Execute((Process, bool)),
-    SelectBoot(SelectBoot),
+    BootSelect(SelectBoot),
 }
 
 #[time("debug")]
@@ -51,7 +51,7 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     };
 
     if let Some(jump) = jump::load(&data, &current_exe)? {
-        return Ok(Action::BootPack(jump));
+        return Ok(Action::BootPack((jump, current_exe)));
     }
 
     let scie = lift::load(current_exe, &data)?;
@@ -65,7 +65,7 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
 
         Ok(Action::Execute((process, selected_command.argv1_consumed)))
     } else {
-        Ok(Action::SelectBoot(SelectBoot {
+        Ok(Action::BootSelect(SelectBoot {
             boots: context.boots(),
             error_message: result.err(),
         }))
