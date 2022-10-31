@@ -40,15 +40,21 @@ impl EnvVars {
     }
 }
 
-#[derive(Debug)]
-pub struct Process {
-    pub env: EnvVars,
-    pub exe: OsString,
-    pub args: Vec<OsString>,
+pub fn execute(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> Result<ExitStatus, String> {
+    execute_with_env(exe, args, argv_skip, [].into_iter())
 }
 
-pub fn execute(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> Result<ExitStatus, String> {
+fn execute_with_env<E>(
+    exe: OsString,
+    args: Vec<OsString>,
+    argv_skip: usize,
+    env: E,
+) -> Result<ExitStatus, String>
+where
+    E: Iterator<Item = (OsString, OsString)>,
+{
     Command::new(&exe)
+        .envs(env)
         .args(&args)
         .args(std::env::args().skip(argv_skip))
         .spawn()
@@ -57,6 +63,15 @@ pub fn execute(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> Result<E
         .map_err(|e| format!("Spawned {exe:?} {args:?} but failed to gather its exit status: {e}"))
 }
 
-pub fn _execute_process(process: Process) -> Result<ExitStatus, String> {
-    execute(process.exe, process.args, 1)
+#[derive(Debug)]
+pub struct Process {
+    pub env: EnvVars,
+    pub exe: OsString,
+    pub args: Vec<OsString>,
+}
+
+impl Process {
+    pub fn _execute(self, process: Process) -> Result<ExitStatus, String> {
+        execute_with_env(process.exe, process.args, 1, process.env.into_env_vars())
+    }
 }
