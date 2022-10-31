@@ -61,8 +61,7 @@ fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String>
 pub(crate) fn load(scie_path: PathBuf, scie_data: &[u8]) -> Result<Scie, String> {
     let end_of_zip = end_of_zip(scie_data, MAXIMUM_CONFIG_SIZE)?;
     let config_bytes = &scie_data[end_of_zip..];
-    let config: Config = serde_json::from_slice(config_bytes)
-        .map_err(|e| format!("Failed to decode scie jmp config: {e}"))?;
+    let config = Config::parse(config_bytes)?;
 
     let mut scie = config.scie;
     let jump = scie.jump.as_ref().ok_or_else(|| {

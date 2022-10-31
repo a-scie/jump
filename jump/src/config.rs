@@ -233,6 +233,12 @@ pub(crate) struct Config {
     pub(crate) scie: Scie,
 }
 
+impl Config {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self, String> {
+        serde_json::from_slice(data).map_err(|e| format!("Failed to decode scie jmp config: {e}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
