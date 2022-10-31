@@ -64,15 +64,15 @@ fn main() -> ExitResult {
             "Failed to find path of the current executable: {e}"
         ))
     })?;
-    std::env::set_var("SCIE", current_exe.as_os_str());
-
     let action = jump::prepare_action(current_exe).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
+
     match action {
         Action::BootPack((jump, path)) => boot::pack(jump, path),
         Action::BootSelect(select_boot) => boot::select(select_boot),
         Action::Execute((process, argv1_consumed)) => {
+            std::env::set_var("SCIE", current_exe.as_os_str());
             process.env.export();
             let argv_skip = if argv1_consumed { 2 } else { 1 };
             exec(process.exe, process.args, argv_skip)

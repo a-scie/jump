@@ -33,8 +33,8 @@ pub struct SelectBoot {
 
 pub enum Action {
     BootPack((Jump, PathBuf)),
-    Execute((Process, bool)),
     BootSelect(SelectBoot),
+    Execute((Process, bool))
 }
 
 #[time("debug")]
