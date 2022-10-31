@@ -190,10 +190,10 @@ pub(crate) struct Cmd {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Jump {
-    pub(crate) size: usize,
+pub struct Jump {
+    pub size: usize,
     #[serde(default)]
-    pub(crate) version: String,
+    pub version: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

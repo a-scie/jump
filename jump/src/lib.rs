@@ -8,22 +8,23 @@ mod atomic;
 mod config;
 mod context;
 mod installer;
-mod jmp;
+mod lift;
+// Exposed for the package crate post-processing of the scie-jump binary.
+pub mod jump;
 mod placeholders;
 
 use std::fs::File;
-use std::io::{Cursor, Seek, SeekFrom};
 use std::path::PathBuf;
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use logging_timer::time;
 
+pub use crate::config::Jump;
 pub use crate::context::Boot;
 use crate::context::Context;
 pub use crate::installer::{EnvVars, Process};
 
 // Exposed for the package crate post-processing of the scie-jump binary.
-pub const EOF_MAGIC: u32 = 0x534a7219;
+pub use crate::jump::EOF_MAGIC;
 
 pub struct SelectBoot {
     pub boots: Vec<Boot>,
@@ -31,7 +32,7 @@ pub struct SelectBoot {
 }
 
 pub enum Action {
-    BootPack(u32),
+    BootPack(Jump),
     Execute((Process, bool)),
     SelectBoot(SelectBoot),
 }
@@ -49,34 +50,11 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
             .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.display()))?
     };
 
-    let mut magic = Cursor::new(&data[data.len() - 8..]);
-    magic.seek(SeekFrom::End(-4)).map_err(|e| format!("{e}"))?;
-    if let Ok(EOF_MAGIC) = magic.read_u32::<LittleEndian>() {
-        magic.seek(SeekFrom::End(-8)).map_err(|e| {
-            format!(
-                "Failed to read scie-jump size from {exe}: {e}",
-                exe = current_exe.display()
-            )
-        })?;
-        let size = magic.read_u32::<LittleEndian>().map_err(|e| {
-            format!(
-                "The scie-jump size of {exe} is malformed: {e}",
-                exe = current_exe.display(),
-            )
-        })?;
-        let actual_size = u32::try_from(data.len())
-            .map_err(|e| format!("Expected the scie-jump launcher size to fit in 32 bits: {e}"))?;
-        if actual_size != size {
-            return Err(format!(
-                "The scie-jump launcher at {path} has size {actual_size} but the expected \
-                    size is {size}.",
-                path = current_exe.display()
-            ));
-        }
-        return Ok(Action::BootPack(size));
+    if let Some(jump) = jump::load(&data, &current_exe)? {
+        return Ok(Action::BootPack(jump));
     }
 
-    let scie = jmp::load(current_exe, &data)?;
+    let scie = lift::load(current_exe, &data)?;
     trace!("Loaded {scie:#?}");
 
     let context = Context::new(scie)?;

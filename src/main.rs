@@ -68,9 +68,8 @@ fn main() -> ExitResult {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
     match action {
-        Action::BootPack(size) => Err(Code::FAILURE.with_message(format!(
-            "TODO(John Sirois): Implement boot-pack (self size should be {size})"
-        ))),
+        Action::BootPack(jump) => Err(Code::FAILURE
+            .with_message(format!("TODO(John Sirois): Implement boot-pack: {jump:#?}"))),
         Action::Execute((process, argv1_consumed)) => {
             process.env.export();
             let argv_skip = if argv1_consumed { 2 } else { 1 };
