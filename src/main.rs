@@ -18,9 +18,10 @@ fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
 
 #[cfg(not(target_family = "windows"))]
 fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
-    use nix::unistd::execv;
     use std::ffi::CString;
     use std::os::unix::ffi::OsStringExt;
+
+    use nix::unistd::execv;
 
     let c_exe = CString::new(exe.into_vec()).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to convert executable to a C string: {e}",))

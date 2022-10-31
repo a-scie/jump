@@ -235,11 +235,12 @@ pub(crate) struct Config {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::{
         Archive, ArchiveType, Blob, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift,
         Locator, Scie,
     };
-    use std::collections::HashMap;
 
     #[test]
     fn test_serialized_form() {

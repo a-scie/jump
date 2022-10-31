@@ -1,6 +1,7 @@
-use crate::config::EnvVar as ConfigEnvVar;
 use std::ffi::OsString;
 use std::process::{Command, ExitStatus};
+
+use crate::config::EnvVar as ConfigEnvVar;
 
 #[derive(Debug)]
 pub enum EnvVar {

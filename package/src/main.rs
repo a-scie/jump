@@ -1,5 +1,6 @@
-use proc_exit::{Code, ExitResult};
 use std::path::PathBuf;
+
+use proc_exit::{Code, ExitResult};
 
 fn main() -> ExitResult {
     if std::env::args().len() != 2 {

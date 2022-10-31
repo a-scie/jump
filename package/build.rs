@@ -1,6 +1,6 @@
-use byteorder::{LittleEndian, WriteBytesExt};
 use std::path::PathBuf;
 
+use byteorder::{LittleEndian, WriteBytesExt};
 use jump::EOF_MAGIC;
 
 const SCIE_JUMP_BINARY: &str = "scie-jump";

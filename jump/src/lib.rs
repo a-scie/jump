@@ -22,10 +22,8 @@ use logging_timer::time;
 pub use crate::config::Jump;
 pub use crate::context::Boot;
 use crate::context::Context;
-
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
-
 pub use crate::process::{execute, EnvVar, EnvVars, Process};
 
 pub struct SelectBoot {

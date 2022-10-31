@@ -1,6 +1,7 @@
+use std::path::PathBuf;
+
 use itertools::Itertools;
 use logging_timer::time;
-use std::path::PathBuf;
 
 use crate::config::{Config, Scie};
 use crate::{fingerprint, jump};
