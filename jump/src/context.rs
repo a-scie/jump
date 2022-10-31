@@ -1,9 +1,10 @@
-use bstr::ByteSlice;
-use logging_timer::time;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
+
+use bstr::ByteSlice;
+use logging_timer::time;
 
 use crate::config::{Archive, Cmd, File, Scie};
 use crate::placeholders;
@@ -74,6 +75,16 @@ fn try_as_str(os_str: &OsStr) -> Option<&str> {
 impl Context {
     #[time("debug")]
     pub(crate) fn new(scie: Scie) -> Result<Self, String> {
+        let scie_jump_size = scie
+            .jump
+            .as_ref()
+            .ok_or_else(|| {
+                format!(
+                    "Creating a context requires a Scie with an identified Jump. Given {scie:?}"
+                )
+            })?
+            .size;
+
         let mut files_by_name = HashMap::new();
         for file in &scie.lift.files {
             match file {
@@ -95,7 +106,7 @@ impl Context {
             _bindings: scie.lift.boot.bindings,
             base: expanduser(scie.lift.base)?,
             files_by_name,
-            scie_jump_size: scie.jump.size,
+            scie_jump_size,
             config_size: scie.lift.size,
             files: scie.lift.files,
             replacements: HashSet::new(),

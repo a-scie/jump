@@ -7,6 +7,7 @@ extern crate structure;
 mod atomic;
 mod config;
 mod context;
+mod fingerprint;
 mod installer;
 mod jump;
 mod lift;

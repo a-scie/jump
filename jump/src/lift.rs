@@ -3,7 +3,7 @@ use logging_timer::time;
 use std::path::PathBuf;
 
 use crate::config::{Config, Scie};
-use crate::jump;
+use crate::{fingerprint, jump};
 
 const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
 
@@ -64,16 +64,20 @@ pub(crate) fn load(scie_path: PathBuf, scie_data: &[u8]) -> Result<Scie, String>
         .map_err(|e| format!("Failed to decode scie jmp config: {e}"))?;
 
     let mut scie = config.scie;
-    if scie.jump.version != jump::VERSION {
+    let jump = scie.jump.as_ref().ok_or_else(|| {
+        format!("Loaded a lift manifest without the required jump manifest. Given {scie:?}")
+    })?;
+
+    if jump.version != jump::VERSION {
         return Err(format!(
             "The scie at {path} has a jump in its tip with version {version} but the lift \
                 manifest declares {jump:?}",
             path = scie_path.display(),
             version = jump::VERSION,
-            jump = scie.jump
         ));
     }
     scie.lift.size = config_bytes.len();
+    scie.lift.hash = fingerprint::digest(config_bytes);
     scie.path = scie_path;
     Ok(scie)
 }

@@ -215,12 +215,15 @@ pub(crate) struct Lift {
     pub(crate) base: PathBuf,
     #[serde(default)]
     pub(crate) size: usize,
+    #[serde(default)]
+    pub(crate) hash: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Scie {
-    pub(crate) jump: Jump,
     pub(crate) lift: Lift,
+    #[serde(default)]
+    pub(crate) jump: Option<Jump>,
     #[serde(default)]
     pub(crate) path: PathBuf,
 }
@@ -245,10 +248,10 @@ mod tests {
             serde_json::to_string_pretty(&Config {
                 scie: Scie {
                     path: "/usr/bin/science".into(),
-                    jump: Jump {
+                    jump: Some(Jump {
                         version: "0.1.0".to_string(),
                         size: 37,
-                    },
+                    }),
                     lift: Lift {
                         base: "~/.nce".into(),
                         files: vec![
@@ -299,7 +302,8 @@ mod tests {
                             .collect::<HashMap<_, _>>(),
                             bindings: Default::default()
                         },
-                        size: 37
+                        size: 37,
+                        hash: "XYZ".to_string()
                     }
                 },
             })
@@ -315,10 +319,6 @@ mod tests {
                 r#"
                 {
                     "scie": {
-                        "jump": {
-                            "version": "0.1.0",
-                            "size": 37
-                        },
                         "lift": {
                             "files": [
                                 {

@@ -1,19 +1,14 @@
-use crate::atomic::atomic_directory;
-use bstr::ByteSlice;
-use logging_timer::{time, timer};
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::io::Cursor;
 
+use bstr::ByteSlice;
+use logging_timer::{time, timer};
+
+use crate::atomic::atomic_directory;
 use crate::config::{Archive, ArchiveType, Blob, Cmd, Compression, File, Locator};
 use crate::context::Context;
-use crate::{EnvVar, EnvVars, Process};
-
-#[time("debug")]
-fn digest(data: &[u8]) -> String {
-    format!("{digest:x}", digest = Sha256::digest(data))
-}
+use crate::{fingerprint, EnvVar, EnvVars, Process};
 
 #[time("debug")]
 pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result<Process, String> {
@@ -87,7 +82,7 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
     let mut location = context.scie_jump_size;
     for (size, expected_hash, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
-        let actual_hash = digest(bytes);
+        let actual_hash = fingerprint::digest(bytes);
         if expected_hash != &actual_hash {
             return Err(format!(
                 "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
