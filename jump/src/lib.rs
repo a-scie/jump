@@ -28,6 +28,7 @@ pub use crate::process::{execute, EnvVar, EnvVars, Process};
 
 pub struct SelectBoot {
     pub boots: Vec<Boot>,
+    pub description: Option<String>,
     pub error_message: Option<String>,
 }
 
@@ -67,6 +68,7 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     } else {
         Ok(Action::BootSelect(SelectBoot {
             boots: context.boots(),
+            description: context.description,
             error_message: result.err(),
         }))
     }

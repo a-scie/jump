@@ -217,6 +217,8 @@ pub(crate) struct Lift {
     pub(crate) size: usize,
     #[serde(default)]
     pub(crate) hash: String,
+    #[serde(default)]
+    pub(crate) description: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -310,7 +312,8 @@ mod tests {
                             bindings: Default::default()
                         },
                         size: 37,
-                        hash: "XYZ".to_string()
+                        hash: "XYZ".to_string(),
+                        description: None
                     }
                 },
             })

@@ -7,12 +7,15 @@ pub(crate) use pack::make as pack;
 pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
     Err(Code::FAILURE.with_message(format!(
         "This Scie binary has no default boot command.\n\
-            Please select from the following:\n\
+            {description}\n\
+            Please select from the following boot commands:\n\
+            \n\
             {boot_commands}\n\
             \n\
             You can select a boot command by passing it as the 1st argument or else by \
             setting the SCIE_BOOT environment variable.\n\
             {error_message}",
+        description = select_boot.description.map(|message| format!("\n{message}\n")).unwrap_or_default(),
         boot_commands = select_boot
             .boots
             .into_iter()

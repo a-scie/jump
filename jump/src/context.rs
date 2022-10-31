@@ -66,6 +66,7 @@ pub(crate) struct Context {
     pub(crate) config_size: usize,
     pub(crate) files: Vec<File>,
     pub(crate) replacements: HashSet<File>,
+    pub(crate) description: Option<String>,
 }
 
 fn try_as_str(os_str: &OsStr) -> Option<&str> {
@@ -102,6 +103,7 @@ impl Context {
         }
         Ok(Context {
             scie: scie.path,
+            description: scie.lift.description,
             commands: scie.lift.boot.commands,
             _bindings: scie.lift.boot.bindings,
             base: expanduser(scie.lift.base)?,
