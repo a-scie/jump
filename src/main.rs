@@ -81,7 +81,7 @@ fn main() -> ExitResult {
             {boot_commands}\n\
             \n\
             You can select a boot command by passing it as the 1st argument or else by \
-            setting the SCIE_CMD environment variable.\n\
+            setting the SCIE_BOOT environment variable.\n\
             {error_message}",
             boot_commands = select_boot
                 .boots

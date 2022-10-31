@@ -99,9 +99,9 @@ impl Context {
     }
 
     pub(crate) fn select_command(&self) -> Result<Option<SelectedCmd>, String> {
-        if let Some(cmd) = env::var_os("SCIE_CMD") {
+        if let Some(cmd) = env::var_os("SCIE_BOOT") {
             let name = cmd.into_string().map_err(|value| {
-                format!("Failed to decode environment variable SCIE_CMD: {value:?}")
+                format!("Failed to decode environment variable SCIE_BOOT: {value:?}")
             })?;
             return Ok(self.commands.get(&name).map(|cmd| SelectedCmd {
                 cmd: cmd.clone(),
