@@ -67,6 +67,10 @@ pub(crate) struct Context {
     pub(crate) replacements: HashSet<File>,
 }
 
+fn try_as_str(os_str: &OsStr) -> Option<&str> {
+    <[u8]>::from_os_str(os_str).and_then(|bytes| std::str::from_utf8(bytes).ok())
+}
+
 impl Context {
     #[time("debug")]
     pub(crate) fn new(scie: Scie) -> Result<Self, String> {
@@ -98,25 +102,41 @@ impl Context {
         })
     }
 
+    #[cfg(target_family = "windows")]
+    fn scie_basename(&self) -> Option<&str> {
+        self.scie.file_stem().and_then(try_as_str)
+    }
+
+    #[cfg(not(target_family = "windows"))]
+    fn scie_basename(&self) -> Option<&str> {
+        self.scie.file_name().and_then(try_as_str)
+    }
+
+    fn select_cmd(&self, name: &str, argv1_consumed: bool) -> Option<SelectedCmd> {
+        self.commands.get(name).map(|cmd| SelectedCmd {
+            cmd: cmd.clone(),
+            argv1_consumed,
+        })
+    }
+
     pub(crate) fn select_command(&self) -> Result<Option<SelectedCmd>, String> {
         if let Some(cmd) = env::var_os("SCIE_BOOT") {
             let name = cmd.into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_BOOT: {value:?}")
             })?;
-            return Ok(self.commands.get(&name).map(|cmd| SelectedCmd {
-                cmd: cmd.clone(),
-                argv1_consumed: false,
-            }));
+            return Ok(self.select_cmd(&name, false));
         }
-        let (name, argv1_consumed) = if let Some(argv1) = env::args().nth(1) {
-            (argv1, true)
-        } else {
-            ("".to_string(), false)
-        };
-        Ok(self.commands.get(&name).map(|cmd| SelectedCmd {
-            cmd: cmd.clone(),
-            argv1_consumed,
-        }))
+        Ok(self
+            .select_cmd("", false)
+            .or_else(|| {
+                self.scie_basename()
+                    .and_then(|basename| self.select_cmd(basename, false))
+            })
+            .or_else(|| {
+                env::args()
+                    .nth(1)
+                    .and_then(|argv1| self.select_cmd(&argv1, true))
+            }))
     }
 
     pub(crate) fn boots(&self) -> Vec<Boot> {
