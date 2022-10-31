@@ -1,7 +1,8 @@
 use jump::SelectBoot;
 use proc_exit::{Code, ExitResult};
 
-pub(crate) mod pack;
+mod pack;
+pub(crate) use pack::make as pack;
 
 pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
     Err(Code::FAILURE.with_message(format!(

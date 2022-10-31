@@ -70,7 +70,7 @@ fn main() -> ExitResult {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
     match action {
-        Action::BootPack(jump) => boot::pack::make(jump),
+        Action::BootPack(jump) => boot::pack(jump),
         Action::SelectBoot(select_boot) => boot::select(select_boot),
         Action::Execute((process, argv1_consumed)) => {
             process.env.export();
