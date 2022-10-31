@@ -15,7 +15,10 @@ pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
             You can select a boot command by passing it as the 1st argument or else by \
             setting the SCIE_BOOT environment variable.\n\
             {error_message}",
-        description = select_boot.description.map(|message| format!("\n{message}\n")).unwrap_or_default(),
+        description = select_boot
+            .description
+            .map(|message| format!("\n{message}\n"))
+            .unwrap_or_default(),
         boot_commands = select_boot
             .boots
             .into_iter()

@@ -57,8 +57,6 @@ fn main() -> ExitResult {
             "Failed to find path of the current executable: {e}"
         ))
     })?;
-    std::env::set_var("SCIE", current_exe.as_os_str());
-
     let action = jump::prepare_action(current_exe).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;

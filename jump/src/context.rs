@@ -52,6 +52,7 @@ pub struct Boot {
 }
 
 pub(crate) struct SelectedCmd {
+    pub(crate) scie: PathBuf,
     pub(crate) cmd: Cmd,
     pub(crate) argv1_consumed: bool,
 }
@@ -127,6 +128,7 @@ impl Context {
 
     fn select_cmd(&self, name: &str, argv1_consumed: bool) -> Option<SelectedCmd> {
         self.commands.get(name).map(|cmd| SelectedCmd {
+            scie: self.scie.clone(),
             cmd: cmd.clone(),
             argv1_consumed,
         })
