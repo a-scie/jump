@@ -1,6 +1,7 @@
 use crate::atomic::atomic_directory;
 use bstr::ByteSlice;
 use logging_timer::{time, timer};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::io::Cursor;
@@ -53,6 +54,11 @@ pub struct Process {
     pub env: EnvVars,
     pub exe: OsString,
     pub args: Vec<OsString>,
+}
+
+#[time("debug")]
+fn hash(data: &[u8]) -> String {
+    format!("{digest:x}", digest = Sha256::digest(data))
 }
 
 #[time("debug")]
@@ -126,10 +132,20 @@ pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, Stri
     }
 
     let mut location = context.scie_jump_size;
-    for (size, _fingerprint, dst, archive_type) in sized {
+    for (size, fingerprint, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
-        // TODO(John Sirois): XXX: Use fingerprint - insert hasher in stream stack to compare
-        //  against.
+        let digest = hash(bytes);
+        if digest != fingerprint.hash {
+            return Err(format!(
+                "Destination {dst} of size {size} had unexpected hash: {digest}",
+                dst = dst.display(),
+            ));
+        } else {
+            debug!(
+                "Destination {dst} of size {size} had expected hash",
+                dst = dst.display()
+            );
+        }
         match archive_type {
             None => {
                 let _timer = timer!("debug", "Unpacking {size} byte blob.");
