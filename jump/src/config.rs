@@ -7,18 +7,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum HashAlgorithm {
-    Sha256,
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct Fingerprint {
-    pub(crate) algorithm: HashAlgorithm,
-    pub(crate) hash: String,
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
 pub(crate) enum Locator {
     Size(usize),
     Entry(PathBuf),
@@ -99,18 +87,11 @@ impl<'de> Deserialize<'de> for ArchiveType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Scie {
-    pub(crate) version: String,
-    pub(crate) root: PathBuf,
-    pub(crate) size: usize,
-}
-
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Blob {
     #[serde(flatten)]
     pub(crate) locator: Locator,
-    pub(crate) fingerprint: Fingerprint,
+    pub(crate) hash: String,
     pub(crate) name: String,
     #[serde(default)]
     pub(crate) always_extract: bool,
@@ -120,7 +101,7 @@ pub(crate) struct Blob {
 pub(crate) struct Archive {
     #[serde(flatten)]
     pub(crate) locator: Locator,
-    pub(crate) fingerprint: Fingerprint,
+    pub(crate) hash: String,
     pub(crate) archive_type: ArchiveType,
     #[serde(default)]
     pub(crate) name: Option<String>,
@@ -204,25 +185,58 @@ pub(crate) struct Cmd {
     pub(crate) env: HashMap<EnvVar, String>,
     #[serde(default)]
     pub(crate) additional_files: Vec<String>,
+    #[serde(default)]
+    pub(crate) description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Jump {
+    pub(crate) size: usize,
+    #[serde(default)]
+    pub(crate) version: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Boot {
+    pub(crate) commands: HashMap<String, Cmd>,
+    #[serde(default)]
+    pub(crate) bindings: HashMap<String, Cmd>,
+}
+
+fn default_base() -> PathBuf {
+    PathBuf::from("~/.nce")
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Lift {
+    pub(crate) files: Vec<File>,
+    pub(crate) boot: Boot,
+    #[serde(default = "default_base")]
+    pub(crate) base: PathBuf,
+    #[serde(default)]
+    pub(crate) size: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Scie {
+    pub(crate) jump: Jump,
+    pub(crate) lift: Lift,
+    #[serde(default)]
+    pub(crate) path: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Config {
     pub(crate) scie: Scie,
-    pub(crate) files: Vec<File>,
-    pub(crate) command: Cmd,
-    #[serde(default)]
-    pub(crate) additional_commands: HashMap<String, Cmd>,
-    #[serde(default)]
-    pub(crate) size: usize,
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        Archive, ArchiveType, Blob, Cmd, Compression, Config, EnvVar, File, Fingerprint,
-        HashAlgorithm, Locator, Scie,
+        Archive, ArchiveType, Blob, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift,
+        Locator, Scie,
     };
+    use std::collections::HashMap;
 
     #[test]
     fn test_serialized_form() {
@@ -230,60 +244,64 @@ mod tests {
             "{}",
             serde_json::to_string_pretty(&Config {
                 scie: Scie {
-                    version: "0.1.0".to_string(),
-                    size: 37,
-                    root: "~/.nce".into(),
+                    path: "/usr/bin/science".into(),
+                    jump: Jump {
+                        version: "0.1.0".to_string(),
+                        size: 37,
+                    },
+                    lift: Lift {
+                        base: "~/.nce".into(),
+                        files: vec![
+                            File::Blob(Blob {
+                                locator: Locator::Size(1137),
+                                hash: "abc".to_string(),
+                                name: "pants-client".to_string(),
+                                always_extract: true
+                            }),
+                            File::Archive(Archive {
+                                locator: Locator::Size(123),
+                                hash: "345".to_string(),
+                                archive_type: ArchiveType::CompressedTar(Compression::Zstd),
+                                name: Some("python".to_string()),
+                                always_extract: false
+                            }),
+                            File::Archive(Archive {
+                                locator: Locator::Size(42),
+                                hash: "def".to_string(),
+                                archive_type: ArchiveType::Zip,
+                                name: None,
+                                always_extract: false
+                            })
+                        ],
+                        boot: Boot {
+                            commands: vec![(
+                                "".to_string(),
+                                Cmd {
+                                    exe: "bob/exe".to_string(),
+                                    args: Default::default(),
+                                    env: [
+                                        (
+                                            EnvVar::Default("DEFAULT".to_string()),
+                                            "default".to_string()
+                                        ),
+                                        (
+                                            EnvVar::Replace("REPLACE".to_string()),
+                                            "replace".to_string()
+                                        )
+                                    ]
+                                    .into_iter()
+                                    .collect(),
+                                    additional_files: Default::default(),
+                                    description: None
+                                }
+                            )]
+                            .into_iter()
+                            .collect::<HashMap<_, _>>(),
+                            bindings: Default::default()
+                        },
+                        size: 37
+                    }
                 },
-                files: vec![
-                    File::Blob(Blob {
-                        locator: Locator::Size(1137),
-                        fingerprint: Fingerprint {
-                            algorithm: HashAlgorithm::Sha256,
-                            hash: "abc".into()
-                        },
-                        name: "pants-client".into(),
-                        always_extract: true
-                    }),
-                    File::Archive(Archive {
-                        locator: Locator::Size(123),
-                        fingerprint: Fingerprint {
-                            algorithm: HashAlgorithm::Sha256,
-                            hash: "345".into()
-                        },
-                        archive_type: ArchiveType::CompressedTar(Compression::Zstd),
-                        name: Some("python".into()),
-                        always_extract: false
-                    }),
-                    File::Archive(Archive {
-                        locator: Locator::Size(42),
-                        fingerprint: Fingerprint {
-                            algorithm: HashAlgorithm::Sha256,
-                            hash: "def".into()
-                        },
-                        archive_type: ArchiveType::Zip,
-                        name: None,
-                        always_extract: false
-                    })
-                ],
-                command: Cmd {
-                    exe: "bob/exe".into(),
-                    args: Default::default(),
-                    env: [
-                        (
-                            EnvVar::Default("DEFAULT".to_string()),
-                            "default".to_string()
-                        ),
-                        (
-                            EnvVar::Replace("REPLACE".to_string()),
-                            "replace".to_string()
-                        )
-                    ]
-                    .into_iter()
-                    .collect(),
-                    additional_files: Default::default()
-                },
-                additional_commands: Default::default(),
-                size: 37
             })
             .unwrap()
         )
@@ -295,54 +313,52 @@ mod tests {
             "{:#?}",
             serde_json::from_str::<Config>(
                 r#"
-            {
-              "scie": {
-                "version": "0.1.0",
-                "size": 37,
-                "root": "~/.nce"
-              },
-              "files": [
                 {
-                  "type": "blob",
-                  "name": "pants-client",
-                  "size": 1,
-                  "fingerprint": {
-                    "algorithm": "sha256",
-                    "hash": "789"
-                  }
-                },
-                {
-                  "type": "archive",
-                  "size": 1137,
-                  "fingerprint": {
-                    "algorithm": "sha256",
-                    "hash": "abc"
-                  },
-                  "archive_type": "tar.gz"
-                },
-                {
-                  "type": "archive",
-                  "name": "app",
-                  "size": 42,
-                  "fingerprint": {
-                    "algorithm": "sha256",
-                    "hash": "xyz"
-                  },
-                  "archive_type": "zip"
+                    "scie": {
+                        "jump": {
+                            "version": "0.1.0",
+                            "size": 37
+                        },
+                        "lift": {
+                            "files": [
+                                {
+                                    "type": "blob",
+                                    "name": "pants-client",
+                                    "size": 1,
+                                    "hash": "789"
+                                },
+                                {
+                                    "type": "archive",
+                                    "size": 1137,
+                                    "hash": "abc",
+                                    "archive_type": "tar.gz"
+                                },
+                                {
+                                    "type": "archive",
+                                    "name": "app",
+                                    "size": 42,
+                                    "hash": "xyz",
+                                    "archive_type": "zip"
+                                }
+                            ],
+                            "boot": {
+                                "commands": {
+                                    "": {
+                                        "env": {
+                                            "PEX_VERBOSE": "1",
+                                            "=PATH": ".:${scie.env.PATH}"
+                                        },
+                                        "exe":"{python}/bin/python",
+                                        "args": [
+                                            "{app}"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-              ],
-              "command": {
-                  "env": {
-                    "PEX_VERBOSE": "1",
-                    "=PATH": ".:${scie.env.PATH}"
-                  },
-                  "exe":"{python}/bin/python",
-                  "args": [
-                    "{app}"
-                  ]
-              }
-            }
-        "#
+                "#
             )
             .unwrap()
         )

@@ -1,12 +1,11 @@
 use bstr::ByteSlice;
-use itertools::Itertools;
 use logging_timer::time;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
-use crate::config::{Archive, Cmd, Config, File};
+use crate::config::{Archive, Cmd, File, Scie};
 use crate::placeholders;
 use crate::placeholders::{Item, Placeholder};
 
@@ -46,22 +45,33 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
         .map_err(|e| format!("{e}"))
 }
 
+pub struct Boot {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+pub(crate) struct SelectedCmd {
+    pub(crate) cmd: Cmd,
+    pub(crate) argv1_consumed: bool,
+}
+
 pub(crate) struct Context {
-    pub(crate) scie: PathBuf,
+    scie: PathBuf,
+    commands: HashMap<String, Cmd>,
+    _bindings: HashMap<String, Cmd>,
+    base: PathBuf,
+    files_by_name: HashMap<String, File>,
     pub(crate) scie_jump_size: usize,
     pub(crate) config_size: usize,
-    pub(crate) cmd: Cmd,
-    pub(crate) additional_commands: HashMap<String, Cmd>,
-    pub(crate) root: PathBuf,
     pub(crate) files: Vec<File>,
     pub(crate) replacements: HashSet<File>,
-    files_by_name: HashMap<String, File>,
 }
 
 impl Context {
-    pub(crate) fn new(scie: PathBuf, config: Config) -> Result<Self, String> {
+    #[time("debug")]
+    pub(crate) fn new(scie: Scie) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
-        for file in &config.files {
+        for file in &scie.lift.files {
             match file {
                 File::Archive(Archive {
                     name: Some(ref name),
@@ -76,53 +86,62 @@ impl Context {
             }
         }
         Ok(Context {
-            scie,
-            scie_jump_size: config.scie.size,
-            config_size: config.size,
-            cmd: config.command,
-            additional_commands: config.additional_commands,
-            root: expanduser(config.scie.root)?,
-            files: config.files,
-            replacements: HashSet::new(),
+            scie: scie.path,
+            commands: scie.lift.boot.commands,
+            _bindings: scie.lift.boot.bindings,
+            base: expanduser(scie.lift.base)?,
             files_by_name,
+            scie_jump_size: scie.jump.size,
+            config_size: scie.lift.size,
+            files: scie.lift.files,
+            replacements: HashSet::new(),
         })
     }
 
-    pub(crate) fn command(&self) -> Result<&Cmd, String> {
+    pub(crate) fn select_command(&self) -> Result<Option<SelectedCmd>, String> {
         if let Some(cmd) = env::var_os("SCIE_CMD") {
             let name = cmd.into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_CMD: {value:?}")
             })?;
-            return self.additional_commands.get(&name).ok_or_else(|| {
-                format!(
-                    "The custom command specified by SCIE_CMD={name} is not a configured command \
-                    in this binary. The following named commands are available: {commands}",
-                    commands = self.additional_commands.keys().join(", ")
-                )
-            });
+            return Ok(self.commands.get(&name).map(|cmd| SelectedCmd {
+                cmd: cmd.clone(),
+                argv1_consumed: false,
+            }));
         }
-        Ok(&self.cmd)
+        let (name, argv1_consumed) = if let Some(argv1) = env::args().nth(1) {
+            (argv1, true)
+        } else {
+            ("".to_string(), false)
+        };
+        Ok(self.commands.get(&name).map(|cmd| SelectedCmd {
+            cmd: cmd.clone(),
+            argv1_consumed,
+        }))
     }
+
+    pub(crate) fn boots(&self) -> Vec<Boot> {
+        self.commands
+            .iter()
+            .map(|(name, cmd)| Boot {
+                name: name.to_string(),
+                description: cmd.description.clone(),
+            })
+            .collect::<Vec<_>>()
+    }
+
     pub(crate) fn get_file(&self, name: &str) -> Option<&File> {
         self.files_by_name.get(name)
     }
 
     pub(crate) fn get_path(&self, file: &File) -> PathBuf {
         match file {
-            File::Archive(archive) => self.root.join(&archive.fingerprint.hash),
-            File::Blob(blob) => self.root.join(&blob.fingerprint.hash).join(&blob.name),
+            File::Archive(archive) => self.base.join(&archive.hash),
+            File::Blob(blob) => self.base.join(&blob.hash).join(&blob.name),
         }
     }
 
     pub(crate) fn reify_string(&mut self, value: &str) -> Result<String, String> {
         let mut reified = String::with_capacity(value.len());
-
-        // let path_to_str = |path| {
-        //     <[u8]>::from_path(path)
-        //         .ok_or_else(|| format!("Failed to decode {} as a utf-8 path name", path.display()))?
-        //         .to_str()
-        //         .map_err(|e| format!("{e}"))
-        // };
 
         let parsed = placeholders::parse(value)?;
         for item in &parsed.items {
@@ -156,9 +175,4 @@ impl Context {
         }
         Ok(reified)
     }
-}
-
-#[time("debug")]
-pub(crate) fn determine(current_exe: PathBuf, config: Config) -> Result<Context, String> {
-    Context::new(current_exe, config)
 }

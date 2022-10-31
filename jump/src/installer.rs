@@ -7,7 +7,7 @@ use std::ffi::OsString;
 use std::io::Cursor;
 
 use crate::config::{
-    Archive, ArchiveType, Blob, Compression, EnvVar as ConfigEnvVar, File, Locator,
+    Archive, ArchiveType, Blob, Cmd, Compression, EnvVar as ConfigEnvVar, File, Locator,
 };
 use crate::context::Context;
 
@@ -57,13 +57,12 @@ pub struct Process {
 }
 
 #[time("debug")]
-fn hash(data: &[u8]) -> String {
+fn digest(data: &[u8]) -> String {
     format!("{digest:x}", digest = Sha256::digest(data))
 }
 
 #[time("debug")]
-pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, String> {
-    let command = context.command()?.clone();
+pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result<Process, String> {
     let mut to_extract = HashSet::new();
     for name in &command.additional_files {
         let file = context.get_file(name.as_str()).ok_or_else(|| {
@@ -106,38 +105,38 @@ pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, Stri
             match file {
                 File::Archive(Archive {
                     locator: Locator::Size(size),
-                    fingerprint,
+                    hash,
                     archive_type,
                     ..
-                }) if !dst.is_dir() => sized.push((size, fingerprint, dst, Some(archive_type))),
+                }) if !dst.is_dir() => sized.push((size, hash, dst, Some(archive_type))),
                 File::Blob(Blob {
                     locator: Locator::Size(size),
-                    fingerprint,
+                    hash,
                     ..
-                }) if !dst.is_file() => sized.push((size, fingerprint, dst, None)),
+                }) if !dst.is_file() => sized.push((size, hash, dst, None)),
                 File::Archive(Archive {
                     locator: Locator::Entry(path),
-                    fingerprint,
+                    hash,
                     archive_type,
                     ..
-                }) if !dst.is_dir() => entries.push((path, fingerprint, dst, Some(archive_type))),
+                }) if !dst.is_dir() => entries.push((path, hash, dst, Some(archive_type))),
                 File::Blob(Blob {
                     locator: Locator::Entry(path),
-                    fingerprint,
+                    hash,
                     ..
-                }) if !dst.is_file() => entries.push((path, fingerprint, dst, None)),
+                }) if !dst.is_file() => entries.push((path, hash, dst, None)),
                 _ => (),
             };
         }
     }
 
     let mut location = context.scie_jump_size;
-    for (size, fingerprint, dst, archive_type) in sized {
+    for (size, expected_hash, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
-        let digest = hash(bytes);
-        if digest != fingerprint.hash {
+        let actual_hash = digest(bytes);
+        if expected_hash != &actual_hash {
             return Err(format!(
-                "Destination {dst} of size {size} had unexpected hash: {digest}",
+                "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
                 dst = dst.display(),
             ));
         } else {

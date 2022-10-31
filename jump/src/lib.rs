@@ -18,14 +18,22 @@ use std::path::PathBuf;
 use byteorder::{LittleEndian, ReadBytesExt};
 use logging_timer::time;
 
+pub use crate::context::Boot;
+use crate::context::Context;
 pub use crate::installer::{EnvVars, Process};
 
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub const EOF_MAGIC: u32 = 0x534a7219;
 
+pub struct SelectBoot {
+    pub boots: Vec<Boot>,
+    pub error_message: Option<String>,
+}
+
 pub enum Action {
     BootPack(u32),
-    Execute(Process),
+    Execute((Process, bool)),
+    SelectBoot(SelectBoot),
 }
 
 #[time("debug")]
@@ -68,13 +76,20 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
         return Ok(Action::BootPack(size));
     }
 
-    let config = jmp::load(&data)?;
-    trace!("Loaded {config:#?}");
+    let scie = jmp::load(current_exe, &data)?;
+    trace!("Loaded {scie:#?}");
 
-    let context = context::determine(current_exe, config)?;
+    let context = Context::new(scie)?;
+    let result = context.select_command();
+    if let Ok(Some(selected_command)) = result {
+        let process = installer::prepare(context, selected_command.cmd, &data)?;
+        trace!("Prepared {process:#?}");
 
-    let process = installer::prepare(&data, context)?;
-    trace!("Prepared {process:#?}");
-
-    Ok(Action::Execute(process))
+        Ok(Action::Execute((process, selected_command.argv1_consumed)))
+    } else {
+        Ok(Action::SelectBoot(SelectBoot {
+            boots: context.boots(),
+            error_message: result.err(),
+        }))
+    }
 }

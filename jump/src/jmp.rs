@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use logging_timer::time;
+use std::path::PathBuf;
 
-use crate::config::Config;
+use crate::config::{Config, Scie};
 
 const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
 
@@ -55,11 +56,14 @@ fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String>
 }
 
 #[time("debug")]
-pub(crate) fn load(data: &[u8]) -> Result<Config, String> {
-    let end_of_zip = end_of_zip(data, MAXIMUM_CONFIG_SIZE)?;
-    let config_bytes = &data[end_of_zip..];
-    let mut config: Config = serde_json::from_slice(config_bytes)
+pub(crate) fn load(scie_path: PathBuf, scie_data: &[u8]) -> Result<Scie, String> {
+    let end_of_zip = end_of_zip(scie_data, MAXIMUM_CONFIG_SIZE)?;
+    let config_bytes = &scie_data[end_of_zip..];
+    let config: Config = serde_json::from_slice(config_bytes)
         .map_err(|e| format!("Failed to decode scie jmp config: {e}"))?;
-    config.size = config_bytes.len();
-    Ok(config)
+
+    let mut scie = config.scie;
+    scie.lift.size = config_bytes.len();
+    scie.path = scie_path;
+    Ok(scie)
 }

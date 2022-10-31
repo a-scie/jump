@@ -6,11 +6,11 @@ use proc_exit::{Code, Exit, ExitResult};
 use jump::Action;
 
 #[cfg(target_family = "windows")]
-fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
+fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
     use std::process::Command;
     let exit_status = Command::new(&exe)
         .args(&args)
-        .args(std::env::args().skip(1))
+        .args(std::env::args().skip(argv_skip))
         .spawn()
         .map_err(|e| Code::FAILURE.with_message(format!("Failed to spawn {exe:?} {args:?}: {e}")))?
         .wait()
@@ -23,7 +23,7 @@ fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
 }
 
 #[cfg(not(target_family = "windows"))]
-fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
+fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
     use nix::unistd::execv;
     use std::ffi::CString;
     use std::os::unix::ffi::OsStringExt;
@@ -35,7 +35,7 @@ fn exec(exe: OsString, args: Vec<OsString>) -> ExitResult {
     let mut c_args = vec![c_exe.clone()];
     c_args.extend(
         args.into_iter()
-            .chain(std::env::args().skip(1).map(OsString::from))
+            .chain(std::env::args().skip(argv_skip).map(OsString::from))
             .map(|arg| {
                 CString::new(arg.into_vec()).map_err(|e| {
                     Code::FAILURE
@@ -68,12 +68,33 @@ fn main() -> ExitResult {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
     match action {
-        Action::BootPack(size) => Err(Exit::new(Code::FAILURE).with_message(format!(
+        Action::BootPack(size) => Err(Code::FAILURE.with_message(format!(
             "TODO(John Sirois): Implement boot-pack (self size should be {size})"
         ))),
-        Action::Execute(process) => {
+        Action::Execute((process, argv1_consumed)) => {
             process.env.export();
-            exec(process.exe, process.args)
+            let argv_skip = if argv1_consumed { 2 } else { 1 };
+            exec(process.exe, process.args, argv_skip)
         }
+        Action::SelectBoot(select_boot) => Err(Code::FAILURE.with_message(format!(
+            "This Scie binary has no default boot command.\n\
+            Please select from the following:\n\
+            {boot_commands}\n\
+            \n\
+            You can select a boot command by passing it as the 1st argument or else by \
+            setting the SCIE_CMD environment variable.\n\
+            {error_message}",
+            boot_commands = select_boot
+                .boots
+                .into_iter()
+                .map(|boot| if let Some(description) = boot.description {
+                    format!("{name}: {description}", name = boot.name)
+                } else {
+                    boot.name
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            error_message = select_boot.error_message.unwrap_or_default()
+        ))),
     }
 }
