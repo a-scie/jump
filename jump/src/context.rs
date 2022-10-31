@@ -53,14 +53,15 @@ pub(crate) struct Context {
     pub(crate) cmd: Cmd,
     pub(crate) additional_commands: HashMap<String, Cmd>,
     pub(crate) root: PathBuf,
-    pub(crate) files_by_name: HashMap<String, File>,
+    pub(crate) files: Vec<File>,
     pub(crate) replacements: HashSet<File>,
+    files_by_name: HashMap<String, File>,
 }
 
 impl Context {
     pub(crate) fn new(scie: PathBuf, config: Config) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
-        for file in config.files {
+        for file in &config.files {
             match file {
                 File::Archive(Archive {
                     name: Some(ref name),
@@ -81,8 +82,9 @@ impl Context {
             cmd: config.command,
             additional_commands: config.additional_commands,
             root: expanduser(config.scie.root)?,
-            files_by_name,
+            files: config.files,
             replacements: HashSet::new(),
+            files_by_name,
         })
     }
 

@@ -95,11 +95,7 @@ pub(crate) fn prepare(data: &[u8], mut context: Context) -> Result<Process, Stri
     let mut sized = vec![];
     let mut entries = vec![];
     if !to_extract.is_empty() {
-        for file in context
-            .files_by_name
-            .values()
-            .filter(|f| to_extract.contains(f))
-        {
+        for file in context.files.iter().filter(|f| to_extract.contains(f)) {
             let dst = context.get_path(file);
             match file {
                 File::Archive(Archive {
