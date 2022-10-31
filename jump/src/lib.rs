@@ -8,10 +8,10 @@ mod atomic;
 mod config;
 mod context;
 mod installer;
+mod jump;
 mod lift;
-// Exposed for the package crate post-processing of the scie-jump binary.
-pub mod jump;
 mod placeholders;
+mod process;
 
 use std::fs::File;
 use std::path::PathBuf;
@@ -21,10 +21,11 @@ use logging_timer::time;
 pub use crate::config::Jump;
 pub use crate::context::Boot;
 use crate::context::Context;
-pub use crate::installer::{EnvVars, Process};
 
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
+
+pub use crate::process::{execute, EnvVar, EnvVars, Process};
 
 pub struct SelectBoot {
     pub boots: Vec<Boot>,
@@ -34,7 +35,7 @@ pub struct SelectBoot {
 pub enum Action {
     BootPack((Jump, PathBuf)),
     BootSelect(SelectBoot),
-    Execute((Process, bool))
+    Execute((Process, bool)),
 }
 
 #[time("debug")]

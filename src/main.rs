@@ -9,19 +9,11 @@ use jump::Action;
 
 #[cfg(target_family = "windows")]
 fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
-    use std::process::Command;
-    let exit_status = Command::new(&exe)
-        .args(&args)
-        .args(std::env::args().skip(argv_skip))
-        .spawn()
-        .map_err(|e| Code::FAILURE.with_message(format!("Failed to spawn {exe:?} {args:?}: {e}")))?
-        .wait()
-        .map_err(|e| {
-            Code::FAILURE.with_message(format!(
-                "Spawned {exe:?} {args:?} but failed to gather its exit status: {e}",
-            ))
-        })?;
-    Code::from_status(exit_status).ok()
+    let result = jump::execute(exe, args, argv_skip);
+    match result {
+        Ok(exit_status) => Code::from(exit_status).ok(),
+        Err(message) => Err(Code::FAILURE.with_message(message)),
+    }
 }
 
 #[cfg(not(target_family = "windows"))]
@@ -64,6 +56,8 @@ fn main() -> ExitResult {
             "Failed to find path of the current executable: {e}"
         ))
     })?;
+    std::env::set_var("SCIE", current_exe.as_os_str());
+
     let action = jump::prepare_action(current_exe).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
@@ -72,7 +66,6 @@ fn main() -> ExitResult {
         Action::BootPack((jump, path)) => boot::pack(jump, path),
         Action::BootSelect(select_boot) => boot::select(select_boot),
         Action::Execute((process, argv1_consumed)) => {
-            std::env::set_var("SCIE", current_exe.as_os_str());
             process.env.export();
             let argv_skip = if argv1_consumed { 2 } else { 1 };
             exec(process.exe, process.args, argv_skip)
