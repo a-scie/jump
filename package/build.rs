@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -29,7 +30,15 @@ fn main() -> Result<(), String> {
         .map_err(|e| format!("{e}"))?;
 
     let dest = std::env::var("OUT_DIR")
-        .map(|path| PathBuf::from(path).join(SCIE_JUMP_BINARY))
+        .map(|path| {
+            PathBuf::from(path)
+                .join(format!(
+                    "{SCIE_JUMP_BINARY}-{os}-{arch}",
+                    os = env::consts::OS,
+                    arch = env::consts::ARCH
+                ))
+                .with_extension(env::consts::EXE_EXTENSION)
+        })
         .map_err(|e| format!("{e}"))?;
     std::fs::copy(path, &dest).map_err(|e| format!("{e}"))?;
     println!("cargo:rustc-env=SCIE_STRAP={}", dest.display());

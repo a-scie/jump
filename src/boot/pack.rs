@@ -104,7 +104,7 @@ fn index_files(config: &Config) -> Result<Vec<(PathBuf, &File)>, String> {
 #[cfg(target_family = "windows")]
 fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
     if path.extension().is_none() {
-        let exe = path.with_extension("exe");
+        let exe = path.with_extension(env::consts::EXE_EXTENSION);
         std::fs::rename(path, &exe).map_err(|e| {
             format!(
                 "Failed to rename executable from {path} to {exe}: {e}",

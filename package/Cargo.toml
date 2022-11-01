@@ -1,6 +1,6 @@
 [package]
 name = "package"
-version = "0.1.0"
+version = "0.1.1"
 description = "Packages the scie-jump binary into its final form."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
