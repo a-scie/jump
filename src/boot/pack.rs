@@ -1,7 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use jump::config::Config;
+use jump::config::{Config, File};
 use jump::Jump;
 use proc_exit::{Code, ExitResult};
 
@@ -42,17 +42,56 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<Config, String> {
     Ok(config)
 }
 
+fn index_files(_config: &Config) -> Result<Vec<(&Path, &File)>, String> {
+    Ok(vec![])
+}
+
 fn pack(config: &Config, scie_jump_path: &PathBuf, single_line: bool) -> Result<PathBuf, String> {
-    eprintln!(
-        "TODO(John Sirois): \n\
-        Using scie-jump: {scie_jump_path:#?}\n\
-        Use single_line: {single_line}\n\
-        Lift manifest:\n\
-        {config:#?}"
-    );
-    env::current_dir()
+    let index = index_files(config)?;
+    let binary_path = env::current_dir()
         .map(|cwd| cwd.join(&config.scie.lift.name))
-        .map_err(|e| format!("{e}"))
+        .map_err(|e| format!("Failed to determine the output directory for scies: {e}"))?;
+
+    std::fs::copy(scie_jump_path, &binary_path).map_err(|e| {
+        format!(
+            "Failed to copy scie jump from {src} to {binary}: {e}",
+            src = scie_jump_path.display(),
+            binary = binary_path.display()
+        )
+    })?;
+    let mut binary = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&binary_path)
+        .map_err(|e| {
+            format!(
+                "Failed to open binary {path} for writing {scie:?}: {e}",
+                path = binary_path.display(),
+                scie = config.scie
+            )
+        })?;
+    for (path, file) in index {
+        let mut blob = std::fs::File::open(path).map_err(|e| {
+            format!(
+                "Failed to open {src} / {file:?} for writing to {binary}: {e}",
+                src = path.display(),
+                binary = binary_path.display()
+            )
+        })?;
+        std::io::copy(&mut blob, &mut binary).map_err(|e| {
+            format!(
+                "Failed to append {src} / {file:?} to {binary}: {e}",
+                src = path.display(),
+                binary = binary_path.display()
+            )
+        })?;
+    }
+    config.serialize(binary, !single_line).map_err(|e| {
+        format!(
+            "Failed to serialize the lift manifest to {binary}: {e}",
+            binary = binary_path.display()
+        )
+    })?;
+    Ok(binary_path)
 }
 
 pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
