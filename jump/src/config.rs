@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Formatter;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use serde::de::{Error, Unexpected, Visitor};
@@ -7,14 +8,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Locator {
+pub enum Locator {
     Size(usize),
     Entry(PathBuf),
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Compression {
+pub enum Compression {
     Bzip2,
     Gzip,
     Xz,
@@ -23,7 +24,7 @@ pub(crate) enum Compression {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub(crate) enum ArchiveType {
+pub enum ArchiveType {
     Zip,
     Tar,
     CompressedTar(Compression),
@@ -88,37 +89,37 @@ impl<'de> Deserialize<'de> for ArchiveType {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct Blob {
+pub struct Blob {
     #[serde(flatten)]
-    pub(crate) locator: Locator,
-    pub(crate) hash: String,
-    pub(crate) name: String,
+    pub locator: Locator,
+    pub hash: String,
+    pub name: String,
     #[serde(default)]
-    pub(crate) always_extract: bool,
+    pub always_extract: bool,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct Archive {
+pub struct Archive {
     #[serde(flatten)]
-    pub(crate) locator: Locator,
-    pub(crate) hash: String,
-    pub(crate) archive_type: ArchiveType,
+    pub locator: Locator,
+    pub hash: String,
+    pub archive_type: ArchiveType,
     #[serde(default)]
-    pub(crate) name: Option<String>,
+    pub name: Option<String>,
     #[serde(default)]
-    pub(crate) always_extract: bool,
+    pub always_extract: bool,
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[serde(tag = "type")]
-pub(crate) enum File {
+pub enum File {
     Archive(Archive),
     Blob(Blob),
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub(crate) enum EnvVar {
+pub enum EnvVar {
     Default(String),
     Replace(String),
 }
@@ -177,19 +178,19 @@ impl<'de> Deserialize<'de> for EnvVar {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct Cmd {
-    pub(crate) exe: String,
+pub struct Cmd {
+    pub exe: String,
     #[serde(default)]
-    pub(crate) args: Vec<String>,
+    pub args: Vec<String>,
     #[serde(default)]
-    pub(crate) env: HashMap<EnvVar, String>,
+    pub env: HashMap<EnvVar, String>,
     #[serde(default)]
-    pub(crate) additional_files: Vec<String>,
+    pub additional_files: Vec<String>,
     #[serde(default)]
-    pub(crate) description: Option<String>,
+    pub description: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Jump {
     pub size: usize,
     #[serde(default)]
@@ -197,10 +198,10 @@ pub struct Jump {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Boot {
-    pub(crate) commands: HashMap<String, Cmd>,
+pub struct Boot {
+    pub commands: HashMap<String, Cmd>,
     #[serde(default)]
-    pub(crate) bindings: HashMap<String, Cmd>,
+    pub bindings: HashMap<String, Cmd>,
 }
 
 fn default_base() -> PathBuf {
@@ -208,37 +209,56 @@ fn default_base() -> PathBuf {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Lift {
-    pub(crate) files: Vec<File>,
-    pub(crate) boot: Boot,
-    pub(crate) name: String,
+pub struct Lift {
+    pub files: Vec<File>,
+    pub boot: Boot,
+    pub name: String,
     #[serde(default)]
-    pub(crate) description: Option<String>,
+    pub description: Option<String>,
     #[serde(default = "default_base")]
-    pub(crate) base: PathBuf,
+    pub base: PathBuf,
     #[serde(default)]
-    pub(crate) size: usize,
+    pub size: usize,
     #[serde(default)]
-    pub(crate) hash: String,
+    pub hash: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Scie {
-    pub(crate) lift: Lift,
+pub struct Scie {
+    pub lift: Lift,
     #[serde(default)]
-    pub(crate) jump: Option<Jump>,
+    pub jump: Option<Jump>,
     #[serde(default)]
-    pub(crate) path: PathBuf,
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Config {
-    pub(crate) scie: Scie,
+pub struct Config {
+    pub scie: Scie,
 }
 
 impl Config {
-    pub(crate) fn parse(data: &[u8]) -> Result<Self, String> {
-        serde_json::from_slice(data).map_err(|e| format!("Failed to decode scie jmp config: {e}"))
+    pub fn parse(data: &[u8]) -> Result<Self, String> {
+        serde_json::from_slice(data)
+            .map_err(|e| format!("Failed to decode scie lift manifest: {e}"))
+    }
+
+    pub fn read_from<R: Read>(stream: R) -> Result<Self, String> {
+        serde_json::from_reader(stream)
+            .map_err(|e| format!("Failed to decode scie lift manifest: {e}"))
+    }
+
+    pub fn serialize<W: Write>(&self, mut stream: W, pretty: bool) -> Result<(), String> {
+        stream
+            .write_all(if cfg!(windows) { "\r\n" } else { "\n" }.as_bytes())
+            .map_err(|e| format!("Failed to write scie lift manifest: {e}"))?;
+        if pretty {
+            serde_json::to_writer_pretty(stream, self)
+                .map_err(|e| format!("Failed to write scie lift manifest: {e}"))
+        } else {
+            serde_json::to_writer(stream, self)
+                .map_err(|e| format!("Failed to write scie lift manifest: {e}"))
+        }
     }
 }
 

@@ -5,7 +5,7 @@ extern crate log;
 extern crate structure;
 
 mod atomic;
-mod config;
+pub mod config;
 mod context;
 mod fingerprint;
 mod installer;
