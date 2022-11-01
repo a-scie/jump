@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Formatter;
-use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::fingerprint;
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -88,6 +90,10 @@ impl<'de> Deserialize<'de> for ArchiveType {
     }
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Blob {
     #[serde(flatten)]
@@ -95,6 +101,7 @@ pub struct Blob {
     pub hash: String,
     pub name: String,
     #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
     pub always_extract: bool,
 }
 
@@ -105,8 +112,10 @@ pub struct Archive {
     pub hash: String,
     pub archive_type: ArchiveType,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
     pub always_extract: bool,
 }
 
@@ -181,12 +190,16 @@ impl<'de> Deserialize<'de> for EnvVar {
 pub struct Cmd {
     pub exe: String,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub env: HashMap<EnvVar, String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub additional_files: Vec<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
@@ -201,6 +214,7 @@ pub struct Jump {
 pub struct Boot {
     pub commands: HashMap<String, Cmd>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub bindings: HashMap<String, Cmd>,
 }
 
@@ -214,6 +228,7 @@ pub struct Lift {
     pub boot: Boot,
     pub name: String,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(default = "default_base")]
     pub base: PathBuf,
@@ -229,6 +244,7 @@ pub struct Scie {
     #[serde(default)]
     pub jump: Option<Jump>,
     #[serde(default)]
+    #[serde(skip_serializing)]
     pub path: PathBuf,
 }
 
@@ -238,16 +254,24 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn parse(data: &[u8]) -> Result<Self, String> {
-        serde_json::from_slice(data)
-            .map_err(|e| format!("Failed to decode scie lift manifest: {e}"))
+    pub fn parse(data: &[u8], origin: &Path) -> Result<Self, String> {
+        let mut config: Self = serde_json::from_slice(data)
+            .map_err(|e| format!("Failed to decode scie lift manifest: {e}"))?;
+        config.scie.lift.size = data.len();
+        config.scie.lift.hash = fingerprint::digest(data);
+        config.scie.path = origin.to_path_buf();
+        Ok(config)
     }
 
-    pub fn read_from<R: Read>(stream: R) -> Result<Self, String> {
-        serde_json::from_reader(stream)
-            .map_err(|e| format!("Failed to decode scie lift manifest: {e}"))
+    pub fn from_file(file: &Path) -> Result<Self, String> {
+        let data = std::fs::read(file).map_err(|e| {
+            format!(
+                "Failed to open lift manifest at {file}: {e}",
+                file = file.display()
+            )
+        })?;
+        Self::parse(data.as_slice(), file)
     }
-
     pub fn serialize<W: Write>(&self, mut stream: W, pretty: bool) -> Result<(), String> {
         stream
             .write_all(if cfg!(windows) { "\r\n" } else { "\n" }.as_bytes())

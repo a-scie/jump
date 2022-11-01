@@ -618,6 +618,8 @@ version = "0.1.0"
 dependencies = [
  "env_logger",
  "jump",
+ "log",
+ "logging_timer",
  "nix",
  "proc-exit",
 ]

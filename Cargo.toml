@@ -30,8 +30,14 @@ lto = "thin"
 opt-level = "s"
 strip = "symbols"
 
+[workspace.dependencies]
+log = "0.4"
+logging_timer = "1.1"
+
 [dependencies]
 env_logger = { version = "0.9", default-features = false }
 jump = { path = "jump" }
+log = { workspace = true }
+logging_timer = { workspace = true }
 nix = "0.25"
 proc-exit = "2.0"

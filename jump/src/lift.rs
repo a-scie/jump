@@ -4,7 +4,7 @@ use itertools::Itertools;
 use logging_timer::time;
 
 use crate::config::{Config, Scie};
-use crate::{fingerprint, jump};
+use crate::jump;
 
 const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
 
@@ -61,9 +61,9 @@ fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String>
 pub(crate) fn load(scie_path: PathBuf, scie_data: &[u8]) -> Result<Scie, String> {
     let end_of_zip = end_of_zip(scie_data, MAXIMUM_CONFIG_SIZE)?;
     let config_bytes = &scie_data[end_of_zip..];
-    let config = Config::parse(config_bytes)?;
+    let config = Config::parse(config_bytes, &scie_path)?;
 
-    let mut scie = config.scie;
+    let scie = config.scie;
     let jump = scie.jump.as_ref().ok_or_else(|| {
         format!("Loaded a lift manifest without the required jump manifest. Given {scie:?}")
     })?;
@@ -76,8 +76,5 @@ pub(crate) fn load(scie_path: PathBuf, scie_data: &[u8]) -> Result<Scie, String>
             version = jump::VERSION,
         ));
     }
-    scie.lift.size = config_bytes.len();
-    scie.lift.hash = fingerprint::digest(config_bytes);
-    scie.path = scie_path;
     Ok(scie)
 }

@@ -7,7 +7,7 @@ extern crate structure;
 mod atomic;
 pub mod config;
 mod context;
-mod fingerprint;
+pub mod fingerprint;
 mod installer;
 mod jump;
 mod lift;
