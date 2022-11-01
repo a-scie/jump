@@ -60,7 +60,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.determine-tag.outputs.release-tag }}
-          name: pex ${{ needs.determine-tag.outputs.release-version }}
+          name: scie-jump ${{ needs.determine-tag.outputs.release-version }}
           body: |
             ---
 
