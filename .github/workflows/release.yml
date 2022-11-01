@@ -40,19 +40,20 @@ jobs:
             exit 1
           fi
   github-release:
-    name: Create Github Release
+    name: (${{ matrix.os }}) Create Github Release
     needs: determine-tag
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, macos-11, windows-2022 ]
     environment: Release
     steps:
       - name: Checkout scie-jump ${{ needs.determine-tag.outputs.release-tag }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        uses: pantsbuild/actions/run-tox@95209b287c817c78a765962d40ac6cea790fc511
-        with:
-          tox-env: package
+        run: cargo run --release -p package dist
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v1
         env:
@@ -69,3 +70,4 @@ jobs:
           draft: false
           prerelease: false
           files: dist/scie-jump*
+          fail_on_unmatched_files: true
