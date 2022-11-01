@@ -14,9 +14,17 @@ fn main() -> ExitResult {
 
     let src: PathBuf = env!("SCIE_STRAP").into();
     let dest_dir: PathBuf = std::env::args().nth(1).unwrap().into();
-    let dst = dest_dir.join(src.file_name().ok_or_else(|| {
-        Code::FAILURE.with_message(format!("Expected {} to end in a file name.", src.display()))
-    })?);
+    let dst = {
+        let dst = dest_dir.join(src.file_name().ok_or_else(|| {
+            Code::FAILURE.with_message(format!("Expected {} to end in a file name.", src.display()))
+        })?);
+        if cfg!(windows) && dst.extension().is_none() {
+            dst.with_extension("exe")
+        } else {
+            dst
+        }
+    };
+
     if dest_dir.is_file() {
         return Err(Code::FAILURE.with_message(format!(
             "The specified dest_dir of {} is a file. Not overwriting",
