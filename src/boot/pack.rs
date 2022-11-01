@@ -112,7 +112,7 @@ fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
                 exe = exe.display()
             )
         })?;
-        Ok(exe)
+        return Ok(exe);
     }
     Ok(path.to_path_buf())
 }
