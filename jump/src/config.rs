@@ -211,14 +211,15 @@ fn default_base() -> PathBuf {
 pub(crate) struct Lift {
     pub(crate) files: Vec<File>,
     pub(crate) boot: Boot,
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) description: Option<String>,
     #[serde(default = "default_base")]
     pub(crate) base: PathBuf,
     #[serde(default)]
     pub(crate) size: usize,
     #[serde(default)]
     pub(crate) hash: String,
-    #[serde(default)]
-    pub(crate) description: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -313,6 +314,7 @@ mod tests {
                         },
                         size: 37,
                         hash: "XYZ".to_string(),
+                        name: "test".to_string(),
                         description: None
                     }
                 },
@@ -330,6 +332,7 @@ mod tests {
                 {
                     "scie": {
                         "lift": {
+                            "name": "example",
                             "files": [
                                 {
                                     "type": "blob",
