@@ -35,4 +35,4 @@ jobs:
       - name: Build
         run: cargo build
       - name: Package
-        run: cargo run -p package dist && dist/scie-jump*
+        run: cargo run -p package dist
