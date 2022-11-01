@@ -102,7 +102,7 @@ fn index_files(config: &Config) -> Result<Vec<(PathBuf, &File)>, String> {
 }
 
 #[cfg(target_family = "windows")]
-fn finalize_executable(path: &Path) -> Result<(), String> {
+fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
     if path.extension().is_none() {
         let exe = path.with_extension("exe");
         std::fs::rename(path, &exe).map_err(|e| {
@@ -112,12 +112,13 @@ fn finalize_executable(path: &Path) -> Result<(), String> {
                 exe = exe.display()
             )
         })?;
+        Ok(exe)
     }
-    Ok(())
+    Ok(path.to_path_buf())
 }
 
 #[cfg(not(target_family = "windows"))]
-fn finalize_executable(path: &Path) -> Result<(), String> {
+fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
     use std::os::unix::fs::PermissionsExt;
     let mut perms = std::fs::metadata(path)
         .map_err(|e| {
@@ -133,7 +134,8 @@ fn finalize_executable(path: &Path) -> Result<(), String> {
             "Failed to mark {binary} as executable: {e}",
             binary = path.display()
         )
-    })
+    })?;
+    Ok(path.to_path_buf())
 }
 
 #[time("debug")]
@@ -197,8 +199,7 @@ fn pack(
             binary = binary_path.display()
         )
     })?;
-    finalize_executable(&binary_path)?;
-    Ok(binary_path)
+    finalize_executable(&binary_path)
 }
 
 pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
