@@ -1,7 +1,7 @@
 use std::env::current_exe;
 use std::ffi::OsString;
 
-use proc_exit::{Code, Exit, ExitResult};
+use proc_exit::{Code, ExitResult};
 
 mod boot;
 
@@ -42,7 +42,7 @@ fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
 
     execv(&c_exe, &c_args)
         .map_err(|e| {
-            Exit::new(Code::new(e as i32)).with_message(format!(
+            Code::new(e as i32).with_message(format!(
                 "Failed to exec {c_exe:?} with argv {c_args:?}: {e}"
             ))
         })
