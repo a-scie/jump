@@ -62,4 +62,5 @@ jobs:
           dist/scie-jump* examples/java/${{ matrix.java-lift }}
           time RUST_LOG=debug ./coursier version
           time ./coursier java-home
-
+          time ./coursier launch org.pantsbuild:jar-tool:0.0.17 \
+            -M org.pantsbuild.tools.jar.Main -- -h

@@ -6,6 +6,7 @@
         "commands": {
           "": {
             "env": {
+              "=JAVA_HOME": "{java}/amazon-corretto-11.jdk/Contents/Home",
               "=PATH": "{java}/amazon-corretto-11.jdk/Contents/Home/bin:{scie.env.PATH}"
             },
             "exe": "{java}/amazon-corretto-11.jdk/Contents/Home/bin/java",

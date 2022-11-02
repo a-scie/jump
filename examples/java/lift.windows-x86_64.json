@@ -6,6 +6,7 @@
         "commands": {
           "": {
             "env": {
+              "=JAVA_HOME": "{java}/jdk11.0.17_8",
               "=PATH": "{java}/jdk11.0.17_8/bin:{scie.env.PATH}"
             },
             "exe": "{java}/jdk11.0.17_8/bin/java",
