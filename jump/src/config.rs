@@ -32,20 +32,40 @@ pub enum ArchiveType {
     CompressedTar(Compression),
 }
 
+impl ArchiveType {
+    fn from_ext(value: &str) -> Option<Self> {
+        // These values are derived from the `-a` extensions described by GNU tar here:
+        // https://www.gnu.org/software/tar/manual/html_node/gzip.html#gzip
+        match value {
+            "zip" => Some(ArchiveType::Zip),
+            "tar" => Some(ArchiveType::Tar),
+            "tar.bz2" | "tbz2" => Some(ArchiveType::CompressedTar(Compression::Bzip2)),
+            "tar.gz" | "tgz" => Some(ArchiveType::CompressedTar(Compression::Gzip)),
+            "tar.xz" | "tar.lzma" | "tlz" => Some(ArchiveType::CompressedTar(Compression::Xz)),
+            "tar.Z" => Some(ArchiveType::CompressedTar(Compression::Zlib)),
+            "tar.zst" | "tzst" => Some(ArchiveType::CompressedTar(Compression::Zstd)),
+            _ => None,
+        }
+    }
+
+    fn as_ext(&self) -> &str {
+        match self {
+            ArchiveType::Zip => "zip",
+            ArchiveType::Tar => "tar",
+            ArchiveType::CompressedTar(Compression::Bzip2) => "tar.bz2",
+            ArchiveType::CompressedTar(Compression::Gzip) => "tar.gz",
+            ArchiveType::CompressedTar(Compression::Xz) => "tar.xz",
+            ArchiveType::CompressedTar(Compression::Zlib) => "tar.Z",
+            ArchiveType::CompressedTar(Compression::Zstd) => "tar.zst",
+        }
+    }
+}
 impl Serialize for ArchiveType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        match self {
-            ArchiveType::Zip => serializer.serialize_str("zip"),
-            ArchiveType::Tar => serializer.serialize_str("tar"),
-            ArchiveType::CompressedTar(Compression::Bzip2) => serializer.serialize_str("tar.bz2"),
-            ArchiveType::CompressedTar(Compression::Gzip) => serializer.serialize_str("tar.gz"),
-            ArchiveType::CompressedTar(Compression::Xz) => serializer.serialize_str("tar.xz"),
-            ArchiveType::CompressedTar(Compression::Zlib) => serializer.serialize_str("tar.Z"),
-            ArchiveType::CompressedTar(Compression::Zstd) => serializer.serialize_str("tar.zst"),
-        }
+        serializer.serialize_str(self.as_ext())
     }
 }
 
@@ -68,16 +88,7 @@ impl<'de> Visitor<'de> for ArchiveTypeVisitor {
     {
         // These values are derived from the `-a` extensions described by GNU tar here:
         // https://www.gnu.org/software/tar/manual/html_node/gzip.html#gzip
-        match value {
-            "zip" => Ok(ArchiveType::Zip),
-            "tar" => Ok(ArchiveType::Tar),
-            "tar.bz2" | "tbz2" => Ok(ArchiveType::CompressedTar(Compression::Bzip2)),
-            "tar.gz" | "tgz" => Ok(ArchiveType::CompressedTar(Compression::Gzip)),
-            "tar.xz" | "tar.lzma" | "tlz" => Ok(ArchiveType::CompressedTar(Compression::Xz)),
-            "tar.Z" => Ok(ArchiveType::CompressedTar(Compression::Zlib)),
-            "tar.zst" | "tzst" => Ok(ArchiveType::CompressedTar(Compression::Zstd)),
-            _ => Err(E::invalid_value(Unexpected::Str(value), &self)),
-        }
+        ArchiveType::from_ext(value).ok_or_else(|| E::invalid_value(Unexpected::Str(value), &self))
     }
 }
 
@@ -105,23 +116,71 @@ pub struct Blob {
     pub always_extract: bool,
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Archive {
+#[derive(Serialize, Deserialize)]
+pub struct JsonArchive {
     #[serde(flatten)]
     pub locator: Locator,
     pub hash: String,
-    pub archive_type: ArchiveType,
-    #[serde(default)]
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub archive_type: Option<ArchiveType>,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub always_extract: bool,
 }
 
+impl From<Archive> for JsonArchive {
+    fn from(value: Archive) -> Self {
+        JsonArchive {
+            locator: value.locator,
+            hash: value.hash,
+            name: value.name,
+            archive_type: Some(value.archive_type),
+            always_extract: value.always_extract,
+        }
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[serde(into = "JsonArchive", try_from = "JsonArchive")]
+pub struct Archive {
+    pub locator: Locator,
+    pub hash: String,
+    pub name: String,
+    pub archive_type: ArchiveType,
+    pub always_extract: bool,
+}
+
+impl TryFrom<JsonArchive> for Archive {
+    type Error = String;
+
+    fn try_from(value: JsonArchive) -> Result<Self, Self::Error> {
+        let archive_type = if let Some(archive_type) = value.archive_type {
+            archive_type
+        } else {
+            let ext = match value.name.as_str().splitn(3, '.').collect::<Vec<_>>()[..] {
+                [stem, "tar", _] => value.name
+                        .as_str()
+                        .trim_start_matches(stem)
+                        .trim_start_matches('.'),
+                [_, ext] => ext,
+                _ => return Err(format!("This archive has no type declared and it could not be guessed from its name: {name}", name=value.name))
+            };
+            ArchiveType::from_ext(ext).ok_or_else(|| format!("This archive has no type declared and it could not be guessed from its extension: {ext}"))?
+        };
+        Ok(Archive {
+            locator: value.locator,
+            hash: value.hash,
+            name: value.name,
+            archive_type,
+            always_extract: value.always_extract,
+        })
+    }
+}
+
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-#[serde(untagged)]
+#[serde(tag = "type")]
 pub enum File {
     Archive(Archive),
     Blob(Blob),
@@ -323,14 +382,14 @@ mod tests {
                                 locator: Locator::Size(123),
                                 hash: "345".to_string(),
                                 archive_type: ArchiveType::CompressedTar(Compression::Zstd),
-                                name: Some("python".to_string()),
+                                name: "python".to_string(),
                                 always_extract: false
                             }),
                             File::Archive(Archive {
                                 locator: Locator::Size(42),
                                 hash: "def".to_string(),
                                 archive_type: ArchiveType::Zip,
-                                name: None,
+                                name: "foo.zip".to_string(),
                                 always_extract: false
                             })
                         ],
@@ -390,16 +449,15 @@ mod tests {
                                 },
                                 {
                                     "type": "archive",
+                                    "name": "foo.tar.gz",
                                     "size": 1137,
-                                    "hash": "abc",
-                                    "archive_type": "tar.gz"
+                                    "hash": "abc"
                                 },
                                 {
                                     "type": "archive",
-                                    "name": "app",
+                                    "name": "app.zip",
                                     "size": 42,
-                                    "hash": "xyz",
-                                    "archive_type": "zip"
+                                    "hash": "xyz"
                                 }
                             ],
                             "boot": {

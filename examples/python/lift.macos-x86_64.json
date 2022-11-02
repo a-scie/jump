@@ -33,13 +33,15 @@
           "archive_type": "tar.gz",
           "hash": "b7d3a1f4b57e9350571ccee49c82f503133de0d113a2dbaebc8ccf108fb3fe1b",
           "name": "python",
-          "size": 17138819
+          "size": 17138819,
+          "type": "archive"
         },
         {
           "archive_type": "zip",
           "hash": "8af7a6bb98906ed02f1d573c9f75cf6c4a99d89bfbe12e965add77821be0ac2e",
           "name": "pants",
-          "size": 188554403
+          "size": 188554403,
+          "type": "archive"
         }
       ]
     }

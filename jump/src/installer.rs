@@ -6,7 +6,7 @@ use bstr::ByteSlice;
 use logging_timer::{time, timer};
 
 use crate::atomic::atomic_directory;
-use crate::config::{Archive, ArchiveType, Blob, Cmd, Compression, File, Locator};
+use crate::config::{ArchiveType, Cmd, Compression, File, Locator};
 use crate::context::Context;
 use crate::{fingerprint, EnvVar, EnvVars, Process};
 
@@ -49,31 +49,35 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
     let mut sized = vec![];
     let mut entries = vec![];
     if !to_extract.is_empty() {
-        for file in context.files.iter().filter(|f| to_extract.contains(f)) {
-            let dst = context.get_path(file);
+        for file in context
+            .files
+            .clone()
+            .into_iter()
+            .filter(|f| to_extract.contains(f))
+        {
+            let dst = context.get_path(&file);
             match file {
-                File::Archive(Archive {
-                    locator: Locator::Size(size),
-                    hash,
-                    archive_type,
-                    ..
-                }) if !dst.is_dir() => sized.push((size, hash, dst, Some(archive_type))),
-                File::Blob(Blob {
-                    locator: Locator::Size(size),
-                    hash,
-                    ..
-                }) if !dst.is_file() => sized.push((size, hash, dst, None)),
-                File::Archive(Archive {
-                    locator: Locator::Entry(path),
-                    hash,
-                    archive_type,
-                    ..
-                }) if !dst.is_dir() => entries.push((path, hash, dst, Some(archive_type))),
-                File::Blob(Blob {
-                    locator: Locator::Entry(path),
-                    hash,
-                    ..
-                }) if !dst.is_file() => entries.push((path, hash, dst, None)),
+                File::Archive(archive) => {
+                    if !dst.is_dir() {
+                        match archive.locator {
+                            Locator::Size(size) => {
+                                sized.push((size, archive.hash, dst, Some(archive.archive_type)))
+                            }
+                            Locator::Entry(path) => entries.push((
+                                path.to_path_buf(),
+                                archive.hash,
+                                dst,
+                                Some(archive.archive_type),
+                            )),
+                        }
+                    }
+                }
+                File::Blob(blob) if !dst.is_file() => match &blob.locator {
+                    Locator::Size(size) => sized.push((*size, blob.hash.clone(), dst, None)),
+                    Locator::Entry(path) => {
+                        entries.push((path.to_path_buf(), blob.hash.clone(), dst, None))
+                    }
+                },
                 _ => (),
             };
         }
@@ -83,7 +87,7 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
     for (size, expected_hash, dst, archive_type) in sized {
         let bytes = &data[location..(location + size)];
         let actual_hash = fingerprint::digest(bytes);
-        if expected_hash != &actual_hash {
+        if expected_hash != actual_hash {
             return Err(format!(
                 "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
                 dst = dst.display(),
@@ -170,7 +174,7 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
         let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{e}"))?;
         for (path, _fingerprint, dst, _archive_type) in entries {
             std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;
-            let name = std::str::from_utf8(<[u8]>::from_path(path).ok_or_else(|| {
+            let name = std::str::from_utf8(<[u8]>::from_path(&path).ok_or_else(|| {
                 format!(
                     "Failed to decode {} to a utf-8 zip entry name",
                     path.display()

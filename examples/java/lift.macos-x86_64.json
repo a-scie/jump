@@ -22,12 +22,14 @@
           "archive_type": "tar.gz",
           "hash": "a64f436ad92d46a6fb3a2e48dd34c0e11849256b302fd53cc9b2614500c54cbd",
           "name": "java",
-          "size": 187788049
+          "size": 187788049,
+          "type": "archive"
         },
         {
           "hash": "a1799d6418fbcbad47ac9e388affc751b4fc2d8678f89c332df9592d2dd3a202",
           "name": "coursier",
-          "size": 42284054
+          "size": 42284054,
+          "type": "blob"
         }
       ]
     }

@@ -6,7 +6,7 @@ use std::path::{Component, Path, PathBuf};
 use bstr::ByteSlice;
 use logging_timer::time;
 
-use crate::config::{Archive, Cmd, File, Scie};
+use crate::config::{Cmd, File, Scie};
 use crate::placeholders;
 use crate::placeholders::{Item, Placeholder};
 
@@ -90,16 +90,12 @@ impl Context {
         let mut files_by_name = HashMap::new();
         for file in &scie.lift.files {
             match file {
-                File::Archive(Archive {
-                    name: Some(ref name),
-                    ..
-                }) => {
-                    files_by_name.insert(name.clone(), file.clone());
+                File::Archive(archive) => {
+                    files_by_name.insert(archive.name.clone(), file.clone());
                 }
-                File::Blob(ref blob) => {
+                File::Blob(blob) => {
                     files_by_name.insert(blob.name.clone(), file.clone());
                 }
-                _ => (),
             }
         }
         Ok(Context {
