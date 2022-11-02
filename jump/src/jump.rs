@@ -37,6 +37,7 @@ pub fn load(data: &[u8], path: &Path) -> Result<Option<Jump>, String> {
         return Ok(Some(Jump {
             version: VERSION.to_string(),
             size: size as usize,
+            bare: true,
         }));
     }
     Ok(None)

@@ -208,6 +208,9 @@ pub struct Jump {
     pub size: usize,
     #[serde(default)]
     pub version: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub bare: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -305,6 +308,7 @@ mod tests {
                     jump: Some(Jump {
                         version: "0.1.0".to_string(),
                         size: 37,
+                        bare: false
                     }),
                     lift: Lift {
                         base: "~/.nce".into(),
