@@ -36,3 +36,4 @@ cd "${REPO_ROOT}/examples"
 for example in "$@"; do
   fetch "$(basename "$1")"
 done
+
