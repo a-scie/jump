@@ -18,7 +18,7 @@
           "inspect": {
             "description": "PEX tools for Pants.",
             "env": {
-              "=PATH": "{python}/python/bin:{scie.env.PATH}"
+              "=PATH": "{python}/python/bin:{scie.env.PATH}",
               "PEX_TOOLS": "1"
             },
             "exe": "{python}/python/bin/python3.9",
