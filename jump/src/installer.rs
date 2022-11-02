@@ -57,28 +57,26 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
         {
             let dst = context.get_path(&file);
             match file {
-                File::Archive(archive) => {
-                    if !dst.is_dir() {
-                        match archive.locator {
-                            Locator::Size(size) => {
-                                sized.push((size, archive.hash, dst, Some(archive.archive_type)))
-                            }
-                            Locator::Entry(path) => entries.push((
-                                path.to_path_buf(),
-                                archive.hash,
-                                dst,
-                                Some(archive.archive_type),
-                            )),
-                        }
+                File::Archive(archive) if !dst.is_dir() => match archive.locator {
+                    Locator::Size(size) => {
+                        sized.push((size, archive.hash, dst, Some(archive.archive_type)))
                     }
-                }
+                    Locator::Entry(path) => entries.push((
+                        path.to_path_buf(),
+                        archive.hash,
+                        dst,
+                        Some(archive.archive_type),
+                    )),
+                },
                 File::Blob(blob) if !dst.is_file() => match &blob.locator {
                     Locator::Size(size) => sized.push((*size, blob.hash.clone(), dst, None)),
                     Locator::Entry(path) => {
                         entries.push((path.to_path_buf(), blob.hash.clone(), dst, None))
                     }
                 },
-                _ => (),
+                _ => {
+                    debug!("Cache hit {dst} for {file:?}", dst = dst.display())
+                }
             };
         }
     }
