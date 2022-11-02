@@ -25,10 +25,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-20.04
-            lift: lift.linux-x86_64.json
+            python-lift: lift.linux-x86_64.json
+            java-lift: lift.linux-x86_64.json
           - os: macos-11
-            lift: lift.macos-x86_64.json
+            python-lift: lift.macos-x86_64.json
+            java-lift: lift.macos-x86_64.json
           - os: windows-2022
+            java-lift: lift.windows-x86_64.json
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
@@ -41,11 +44,18 @@ jobs:
         run: cargo build
       - name: Package
         run: cargo run -p package dist
-      - name: Exercise
+      - name: Python Example (Pants)
         if: ${{ matrix.lift }}
         run: |
-          examples/prepare.sh examples/python
+          examples/prepare.sh python
           dist/scie-jump* examples/python/${{ matrix.lift }}
           time RUST_LOG=trace ./pants -V
           time ./pants -V
           SCIE_BOOT=inspect ./pants interpreter --verbose --indent 2
+      - name: Java Example (Coursier)
+        run: |
+          examples/prepare.sh java
+          dist/scie-jump* examples/java/${{ matrix.lift }}
+          time RUST_LOG=debug ./coursier version
+          time ./coursier java-home
+
