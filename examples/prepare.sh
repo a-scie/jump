@@ -21,8 +21,10 @@ function fetch() {
   (
     cd "${example}"
     while read -r url; do
-      echo "Fetching ${url} ..."
-      curl -L -O "${url}"
+      if [ -n "${url}" ]; then
+        echo "Fetching ${url} ..."
+        curl -fL -o "$(basename "${url}")" "${url}"
+      fi
     done
   ) < "${example}.fetch"
 }
