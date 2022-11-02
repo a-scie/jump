@@ -22,7 +22,7 @@ function fetch() {
     cd "${example}"
     while read -r url; do
       echo "Fetching ${url} ..."
-      curl -fL -O "${url}"
+      curl -L -O "${url}"
     done
   ) < "${example}.fetch"
 }
