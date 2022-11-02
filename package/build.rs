@@ -42,6 +42,5 @@ fn main() -> Result<(), String> {
         .map_err(|e| format!("{e}"))?;
     std::fs::copy(path, &dest).map_err(|e| format!("{e}"))?;
     println!("cargo:rustc-env=SCIE_STRAP={}", dest.display());
-    println!("cargo:warning=Packaged scie-jump to {}", dest.display());
     Ok(())
 }
