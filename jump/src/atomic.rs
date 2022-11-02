@@ -28,7 +28,7 @@ where
 
     // We use an atomic rename under a double-checked exclusive write lock to implement an atomic
     // directory creation.
-    if work_dir.exists() {
+    if target_dir.exists() {
         return Ok(());
     }
 
@@ -40,9 +40,15 @@ where
     })?;
     let mut lock = fd_lock::RwLock::new(lock_fd);
     let _write_lock = lock.write();
-    if work_dir.exists() {
+    if target_dir.exists() {
         return Ok(());
     }
+    std::fs::create_dir_all(&work_dir).map_err(|e| {
+        format!(
+            "Failed to prepare workdir {work_dir}: {e}",
+            work_dir = work_dir.display()
+        )
+    })?;
     work(&work_dir).map_err(|e| {
         format!(
             "Failed to establish atomic directory {target_dir}. Population of work directory \
