@@ -23,7 +23,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macos-11, windows-2022 ]
+        include:
+          - os: ubuntu-20.04
+            lift: lift.linux-x86_64.json
+          - os: macos-11
+            lift: lift.macos-x86_64.json
+          - os: windows-2022
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
@@ -36,3 +41,11 @@ jobs:
         run: cargo build
       - name: Package
         run: cargo run -p package dist
+      - name: Exercise
+        if: ${{ matrix.lift }}
+        run: |
+          examples/prepare.sh examples/python
+          dist/scie-jump* examples/python/${{ matrix.lift }}
+          time RUST_LOG=trace ./pants -V
+          time ./pants -V
+          SCIE_BOOT=inspect ./pants interpreter --verbose --indent 2
