@@ -121,7 +121,7 @@ pub struct Archive {
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum File {
     Archive(Archive),
     Blob(Blob),
