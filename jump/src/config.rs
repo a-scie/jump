@@ -15,7 +15,7 @@ pub enum Locator {
     Entry(PathBuf),
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
     Bzip2,
@@ -25,7 +25,7 @@ pub enum Compression {
     Zstd,
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum ArchiveType {
     Zip,
     Tar,
@@ -48,7 +48,7 @@ impl ArchiveType {
         }
     }
 
-    fn as_ext(&self) -> &str {
+    pub fn as_ext(&self) -> &str {
         match self {
             ArchiveType::Zip => "zip",
             ArchiveType::Tar => "tar",
@@ -60,6 +60,7 @@ impl ArchiveType {
         }
     }
 }
+
 impl Serialize for ArchiveType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -190,11 +191,29 @@ impl TryFrom<JsonArchive> for Archive {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct Directory {
+    pub name: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locator: Option<Locator>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archive_type: Option<ArchiveType>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_false")]
+    pub always_extract: bool,
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[serde(tag = "type")]
 pub enum File {
     Archive(Archive),
     Blob(Blob),
+    Directory(Directory),
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
@@ -256,7 +275,7 @@ impl<'de> Deserialize<'de> for EnvVar {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cmd {
     pub exe: String,
     #[serde(default)]
@@ -283,7 +302,7 @@ pub struct Jump {
     pub bare: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Boot {
     pub commands: HashMap<String, Cmd>,
     #[serde(default)]
@@ -295,7 +314,7 @@ fn default_base() -> PathBuf {
     PathBuf::from("~/.nce")
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Lift {
     pub files: Vec<File>,
     pub boot: Boot,
@@ -311,7 +330,7 @@ pub struct Lift {
     pub hash: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Scie {
     pub lift: Lift,
     #[serde(default)]
@@ -321,7 +340,7 @@ pub struct Scie {
     pub path: PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub scie: Scie,
 }

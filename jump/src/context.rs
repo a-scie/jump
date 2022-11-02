@@ -96,6 +96,9 @@ impl Context {
                 File::Blob(blob) => {
                     files_by_name.insert(blob.name.clone(), file.clone());
                 }
+                File::Directory(directory) => {
+                    files_by_name.insert(directory.name.clone(), file.clone());
+                }
             }
         }
         Ok(Context {
@@ -164,10 +167,19 @@ impl Context {
         self.files_by_name.get(name)
     }
 
-    pub(crate) fn get_path(&self, file: &File) -> PathBuf {
+    pub(crate) fn get_path(&self, file: &File) -> Result<PathBuf, String> {
         match file {
-            File::Archive(archive) => self.base.join(&archive.hash),
-            File::Blob(blob) => self.base.join(&blob.hash).join(&blob.name),
+            File::Archive(archive) => Ok(self.base.join(&archive.hash)),
+            File::Blob(blob) => Ok(self.base.join(&blob.hash).join(&blob.name)),
+            File::Directory(directory) => {
+                let hash = &directory.hash.as_ref().ok_or_else(|| {
+                    format!(
+                        "Directory entries without a hash should never be present in an assembled \
+                        scie's lift manifest. Found unexpected: {directory:?}"
+                    )
+                })?;
+                Ok(self.base.join(hash))
+            }
         }
     }
 
@@ -183,7 +195,7 @@ impl Context {
                     let file = self
                         .get_file(name)
                         .ok_or_else(|| format!("No file named {name} is stored in this scie."))?;
-                    let path = self.get_path(file);
+                    let path = self.get_path(file)?;
                     reified.push_str(path_to_str(&path)?);
                     self.replacements.insert(file.clone());
                 }
