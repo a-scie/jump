@@ -159,20 +159,21 @@ impl TryFrom<JsonArchive> for Archive {
         let archive_type = if let Some(archive_type) = value.archive_type {
             archive_type
         } else {
-            let ext =
-                match value.name.as_str().splitn(3, '.').collect::<Vec<_>>()[..] {
-                    [stem, "tar", _] => value
-                        .name
-                        .as_str()
-                        .trim_start_matches(stem)
-                        .trim_start_matches('.'),
-                    [_, ext] => ext,
-                    _ => {
-                        return Err(format!(
-                        "This archive has no type declared and it could not be guessed from its \
-                        name: {name}", name=value.name))
-                    }
-                };
+            let ext = match value.name.as_str().rsplitn(3, '.').collect::<Vec<_>>()[..] {
+                [_, "tar", stem] => value
+                    .name
+                    .as_str()
+                    .trim_start_matches(stem)
+                    .trim_start_matches('.'),
+                [ext, _] => ext,
+                _ => {
+                    return Err(format!(
+                        "This archive has no type declared and it could not be guessed from \
+                            its name: {name} (!)",
+                        name = value.name
+                    ))
+                }
+            };
             ArchiveType::from_ext(ext).ok_or_else(|| {
                 format!(
                     "This archive has no type declared and it could not be guessed from its \
