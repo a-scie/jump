@@ -13,6 +13,7 @@ mod jump;
 mod lift;
 mod placeholders;
 mod process;
+mod zip;
 
 use std::env;
 use std::fs::File;
