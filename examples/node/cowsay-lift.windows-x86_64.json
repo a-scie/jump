@@ -24,7 +24,7 @@
           "type": "archive"
         },
         {
-          "name": "noop",
+          "name": "node_modules",
           "type": "directory"
         }
       ]
