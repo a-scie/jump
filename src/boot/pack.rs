@@ -41,7 +41,7 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<Config, String> {
 
 #[cfg(not(target_family = "unix"))]
 fn create_options(_entry: &DirEntry) -> Result<FileOptions, String> {
-    FileOptions::default()
+    Ok(FileOptions::default())
 }
 
 #[cfg(target_family = "unix")]
