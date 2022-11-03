@@ -27,11 +27,14 @@ jobs:
           - os: ubuntu-20.04
             python-lift: lift.linux-x86_64.json
             java-lift: lift.linux-x86_64.json
+            node-lift: lift.linux-x86_64.json
           - os: macos-11
             python-lift: lift.macos-x86_64.json
             java-lift: lift.macos-x86_64.json
+            node-lift: lift.macos-x86_64.json
           - os: windows-2022
             java-lift: lift.windows-x86_64.json
+            node-lift: lift.windows-x86_64.json
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
@@ -51,6 +54,8 @@ jobs:
           dist/scie-jump* examples/python/${{ matrix.python-lift }}
           time RUST_LOG=trace ./pants -V
           time ./pants -V
+          
+          # Use the built-in BusyBox functionality via env var.
           SCIE_BOOT=inspect ./pants interpreter --verbose --indent 2
       - name: Java Example (Coursier)
         run: |
@@ -64,3 +69,22 @@ jobs:
           time ./coursier java-home
           time ./coursier launch org.pantsbuild:jar-tool:0.0.17 \
             -M org.pantsbuild.tools.jar.Main -- -h
+      - name: Node Example (npm and cowsay)
+        run: |
+          if [ "windows-2022" == "${{ matrix.os }}" ]; then
+            pwsh examples/prepare.ps1 node
+            npm_exe=npm.exe
+          else
+            examples/prepare.sh node
+            npm_exe=npm
+          fi
+          dist/scie-jump* examples/node/${{ matrix.node-lift }}
+          
+          # Use the built-in BusyBox functionality via binary base name.
+          cd examples/node && rm noop.zip && ln ../../node.js ${npm_exe}
+          ./npm install cowsay
+          
+          # Build a scie from another scie's tip-embedded scie-jump.
+          SCIE=boot-pack ../../node.js ./cowsay-${{ matrix.node-lift }}
+          rm -rf node_modules node_modules.zip
+          ./cowsay.js -b 'All the binaries belong to us!'

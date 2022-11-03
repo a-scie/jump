@@ -1,0 +1,41 @@
+{
+  "scie": {
+    "lift": {
+      "name": "node.js",
+      "boot": {
+        "commands": {
+          "node": {
+            "env": {
+              "=PATH": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64:{scie.env.PATH}"
+            },
+            "exe": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64/node.exe"
+          },
+          "npm": {
+            "env": {
+              "=PATH": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64/bin:{scie.env.PATH}"
+            },
+            "exe": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64/npm.cmd"
+          },
+          "npx": {
+            "env": {
+              "=PATH": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64:{scie.env.PATH}"
+            },
+            "exe": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64/npx.cmd"
+          }
+        }
+      },
+      "files": [
+        {
+          "hash": "56a3a49e0e4701f169bb742ea98f5006800229e2e3bf7e10493642f392416ac8",
+          "name": "node-v18.12.0-win-x64.zip",
+          "size": 28276708,
+          "type": "archive"
+        },
+        {
+          "name": "noop",
+          "type": "directory"
+        }
+      ]
+    }
+  }
+}

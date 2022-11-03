@@ -1,5 +1,6 @@
 *.jar
 *.pex
 *.tar.gz
+*.tar.xz
 *.zip
 
