@@ -115,6 +115,12 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
             std::io::copy(&mut file, &mut zip).map_err(|e| format!("{e}"))?;
         }
     }
+    zip.finish().map_err(|e| {
+        format!(
+            "Failed to finalize zip {zip}: {e}",
+            zip = zip_path.display()
+        )
+    })?;
     Ok(zip_path)
 }
 
