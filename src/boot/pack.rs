@@ -74,7 +74,7 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
                 )
             })?,
     );
-    for entry in WalkDir::new(dir).contents_first(false).follow_links(false) {
+    for entry in WalkDir::new(dir).contents_first(false).follow_links(true) {
         let entry = entry.map_err(|e| {
             format!(
                 "Walk failed while trying to create a zip of {dir}: {e}",
@@ -107,14 +107,11 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
         } else {
             zip.start_file(entry_name, options)
                 .map_err(|e| format!("{e}"))?;
-            let path = if entry.path_is_symlink() {
-                debug!("Resolving symlink {entry}", entry = rel_path.display());
-                std::fs::read_link(entry.path()).map_err(|e| format!("{e}"))?
-            } else {
-                debug!("Adding file entry {entry}", entry = rel_path.display());
-                entry.path().to_path_buf()
+            if entry.path_is_symlink() {
+                debug!("Resolved symlink {entry}", entry = rel_path.display());
             };
-            let mut file = std::fs::File::open(path).map_err(|e| format!("{e}"))?;
+            debug!("Adding file entry {entry}", entry = rel_path.display());
+            let mut file = std::fs::File::open(entry.path()).map_err(|e| format!("{e}"))?;
             std::io::copy(&mut file, &mut zip).map_err(|e| format!("{e}"))?;
         }
     }
@@ -341,7 +338,7 @@ pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
     let mut single_line = true;
     for arg in env::args().skip(1) {
         match arg.as_str() {
-            "--single-lift-line" => single_line = true,
+            "-1" | "--single-lift-line" => single_line = true,
             "--no-single-lift-line" => single_line = false,
             _ => {
                 lifts.push(
