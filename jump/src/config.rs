@@ -165,11 +165,12 @@ impl TryFrom<JsonArchive> for Archive {
                     .as_str()
                     .trim_start_matches(stem)
                     .trim_start_matches('.'),
+                [ext, _, _] => ext,
                 [ext, _] => ext,
                 _ => {
                     return Err(format!(
                         "This archive has no type declared and it could not be guessed from \
-                            its name: {name} (!)",
+                        its name: {name}",
                         name = value.name
                     ))
                 }
