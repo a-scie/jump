@@ -11,10 +11,10 @@ publish = false
 [dependencies]
 bstr = { workspace = true }
 byteorder = "1.4"
-bzip2 = { workspace = true }
+bzip2 = "0.4"
 dirs = "4.0"
 fd-lock = "3.0"
-flate2 = { workspace = true }
+flate2 = "1.0"  # For gz support.
 itertools = "0.10"
 log = { workspace = true }
 logging_timer = { workspace = true }
@@ -23,16 +23,17 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 structure = "0.1"
-tar = { workspace = true }
+tar = "0.4"
 tuple = "0.5"
-xz2 = { workspace = true }
-zstd = { workspace = true }
+xz2 = "0.1"
+zstd = "0.11"
 walkdir = "2.3"
 
 [dependencies.zip]
 version = "0.6"
 default-features = false
-# We specifically don't include "time" which is otherwise default.
-# Without time, zip creation always uses 1/1/1980 and gives us
-# reproducible zip creation.
-features = ["deflate", "bzip2", "zstd"]
+# We specifically don't include "time" which is otherwise default. Without time, zip creation
+# always uses 1/1/1980 and gives us reproducible zip creation by default.
+# We also leave out non-standard forms of compression which net a ~40% increase in final binary
+# size as of this commit (~1.4MB -> 2MB).
+features = ["deflate"]

@@ -32,13 +32,8 @@ strip = "symbols"
 
 [workspace.dependencies]
 bstr = "1.0"
-bzip2 = "0.4"
-flate2 = "1.0"
 log = "0.4"
 logging_timer = "1.1"
-tar = "0.4"
-xz2 = "0.1"
-zstd = "0.11"
 
 [dependencies]
 bstr = { workspace = true }
