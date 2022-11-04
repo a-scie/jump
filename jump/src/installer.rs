@@ -146,20 +146,24 @@ pub(crate) fn prepare(
                 Locator::Size(size) => {
                     if to_extract.contains(file) {
                         let dst = context.get_path(file)?;
-                        let bytes = &payload[location..(location + size)];
-                        let actual_hash = fingerprint::digest(bytes);
-                        if archive.hash != actual_hash {
-                            return Err(format!(
+                        if !dst.is_dir() {
+                            let bytes = &payload[location..(location + size)];
+                            let actual_hash = fingerprint::digest(bytes);
+                            if archive.hash != actual_hash {
+                                return Err(format!(
                                     "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
                                     dst = dst.display(),
                                 ));
+                            } else {
+                                debug!(
+                                    "Destination {dst} of size {size} had expected hash",
+                                    dst = dst.display()
+                                );
+                            }
+                            unpack(Some(archive.archive_type), Cursor::new(bytes), &dst)?;
                         } else {
-                            debug!(
-                                "Destination {dst} of size {size} had expected hash",
-                                dst = dst.display()
-                            );
+                            debug!("Cache hit {dst} for {file:?}", dst = dst.display())
                         }
-                        unpack(Some(archive.archive_type), Cursor::new(bytes), &dst)?;
                     }
                     location += size
                 }
@@ -179,20 +183,24 @@ pub(crate) fn prepare(
                 Locator::Size(size) => {
                     if to_extract.contains(file) {
                         let dst = context.get_path(file)?;
-                        let bytes = &payload[location..(location + size)];
-                        let actual_hash = fingerprint::digest(bytes);
-                        if blob.hash != actual_hash {
-                            return Err(format!(
+                        if !dst.is_file() {
+                            let bytes = &payload[location..(location + size)];
+                            let actual_hash = fingerprint::digest(bytes);
+                            if blob.hash != actual_hash {
+                                return Err(format!(
                                     "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
                                     dst = dst.display(),
                                 ));
+                            } else {
+                                debug!(
+                                    "Destination {dst} of size {size} had expected hash",
+                                    dst = dst.display()
+                                );
+                            }
+                            unpack(None, Cursor::new(bytes), &dst)?;
                         } else {
-                            debug!(
-                                "Destination {dst} of size {size} had expected hash",
-                                dst = dst.display()
-                            );
+                            debug!("Cache hit {dst} for {file:?}", dst = dst.display())
                         }
-                        unpack(None, Cursor::new(bytes), &dst)?;
                     }
                     location += size
                 }

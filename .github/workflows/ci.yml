@@ -86,5 +86,5 @@ jobs:
           
           # Build a scie from another scie's tip-embedded scie-jump.
           SCIE=boot-pack ../../node.js ./cowsay-${{ matrix.node-lift }}
-          rm -rf npm node_modules node_modules.zip package*.json
+          rm -rf npm node_modules* package*.json
           ./cowsay.js -b 'All the binaries belong to us!'
