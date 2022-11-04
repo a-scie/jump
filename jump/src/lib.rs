@@ -70,10 +70,12 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
         }
     }
 
-    let context = Context::new(current_exe, jump, lift)?;
+    let manifest_size = lift.size;
+    let context = Context::new(current_exe, lift)?;
     let result = context.select_command();
     if let Ok(Some(selected_command)) = result {
-        let process = installer::prepare(context, selected_command.cmd, &data)?;
+        let payload = &data[jump.size..data.len() - manifest_size];
+        let process = installer::prepare(context, selected_command.cmd, payload)?;
         trace!("Prepared {process:#?}");
         env::set_var("SCIE", selected_command.scie.as_os_str());
         Ok(Action::Execute((process, selected_command.argv1_consumed)))

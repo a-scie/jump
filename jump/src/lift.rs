@@ -107,8 +107,6 @@ impl From<Lift> for crate::config::Lift {
             name: value.name,
             description: value.description,
             base: value.base,
-            size: value.size,
-            hash: value.hash,
             boot: value.boot,
             files: value
                 .files
@@ -135,9 +133,12 @@ impl From<Scie> for crate::config::Scie {
 }
 
 #[time("debug")]
-fn assemble(resolve_base: &Path, lift: crate::config::Lift) -> Result<Lift, String> {
+fn assemble(
+    resolve_base: &Path,
+    config_files: Vec<crate::config::File>,
+) -> Result<Vec<File>, String> {
     let mut files = vec![];
-    for file in lift.files {
+    for file in config_files {
         let assembled_file = match file {
             crate::config::File::Archive(archive) => {
                 let (locator, hash) =
@@ -225,15 +226,7 @@ fn assemble(resolve_base: &Path, lift: crate::config::Lift) -> Result<Lift, Stri
         };
         files.push(assembled_file);
     }
-    Ok(Lift {
-        name: lift.name,
-        description: lift.description,
-        base: lift.base,
-        size: lift.size,
-        hash: lift.hash,
-        boot: lift.boot,
-        files,
-    })
+    Ok(files)
 }
 
 #[time("debug")]
@@ -261,11 +254,6 @@ pub fn load_lift(manifest_path: &Path) -> Result<(Option<Jump>, Lift), String> {
 
 fn load(manifest_path: &Path, data: &[u8]) -> Result<(Option<Jump>, Lift), String> {
     let config = Config::parse(data)?;
-    let jump = config.scie.jump.map(|config_jump| Jump {
-        size: config_jump.size,
-        version: config_jump.version,
-        bare: false,
-    });
     let resolve_base = manifest_path
         .parent()
         .unwrap_or_else(|| Path::new(""))
@@ -277,8 +265,18 @@ fn load(manifest_path: &Path, data: &[u8]) -> Result<(Option<Jump>, Lift), Strin
                 manifest = manifest_path.display()
             )
         })?;
-    let mut lift = assemble(&resolve_base, config.scie.lift)?;
-    lift.size = data.len();
-    lift.hash = fingerprint::digest(data);
-    Ok((jump, lift))
+    let lift = config.scie.lift;
+    let files = assemble(&resolve_base, lift.files)?;
+    Ok((
+        config.scie.jump,
+        Lift {
+            name: lift.name,
+            description: lift.description,
+            base: lift.base,
+            boot: lift.boot,
+            size: data.len(),
+            hash: fingerprint::digest(data),
+            files,
+        },
+    ))
 }

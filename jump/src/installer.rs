@@ -13,7 +13,11 @@ use crate::lift::File;
 use crate::process::{EnvVar, EnvVars, Process};
 
 #[time("debug")]
-pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result<Process, String> {
+pub(crate) fn prepare(
+    mut context: Context,
+    command: Cmd,
+    payload: &[u8],
+) -> Result<Process, String> {
     let mut to_extract = HashSet::new();
     for name in &command.additional_files {
         let file = context.get_file(name.as_str()).ok_or_else(|| {
@@ -83,9 +87,9 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
         }
     }
 
-    let mut location = context.scie_jump_size;
+    let mut location = 0;
     for (size, expected_hash, dst, archive_type) in sized {
-        let bytes = &data[location..(location + size)];
+        let bytes = &payload[location..(location + size)];
         let actual_hash = fingerprint::digest(bytes);
         if expected_hash != actual_hash {
             return Err(format!(
@@ -170,7 +174,7 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
     }
 
     if !entries.is_empty() {
-        let seekable_bytes = Cursor::new(&data[location..(data.len() - context.config_size)]);
+        let seekable_bytes = Cursor::new(&payload[location..]);
         let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{e}"))?;
         for (path, _fingerprint, dst, _archive_type) in entries {
             std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;

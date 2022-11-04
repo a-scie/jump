@@ -299,14 +299,11 @@ pub struct Cmd {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Jump {
     pub size: usize,
     #[serde(default)]
     pub version: String,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub bare: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -329,10 +326,6 @@ pub struct Lift {
     pub description: Option<String>,
     #[serde(default = "default_base")]
     pub base: PathBuf,
-    #[serde(default)]
-    pub size: usize,
-    #[serde(default)]
-    pub hash: String,
     pub files: Vec<File>,
     pub boot: Boot,
 }
@@ -390,7 +383,6 @@ mod tests {
                     jump: Some(Jump {
                         version: "0.1.0".to_string(),
                         size: 37,
-                        bare: false
                     }),
                     lift: Lift {
                         base: "~/.nce".into(),
@@ -445,8 +437,6 @@ mod tests {
                             .collect::<HashMap<_, _>>(),
                             bindings: Default::default()
                         },
-                        size: 37,
-                        hash: "XYZ".to_string(),
                         name: "test".to_string(),
                         description: None
                     }

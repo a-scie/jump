@@ -6,7 +6,7 @@ use std::path::{Component, Path, PathBuf};
 use bstr::ByteSlice;
 use logging_timer::time;
 
-use crate::config::{Cmd, Jump};
+use crate::config::Cmd;
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder};
 
@@ -63,8 +63,6 @@ pub(crate) struct Context {
     _bindings: HashMap<String, Cmd>,
     base: PathBuf,
     files_by_name: HashMap<String, File>,
-    pub(crate) scie_jump_size: usize,
-    pub(crate) config_size: usize,
     pub(crate) files: Vec<File>,
     pub(crate) replacements: HashSet<File>,
     pub(crate) description: Option<String>,
@@ -76,8 +74,7 @@ fn try_as_str(os_str: &OsStr) -> Option<&str> {
 
 impl Context {
     #[time("debug")]
-    pub(crate) fn new(scie_path: PathBuf, jump: Jump, lift: Lift) -> Result<Self, String> {
-        let scie_jump_size = jump.size;
+    pub(crate) fn new(scie_path: PathBuf, lift: Lift) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
         for file in &lift.files {
             match file {
@@ -102,8 +99,6 @@ impl Context {
             _bindings: lift.boot.bindings,
             base: expanduser(lift.base)?,
             files_by_name,
-            scie_jump_size,
-            config_size: lift.size,
             files: lift.files,
             replacements: HashSet::new(),
         })

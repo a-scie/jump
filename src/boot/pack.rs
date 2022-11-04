@@ -74,8 +74,8 @@ fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
 fn pack(
     lift: Lift,
     manifest_path: &Path,
+    jump: &Jump,
     scie_jump_path: &Path,
-    scie_jump_size: usize,
     single_line: bool,
 ) -> Result<PathBuf, String> {
     let binary_path = env::current_dir()
@@ -99,11 +99,12 @@ fn pack(
                 binary = binary_path.display()
             )
         })?
-        .take(scie_jump_size as u64);
+        .take(jump.size as u64);
     std::io::copy(&mut scie_jump, &mut binary).map_err(|e| {
         format!(
             "Failed to write first {scie_jump_size} bytes of the scie-jump binary {path} to \
             {binary}: {e}",
+            scie_jump_size = jump.size,
             path = scie_jump_path.display(),
             binary = binary_path.display()
         )
@@ -131,11 +132,7 @@ fn pack(
     }
     let config = Config {
         scie: Scie {
-            jump: Some(Jump {
-                size: scie_jump_size,
-                version: "".to_string(), // TODO(John Sirois): XXX
-                bare: false,
-            }),
+            jump: Some(jump.clone()),
             lift,
         }
         .into(),
@@ -181,7 +178,7 @@ pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
     let results = lifts
         .into_iter()
         .map(|(lift, manifest)| {
-            pack(lift, &manifest, &scie_jump_path, jump.size, single_line)
+            pack(lift, &manifest, &jump, &scie_jump_path, single_line)
                 .map(|binary| (manifest, binary))
         })
         .collect::<Result<Vec<_>, _>>()
