@@ -77,19 +77,9 @@ impl Context {
     pub(crate) fn new(scie_path: PathBuf, lift: Lift) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
         for file in &lift.files {
-            match file {
-                File::Archive(archive) => {
-                    files_by_name.insert(archive.name.clone(), file.clone());
-                    if let Some(key) = archive.key.as_ref() {
-                        files_by_name.insert(key.clone(), file.clone());
-                    }
-                }
-                File::Blob(blob) => {
-                    files_by_name.insert(blob.name.clone(), file.clone());
-                    if let Some(key) = blob.key.as_ref() {
-                        files_by_name.insert(key.clone(), file.clone());
-                    }
-                }
+            files_by_name.insert(file.name.clone(), file.clone());
+            if let Some(key) = file.key.as_ref() {
+                files_by_name.insert(key.clone(), file.clone());
             }
         }
         Ok(Context {
@@ -156,11 +146,8 @@ impl Context {
         self.files_by_name.get(name)
     }
 
-    pub(crate) fn get_path(&self, file: &File) -> Result<PathBuf, String> {
-        match file {
-            File::Archive(archive) => Ok(self.base.join(&archive.hash)),
-            File::Blob(blob) => Ok(self.base.join(&blob.hash).join(&blob.name)),
-        }
+    pub(crate) fn get_path(&self, file: &File) -> PathBuf {
+        self.base.join(&file.hash).join(&file.name)
     }
 
     pub(crate) fn reify_string(&mut self, value: &str) -> Result<String, String> {
@@ -175,7 +162,7 @@ impl Context {
                     let file = self
                         .get_file(name)
                         .ok_or_else(|| format!("No file named {name} is stored in this scie."))?;
-                    let path = self.get_path(file)?;
+                    let path = self.get_path(file);
                     reified.push_str(path_to_str(&path)?);
                     self.replacements.insert(file.clone());
                 }

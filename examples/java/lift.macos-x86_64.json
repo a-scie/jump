@@ -20,12 +20,10 @@
       "files": [
         {
           "name": "amazon-corretto-11.0.17.8.1-macosx-x64.tar.gz",
-          "key": "jdk",
-          "type": "archive"
+          "key": "jdk"
         },
         {
-          "name": "coursier.jar",
-          "type": "blob"
+          "name": "coursier.jar"
         }
       ]
     }

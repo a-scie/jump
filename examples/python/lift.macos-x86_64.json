@@ -30,16 +30,14 @@
       },
       "files": [
         {
-          "hash": "b7d3a1f4b57e9350571ccee49c82f503133de0d113a2dbaebc8ccf108fb3fe1b",
           "name": "cpython-3.9.14+20221002-x86_64-apple-darwin-install_only.tar.gz",
           "key": "cpython",
-          "size": 17138819,
-          "type": "archive"
+          "hash": "b7d3a1f4b57e9350571ccee49c82f503133de0d113a2dbaebc8ccf108fb3fe1b",
+          "size": 17138819
         },
         {
-          "archive_type": "zip",
           "name": "pants.2.14.0.pex",
-          "type": "archive"
+          "type": "zip"
         }
       ]
     }

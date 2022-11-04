@@ -4,6 +4,7 @@ extern crate log;
 #[macro_use]
 extern crate structure;
 
+mod archive;
 mod atomic;
 pub mod config;
 mod context;
@@ -11,7 +12,6 @@ pub mod fingerprint;
 mod installer;
 mod jump;
 mod lift;
-mod pack;
 mod placeholders;
 mod process;
 mod zip;

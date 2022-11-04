@@ -23,9 +23,7 @@
           "type": "archive"
         },
         {
-          "name": "node_modules",
-          "key": "node_modules",
-          "type": "directory"
+          "name": "node_modules"
         }
       ]
     }

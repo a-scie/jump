@@ -4,14 +4,12 @@ use std::fs::OpenOptions;
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
-use bstr::ByteSlice;
 use logging_timer::time;
 
 use crate::atomic::atomic_directory;
-use crate::config::{ArchiveType, Cmd, Compression, Locator};
+use crate::config::{ArchiveType, Cmd, Compression, FileType};
 use crate::context::Context;
 use crate::fingerprint;
-use crate::lift::File;
 use crate::process::{EnvVar, EnvVars, Process};
 
 #[time("debug")]
@@ -89,15 +87,11 @@ fn unpack_blob<R: Read>(mut bytes: R, dst: &Path) -> Result<(), String> {
     })
 }
 
-fn unpack<R: Read + Seek>(
-    archive_type: Option<ArchiveType>,
-    bytes: R,
-    dst: &Path,
-) -> Result<(), String> {
-    if let Some(archive) = archive_type {
-        unpack_archive(archive, bytes, dst)
-    } else {
-        unpack_blob(bytes, dst)
+fn unpack<R: Read + Seek>(file_type: FileType, bytes: R, dst: &Path) -> Result<(), String> {
+    match file_type {
+        FileType::Archive(archive_type) => unpack_archive(archive_type, bytes, dst),
+        FileType::Blob => unpack_blob(bytes, dst),
+        FileType::Directory => unpack_archive(ArchiveType::Zip, bytes, dst),
     }
 }
 
@@ -138,101 +132,38 @@ pub(crate) fn prepare(
         to_extract.insert(file.clone());
     }
 
-    let mut entries = vec![];
     let mut location = 0;
     for file in &context.files {
-        match file {
-            File::Archive(ref archive) => match &archive.locator {
-                Locator::Size(size) => {
-                    if to_extract.contains(file) {
-                        let dst = context.get_path(file)?;
-                        if !dst.is_dir() {
-                            let bytes = &payload[location..(location + size)];
-                            let actual_hash = fingerprint::digest(bytes);
-                            if archive.hash != actual_hash {
-                                return Err(format!(
-                                    "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
-                                    dst = dst.display(),
-                                ));
-                            } else {
-                                debug!(
-                                    "Destination {dst} of size {size} had expected hash",
-                                    dst = dst.display()
-                                );
-                            }
-                            unpack(Some(archive.archive_type), Cursor::new(bytes), &dst)?;
-                        } else {
-                            debug!("Cache hit {dst} for {file:?}", dst = dst.display())
-                        }
-                    }
-                    location += size
+        if to_extract.contains(file) {
+            let dst = context.get_path(file);
+            let file_type = match file.file_type {
+                archive_type @ FileType::Archive(_) if !dst.is_dir() => Some(archive_type),
+                FileType::Blob if !dst.is_file() => Some(FileType::Blob),
+                FileType::Directory if !dst.is_dir() => Some(FileType::Directory),
+                _ => None,
+            };
+            if let Some(file_type) = file_type {
+                let bytes = &payload[location..(location + file.size)];
+                let actual_hash = fingerprint::digest(bytes);
+                if file.hash != actual_hash {
+                    return Err(format!(
+                        "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
+                        size = file.size,
+                        dst = dst.display(),
+                    ));
+                } else {
+                    debug!(
+                        "Destination {dst} of size {size} had expected hash",
+                        size = file.size,
+                        dst = dst.display()
+                    );
                 }
-                Locator::Entry(path) => {
-                    if to_extract.contains(file) {
-                        let dst = context.get_path(file)?;
-                        entries.push((
-                            path.to_path_buf(),
-                            archive.hash.clone(),
-                            dst,
-                            Some(archive.archive_type),
-                        ))
-                    }
-                }
-            },
-            File::Blob(ref blob) => match &blob.locator {
-                Locator::Size(size) => {
-                    if to_extract.contains(file) {
-                        let dst = context.get_path(file)?;
-                        if !dst.is_file() {
-                            let bytes = &payload[location..(location + size)];
-                            let actual_hash = fingerprint::digest(bytes);
-                            if blob.hash != actual_hash {
-                                return Err(format!(
-                                    "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
-                                    dst = dst.display(),
-                                ));
-                            } else {
-                                debug!(
-                                    "Destination {dst} of size {size} had expected hash",
-                                    dst = dst.display()
-                                );
-                            }
-                            unpack(None, Cursor::new(bytes), &dst)?;
-                        } else {
-                            debug!("Cache hit {dst} for {file:?}", dst = dst.display())
-                        }
-                    }
-                    location += size
-                }
-                Locator::Entry(path) => {
-                    if to_extract.contains(file) {
-                        let dst = context.get_path(file)?;
-                        entries.push((path.to_path_buf(), blob.hash.clone(), dst, None))
-                    }
-                }
-            },
+                unpack(file_type, Cursor::new(bytes), &dst)?;
+            } else {
+                debug!("Cache hit {dst} for {file:?}", dst = dst.display())
+            };
         }
-    }
-
-    if !entries.is_empty() {
-        let seekable_bytes = Cursor::new(&payload[location..]);
-        let mut zip = zip::ZipArchive::new(seekable_bytes).map_err(|e| format!("{e}"))?;
-        for (path, _fingerprint, dst, _archive_type) in entries {
-            std::fs::create_dir_all(&dst).map_err(|e| format!("{e}"))?;
-            let name = std::str::from_utf8(<[u8]>::from_path(&path).ok_or_else(|| {
-                format!(
-                    "Failed to decode {} to a utf-8 zip entry name",
-                    path.display()
-                )
-            })?)
-            .map_err(|e| format!("{e}"))?;
-            let zip_entry = zip.by_name(name).map_err(|e| format!("{e}"))?;
-            todo!(
-                "Use unpack to extract zip entry {} to {}",
-                zip_entry.name(),
-                dst.display()
-            )
-        }
+        location += file.size;
     }
 
     Ok(Process {

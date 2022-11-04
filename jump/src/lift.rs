@@ -3,89 +3,28 @@ use std::path::{Path, PathBuf};
 use bstr::ByteSlice;
 use logging_timer::time;
 
-use crate::config::{ArchiveType, BaseArchive, Boot, Config, Jump, Locator};
-use crate::{fingerprint, pack};
+use crate::config::{ArchiveType, Boot, Config, FileType, Jump};
+use crate::{archive, fingerprint};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct Blob {
+pub struct File {
     pub name: String,
     pub key: Option<String>,
-    pub locator: Locator,
+    pub size: usize,
     pub hash: String,
+    pub file_type: FileType,
     pub always_extract: bool,
-}
-
-impl From<Blob> for crate::config::Blob {
-    fn from(value: Blob) -> Self {
-        crate::config::Blob(crate::config::BaseFile {
-            name: value.name,
-            key: value.key,
-            locator: Some(value.locator),
-            hash: Some(value.hash),
-            always_extract: value.always_extract,
-        })
-    }
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub enum ArchiveSource {
-    File,
-    Directory,
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct Archive {
-    pub name: String,
-    pub key: Option<String>,
-    pub locator: Locator,
-    pub hash: String,
-    pub archive_type: ArchiveType,
-    pub source: ArchiveSource,
-    pub always_extract: bool,
-}
-
-impl From<Archive> for crate::config::Archive {
-    fn from(value: Archive) -> Self {
-        crate::config::Archive {
-            name: value.name,
-            key: value.key,
-            locator: Some(value.locator),
-            hash: Some(value.hash),
-            archive_type: value.archive_type,
-            always_extract: value.always_extract,
-        }
-    }
-}
-
-impl From<Archive> for crate::config::Directory {
-    fn from(value: Archive) -> Self {
-        crate::config::Directory(BaseArchive {
-            base: crate::config::BaseFile {
-                name: value.name,
-                key: value.key,
-                locator: Some(value.locator),
-                hash: Some(value.hash),
-                always_extract: value.always_extract,
-            },
-            archive_type: Some(value.archive_type),
-        })
-    }
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub enum File {
-    Archive(Archive),
-    Blob(Blob),
 }
 
 impl From<File> for crate::config::File {
     fn from(value: File) -> Self {
-        match value {
-            File::Archive(archive) => match archive.source {
-                ArchiveSource::File => crate::config::File::Archive(archive.into()),
-                ArchiveSource::Directory => crate::config::File::Directory(archive.into()),
-            },
-            File::Blob(blob) => crate::config::File::Blob(blob.into()),
+        Self {
+            name: value.name,
+            key: value.key,
+            size: Some(value.size),
+            hash: Some(value.hash),
+            file_type: Some(value.file_type),
+            always_extract: value.always_extract,
         }
     }
 }
@@ -132,6 +71,42 @@ impl From<Scie> for crate::config::Scie {
     }
 }
 
+fn determine_file_type(path: &Path) -> Result<FileType, String> {
+    if path.is_dir() {
+        return Ok(FileType::Directory);
+    }
+    if path.is_file() {
+        if let Some(basename) = path.file_name() {
+            let name = <[u8]>::from_os_str(basename)
+                .ok_or_else(|| format!("Failed to decode {basename:?} as a utf-8 path name"))?
+                .to_str()
+                .map_err(|e| {
+                    format!("Failed to interpret file name {basename:?} as a utf-8 string: {e}")
+                })?;
+            let ext = match name.rsplitn(3, '.').collect::<Vec<_>>()[..] {
+                [_, "tar", stem] => name.trim_start_matches(stem).trim_start_matches('.'),
+                [ext, ..] => ext,
+                _ => {
+                    return Err(format!(
+                        "This archive has no type declared and it could not be guessed from \
+                            its name: {name}",
+                    ))
+                }
+            };
+            let file_type = if let Some(archive_type) = ArchiveType::from_ext(ext) {
+                FileType::Archive(archive_type)
+            } else {
+                FileType::Blob
+            };
+            return Ok(file_type);
+        }
+    }
+    Err(format!(
+        "Could not identify the file type of {path}",
+        path = path.display()
+    ))
+}
+
 #[time("debug")]
 fn assemble(
     resolve_base: &Path,
@@ -139,92 +114,31 @@ fn assemble(
 ) -> Result<Vec<File>, String> {
     let mut files = vec![];
     for file in config_files {
-        let assembled_file = match file {
-            crate::config::File::Archive(archive) => {
-                let (locator, hash) =
-                    if let (Some(locator), Some(hash)) = (archive.locator, archive.hash) {
-                        (locator.clone(), hash.to_string())
-                    } else {
-                        let path = resolve_base.join(&archive.name);
-                        let (size, hash) = fingerprint::digest_file(&path)?;
-                        (Locator::Size(size), hash)
-                    };
-                File::Archive(Archive {
-                    name: archive.name,
-                    key: archive.key,
-                    locator,
-                    hash,
-                    archive_type: archive.archive_type,
-                    source: ArchiveSource::File,
-                    always_extract: archive.always_extract,
-                })
-            }
-            crate::config::File::Blob(blob) => {
-                let (locator, hash) =
-                    if let (Some(locator), Some(hash)) = (blob.0.locator, blob.0.hash) {
-                        (locator, hash)
-                    } else {
-                        let path = resolve_base.join(&blob.0.name);
-                        let (size, hash) = fingerprint::digest_file(&path)?;
-                        (Locator::Size(size), hash)
-                    };
-                File::Blob(Blob {
-                    name: blob.0.name,
-                    key: blob.0.key,
-                    locator,
-                    hash,
-                    always_extract: blob.0.always_extract,
-                })
-            }
-            crate::config::File::Directory(directory) => {
-                let (name, locator, hash, archive_type) =
-                    if let (Some(locator), Some(hash), Some(archive_type)) = (
-                        directory.0.base.locator,
-                        directory.0.base.hash,
-                        directory.0.archive_type,
-                    ) {
-                        (directory.0.base.name, locator, hash, archive_type)
-                    } else {
-                        let (directory_archive, archive_type) = pack::create_archive(
-                            resolve_base,
-                            &directory.0.base.name,
-                            directory.0.archive_type,
-                        )?;
-                        let relative_archive_path =
-                            directory_archive.strip_prefix(resolve_base).map_err(|e| {
-                                format!(
-                                    "Failed to relativize archive path of {archive} created from \
-                                    {directory} for a base directory of {base}: {e}",
-                                    archive = directory_archive.display(),
-                                    directory = directory.0.base.name,
-                                    base = resolve_base.display()
-                                )
-                            })?;
-                        let name_bytes =
-                            <[u8]>::from_path(relative_archive_path).ok_or_else(|| {
-                                format!("Failed read {relative_archive_path:?} as bytes")
-                            })?;
-                        let name = String::from_utf8(name_bytes.to_vec()).map_err(|e| {
-                            format!(
-                                "Failed to parse relative path {path} as utf8 string: {e}",
-                                path = relative_archive_path.display()
-                            )
-                        })?;
-                        let (size, hash) = fingerprint::digest_file(&directory_archive)?;
-                        (name, Locator::Size(size), hash, archive_type)
-                    };
-                File::Archive(Archive {
-                    name,
-                    key: directory.0.base.key,
-                    locator,
-                    hash,
-                    archive_type,
-                    source: ArchiveSource::Directory,
-                    always_extract: directory.0.base.always_extract,
-                })
-            }
+        let mut path = resolve_base.join(&file.name);
+
+        let file_type = if let Some(file_type) = file.file_type {
+            file_type
+        } else {
+            determine_file_type(&path)?
         };
-        files.push(assembled_file);
+
+        let (size, hash) = if let (Some(size), Some(hash)) = (file.size, file.hash) {
+            (size, hash)
+        } else {
+            if FileType::Directory == file_type {
+                path = archive::create(resolve_base, &file.name)?;
+            }
+            fingerprint::digest_file(&path)?
+        };
+
+        files.push(File {
+            name: file.name,
+            key: file.key,
+            size,
+            hash,
+            file_type,
+            always_extract: file.always_extract,
+        });
     }
     Ok(files)
 }

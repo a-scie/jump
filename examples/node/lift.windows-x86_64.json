@@ -15,24 +15,16 @@
               "=PATH": "{node}/node-v18.12.0-win-x64/bin:{scie.env.PATH}"
             },
             "exe": "{node}/node-v18.12.0-win-x64/npm.cmd"
-          },
-          "npx": {
-            "env": {
-              "=PATH": "{node}/node-v18.12.0-win-x64:{scie.env.PATH}"
-            },
-            "exe": "{node}/node-v18.12.0-win-x64/npx.cmd"
           }
         }
       },
       "files": [
         {
           "name": "node-v18.12.0-win-x64.zip",
-          "key": "node",
-          "type": "archive"
+          "key": "node"
         },
         {
-          "name": "noop",
-          "type": "directory"
+          "name": "noop"
         }
       ]
     }

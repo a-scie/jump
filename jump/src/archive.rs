@@ -5,8 +5,6 @@ use logging_timer::time;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 
-use crate::config::ArchiveType;
-
 #[cfg(not(target_family = "unix"))]
 fn create_options(_entry: &DirEntry) -> Result<FileOptions, String> {
     Ok(FileOptions::default())
@@ -92,41 +90,19 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
 }
 
 #[time("debug")]
-pub(crate) fn create_archive(
-    dir: &Path,
-    name: &str,
-    maybe_archive_type: Option<ArchiveType>,
-) -> Result<(PathBuf, ArchiveType), String> {
-    let archive_type = maybe_archive_type.unwrap_or(ArchiveType::Zip);
-    let directory = dir.join(name).canonicalize().map_err(|e| {
+pub(crate) fn create(dir: &Path, name: &str) -> Result<PathBuf, String> {
+    let path = dir.join(name);
+    let directory = path.canonicalize().map_err(|e| {
         format!(
-            "Cannot create an {archive_type} archive from {name}: Directory does not exist: {e}",
-            archive_type = archive_type.as_ext()
+            "Cannot create a zip archive from {path}: Directory does not exist: {e}",
+            path = path.display()
         )
     })?;
     if !directory.is_dir() {
         return Err(format!(
-            "Cannot create an {archive_type} archive from {name}: {directory} is a file.",
-            archive_type = archive_type.as_ext(),
+            "Cannot create a zip archive from {name}: {directory} is a file.",
             directory = directory.display()
         ));
     }
-
-    match archive_type {
-        ArchiveType::Zip => create_zip(&directory).map(|path| (path, ArchiveType::Zip)),
-        ArchiveType::Tar => {
-            todo!(
-                "TODO(John Sirois): Implement tar archive support for directories: cannot create \
-                archive for: {directory}",
-                directory = directory.display()
-            );
-        }
-        ArchiveType::CompressedTar(compression) => {
-            todo!(
-                "TODO(John Sirois): Implement tar {compression:?} archive support for directories: \
-                cannot create archive for: {directory}",
-                directory=directory.display()
-            );
-        }
-    }
+    create_zip(&directory)
 }

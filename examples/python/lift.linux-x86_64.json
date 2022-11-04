@@ -30,16 +30,14 @@
       },
       "files": [
         {
-          "hash": "e63d0c00a499e0202ba7a0f53ce69fca6d30237af39af9bc3c76bce6c7bf14d7",
           "name": "cpython-3.9.14+20221002-x86_64-unknown-linux-gnu-install_only.tar.gz",
           "key": "cpython",
-          "size": 26761725,
-          "type": "archive"
+          "hash": "e63d0c00a499e0202ba7a0f53ce69fca6d30237af39af9bc3c76bce6c7bf14d7",
+          "size": 26761725
         },
         {
-          "archive_type": "zip",
           "name": "pants.2.14.0.pex",
-          "type": "archive"
+          "type": "zip"
         }
       ]
     }

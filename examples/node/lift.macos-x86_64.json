@@ -15,24 +15,16 @@
               "=PATH": "{node}/node-v18.12.0-darwin-x64/bin:{scie.env.PATH}"
             },
             "exe": "{node}/node-v18.12.0-darwin-x64/bin/npm"
-          },
-          "npx": {
-            "env": {
-              "=PATH": "{node}/node-v18.12.0-darwin-x64/bin:{scie.env.PATH}"
-            },
-            "exe": "{node}/node-v18.12.0-darwin-x64/bin/npx"
           }
         }
       },
       "files": [
         {
           "name": "node-v18.12.0-darwin-x64.tar.gz",
-          "key": "node",
-          "type": "archive"
+          "key": "node"
         },
         {
-          "name": "noop",
-          "type": "directory"
+          "name": "noop"
         }
       ]
     }

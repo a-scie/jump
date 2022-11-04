@@ -6,13 +6,6 @@ use std::path::PathBuf;
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Locator {
-    Size(usize),
-    Entry(PathBuf),
-}
-
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum Compression {
     Bzip2,
@@ -24,13 +17,13 @@ pub enum Compression {
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum ArchiveType {
-    Zip,
-    Tar,
     CompressedTar(Compression),
+    Tar,
+    Zip,
 }
 
 impl ArchiveType {
-    fn from_ext(value: &str) -> Option<Self> {
+    pub(crate) fn from_ext(value: &str) -> Option<Self> {
         // These values are derived from the `-a` extensions described by GNU tar here:
         // https://www.gnu.org/software/tar/manual/html_node/gzip.html#gzip
         match value {
@@ -58,25 +51,36 @@ impl ArchiveType {
     }
 }
 
-impl Serialize for ArchiveType {
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub enum FileType {
+    Archive(ArchiveType),
+    Blob,
+    Directory,
+}
+
+impl Serialize for FileType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.as_ext())
+        match self {
+            FileType::Archive(archive_type) => serializer.serialize_str(archive_type.as_ext()),
+            FileType::Blob => serializer.serialize_str("blob"),
+            FileType::Directory => serializer.serialize_str("directory"),
+        }
     }
 }
 
-struct ArchiveTypeVisitor;
+struct FileTypeVisitor;
 
-impl<'de> Visitor<'de> for ArchiveTypeVisitor {
-    type Value = ArchiveType;
+impl<'de> Visitor<'de> for FileTypeVisitor {
+    type Value = FileType;
 
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
         write!(
             formatter,
-            "one of: zip, tar, tar.bz2, tbz2, tar.gz, tgz, tar.xz, tar.lzma, tlz, tar.Z, \
-            tar.zst or tzst"
+            "one of: blob, directory, zip, tar, tar.bz2, tbz2, tar.gz, tgz, tar.xz, tar.lzma, \
+            tlz, tar.Z, tar.zst or tzst"
         )
     }
 
@@ -84,18 +88,22 @@ impl<'de> Visitor<'de> for ArchiveTypeVisitor {
     where
         E: Error,
     {
-        // These values are derived from the `-a` extensions described by GNU tar here:
-        // https://www.gnu.org/software/tar/manual/html_node/gzip.html#gzip
-        ArchiveType::from_ext(value).ok_or_else(|| E::invalid_value(Unexpected::Str(value), &self))
+        match value {
+            "blob" => Ok(FileType::Blob),
+            "directory" => Ok(FileType::Directory),
+            _ => ArchiveType::from_ext(value)
+                .map(FileType::Archive)
+                .ok_or_else(|| E::invalid_value(Unexpected::Str(value), &self)),
+        }
     }
 }
 
-impl<'de> Deserialize<'de> for ArchiveType {
+impl<'de> Deserialize<'de> for FileType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_string(ArchiveTypeVisitor)
+        deserializer.deserialize_string(FileTypeVisitor)
     }
 }
 
@@ -104,123 +112,20 @@ fn is_false(value: &bool) -> bool {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BaseFile {
+pub struct File {
     pub name: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
-    #[serde(default, flatten)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub locator: Option<Locator>,
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<usize>,
+    #[serde(default)]
     pub hash: Option<String>,
+    #[serde(default, rename = "type")]
+    pub file_type: Option<FileType>,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub always_extract: bool,
-}
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Blob(pub BaseFile);
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BaseArchive {
-    #[serde(flatten)]
-    pub base: BaseFile,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub archive_type: Option<ArchiveType>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(transparent)]
-struct JsonArchive(BaseArchive);
-
-impl From<Archive> for JsonArchive {
-    fn from(value: Archive) -> Self {
-        JsonArchive(BaseArchive {
-            base: BaseFile {
-                name: value.name,
-                key: value.key,
-                locator: value.locator,
-                hash: value.hash,
-                always_extract: value.always_extract,
-            },
-            archive_type: Some(value.archive_type),
-        })
-    }
-}
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(into = "JsonArchive", try_from = "JsonArchive")]
-pub struct Archive {
-    pub name: String,
-    pub key: Option<String>,
-    pub locator: Option<Locator>,
-    pub hash: Option<String>,
-    pub archive_type: ArchiveType,
-    pub always_extract: bool,
-}
-
-impl TryFrom<JsonArchive> for Archive {
-    type Error = String;
-
-    fn try_from(value: JsonArchive) -> Result<Self, Self::Error> {
-        let archive_type = if let Some(archive_type) = value.0.archive_type {
-            archive_type
-        } else {
-            let ext = match value
-                .0
-                .base
-                .name
-                .as_str()
-                .rsplitn(3, '.')
-                .collect::<Vec<_>>()[..]
-            {
-                [_, "tar", stem] => value
-                    .0
-                    .base
-                    .name
-                    .as_str()
-                    .trim_start_matches(stem)
-                    .trim_start_matches('.'),
-                [ext, ..] => ext,
-                _ => {
-                    return Err(format!(
-                        "This archive has no type declared and it could not be guessed from \
-                        its name: {name}",
-                        name = value.0.base.name
-                    ))
-                }
-            };
-            ArchiveType::from_ext(ext).ok_or_else(|| {
-                format!(
-                    "This archive has no type declared and it could not be guessed from its \
-                    extension: {ext}"
-                )
-            })?
-        };
-        Ok(Archive {
-            name: value.0.base.name,
-            key: value.0.base.key,
-            locator: value.0.base.locator,
-            hash: value.0.base.hash,
-            archive_type,
-            always_extract: value.0.base.always_extract,
-        })
-    }
-}
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Directory(pub BaseArchive);
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-#[serde(tag = "type")]
-pub enum File {
-    Archive(Archive),
-    Blob(Blob),
-    Directory(Directory),
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -369,10 +274,8 @@ impl Config {
 mod tests {
     use std::collections::HashMap;
 
-    use super::{
-        Archive, ArchiveType, BaseFile, Blob, Boot, Cmd, Compression, Config, EnvVar, File, Jump,
-        Lift, Locator, Scie,
-    };
+    use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift, Scie};
+    use crate::config::FileType;
 
     #[test]
     fn test_serialized_form() {
@@ -387,29 +290,32 @@ mod tests {
                     lift: Lift {
                         base: "~/.nce".into(),
                         files: vec![
-                            File::Blob(Blob(BaseFile {
+                            File {
                                 name: "pants-client".to_string(),
                                 key: None,
-                                locator: Some(Locator::Size(1137)),
+                                size: Some(1137),
                                 hash: Some("abc".to_string()),
+                                file_type: Some(FileType::Blob),
                                 always_extract: true
-                            })),
-                            File::Archive(Archive {
+                            },
+                            File {
                                 name: "python".to_string(),
                                 key: None,
-                                locator: Some(Locator::Size(123)),
+                                size: Some(123),
                                 hash: Some("345".to_string()),
-                                archive_type: ArchiveType::CompressedTar(Compression::Zstd),
+                                file_type: Some(FileType::Archive(ArchiveType::CompressedTar(
+                                    Compression::Zstd
+                                ))),
                                 always_extract: false
-                            }),
-                            File::Archive(Archive {
+                            },
+                            File {
                                 name: "foo.zip".to_string(),
                                 key: None,
-                                locator: Some(Locator::Size(42)),
+                                size: Some(42),
                                 hash: Some("def".to_string()),
-                                archive_type: ArchiveType::Zip,
+                                file_type: Some(FileType::Archive(ArchiveType::Zip)),
                                 always_extract: false,
-                            })
+                            }
                         ],
                         boot: Boot {
                             commands: vec![(
@@ -458,16 +364,13 @@ mod tests {
                             "name": "example",
                             "files": [
                                 {
-                                    "type": "blob",
                                     "name": "pants-client"
                                 },
                                 {
-                                    "type": "archive",
                                     "name": "foo.tar.gz"
                                 },
                                 {
-                                    "name": "app.zip",
-                                    "type": "archive"
+                                    "name": "app.zip"
                                 }
                             ],
                             "boot": {

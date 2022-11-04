@@ -2,8 +2,8 @@ use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use jump::config::Config;
-use jump::{load_lift, File, Jump, Lift, Scie};
+use jump::config::{Config, FileType};
+use jump::{load_lift, Jump, Lift, Scie};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
 
@@ -111,10 +111,10 @@ fn pack(
     })?;
     let resolve_base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
     for file in &lift.files {
-        let path = match file {
-            File::Archive(archive) => resolve_base.join(&archive.name),
-            File::Blob(blob) => resolve_base.join(&blob.name),
-        };
+        let mut path = resolve_base.join(&file.name);
+        if FileType::Directory == file.file_type {
+            path = path.with_extension("zip");
+        }
         let mut blob = std::fs::File::open(&path).map_err(|e| {
             format!(
                 "Failed to open {src} / {file:?} for writing to {binary}: {e}",
