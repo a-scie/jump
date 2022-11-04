@@ -6,9 +6,11 @@ use bstr::ByteSlice;
 use logging_timer::{time, timer};
 
 use crate::atomic::atomic_directory;
-use crate::config::{ArchiveType, Cmd, Compression, File, Locator};
+use crate::config::{ArchiveType, Cmd, Compression, Locator};
 use crate::context::Context;
-use crate::{fingerprint, EnvVar, EnvVars, Process};
+use crate::fingerprint;
+use crate::lift::File;
+use crate::process::{EnvVar, EnvVars, Process};
 
 #[time("debug")]
 pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result<Process, String> {
@@ -74,31 +76,6 @@ pub(crate) fn prepare(mut context: Context, command: Cmd, data: &[u8]) -> Result
                         entries.push((path.to_path_buf(), blob.hash.clone(), dst, None))
                     }
                 },
-                File::Directory(directory) if !dst.is_dir() => {
-                    let directory2 = directory.clone();
-                    let (locator, hash, archive_type) = directory
-                        .locator
-                        .and_then(|locator| {
-                            directory.hash.and_then(|hash| {
-                                directory
-                                    .archive_type
-                                    .map(|archive_type| (locator, hash, archive_type))
-                            })
-                        })
-                        .ok_or_else(|| {
-                            format!(
-                                "Directory entries without a location, hash or archive type \
-                                should never be present in an assembled scie's lift manifest. \
-                                Found unexpected: {directory2:?}"
-                            )
-                        })?;
-                    match locator {
-                        Locator::Size(size) => sized.push((size, hash, dst, Some(archive_type))),
-                        Locator::Entry(path) => {
-                            entries.push((path.to_path_buf(), hash, dst, Some(archive_type)))
-                        }
-                    }
-                }
                 _ => {
                     debug!("Cache hit {dst} for {file:?}", dst = dst.display())
                 }

@@ -6,29 +6,28 @@
         "commands": {
           "node": {
             "env": {
-              "=PATH": "{node-v18.12.0-linux-x64.tar.xz}/node-v18.12.0-linux-x64/bin:{scie.env.PATH}"
+              "=PATH": "{node}/node-v18.12.0-linux-x64/bin:{scie.env.PATH}"
             },
-            "exe": "{node-v18.12.0-linux-x64.tar.xz}/node-v18.12.0-linux-x64/bin/node"
+            "exe": "{node}/node-v18.12.0-linux-x64/bin/node"
           },
           "npm": {
             "env": {
-              "=PATH": "{node-v18.12.0-linux-x64.tar.xz}/node-v18.12.0-linux-x64/bin:{scie.env.PATH}"
+              "=PATH": "{node}/node-v18.12.0-linux-x64/bin:{scie.env.PATH}"
             },
-            "exe": "{node-v18.12.0-linux-x64.tar.xz}/node-v18.12.0-linux-x64/bin/npm"
+            "exe": "{node}/node-v18.12.0-linux-x64/bin/npm"
           },
           "npx": {
             "env": {
-              "=PATH": "{node-v18.12.0-linux-x64.tar.xz}/node-v18.12.0-linux-x64/bin:{scie.env.PATH}"
+              "=PATH": "{node}/node-v18.12.0-linux-x64/bin:{scie.env.PATH}"
             },
-            "exe": "{node-v18.12.0-linux-x64.tar.xz}/node-v18.12.0-linux-x64/bin/npx"
+            "exe": "{node}/node-v18.12.0-linux-x64/bin/npx"
           }
         }
       },
       "files": [
         {
-          "hash": "9429e26d9a35cb079897f0a22622fe89ff597976259a8fcb38b7d08b154789dc",
           "name": "node-v18.12.0-linux-x64.tar.xz",
-          "size": 23692504,
+          "key": "node",
           "type": "archive"
         },
         {

@@ -6,29 +6,25 @@
         "commands": {
           "": {
             "env": {
-              "=JAVA_HOME": "{java}/amazon-corretto-11.0.17.8.1-linux-x64",
-              "=PATH": "{java}/amazon-corretto-11.0.17.8.1-linux-x64/bin:{scie.env.PATH}"
+              "=JAVA_HOME": "{jdk}/amazon-corretto-11.0.17.8.1-linux-x64",
+              "=PATH": "{jdk}/amazon-corretto-11.0.17.8.1-linux-x64/bin:{scie.env.PATH}"
             },
-            "exe": "{java}/amazon-corretto-11.0.17.8.1-linux-x64/bin/java",
+            "exe": "{jdk}/amazon-corretto-11.0.17.8.1-linux-x64/bin/java",
             "args": [
               "-jar",
-              "{coursier}"
+              "{coursier.jar}"
             ]
           }
         }
       },
       "files": [
         {
-          "archive_type": "tar.gz",
-          "hash": "9628b1c1ec298a6e0f277afe383b342580086cfd7eee2be567b8d00529ca9449",
-          "name": "java",
-          "size": 194998805,
+          "name": "amazon-corretto-11.0.17.8.1-linux-x64.tar.gz",
+          "key": "jdk",
           "type": "archive"
         },
         {
-          "hash": "a1799d6418fbcbad47ac9e388affc751b4fc2d8678f89c332df9592d2dd3a202",
-          "name": "coursier",
-          "size": 42284054,
+          "name": "coursier.jar",
           "type": "blob"
         }
       ]

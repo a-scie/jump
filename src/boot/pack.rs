@@ -1,19 +1,14 @@
-use std::collections::HashMap;
 use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use bstr::ByteSlice;
-use jump::config::{ArchiveType, Config, File, Locator};
-use jump::{fingerprint, Jump};
-use log::debug;
+use jump::config::Config;
+use jump::{load_lift, File, Jump, Lift, Scie};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
-use walkdir::{DirEntry, WalkDir};
-use zip::write::FileOptions;
 
 #[time("debug")]
-fn load_manifest(path: &Path, jump: &Jump) -> Result<Config, String> {
+fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
     let manifest_path = if path.is_dir() {
         path.join("lift.json")
     } else {
@@ -25,217 +20,17 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<Config, String> {
             path = path.display()
         ));
     }
-    let mut config = Config::from_file(&manifest_path)?;
-    if let Some(expected_jump) = config.scie.jump {
-        if &expected_jump != jump {
+    let (maybe_jump, lift) = load_lift(&manifest_path)?;
+    if let Some(ref configured_jump) = maybe_jump {
+        if jump != configured_jump {
             return Err(format!(
-                "The manifest at {path} expected to be lifted into a binary with {expected_jump:?} \
-                but the current is {jump:?}.",
-                path = manifest_path.display()
+                "The lift manifest {manifest} specifies a scie jump binary of \
+                    {configured_jump:?} that does not match the current of {jump:?}.",
+                manifest = manifest_path.display()
             ));
         }
     }
-    config.scie.jump = Some(jump.to_owned());
-    Ok(config)
-}
-
-#[cfg(not(target_family = "unix"))]
-fn create_options(_entry: &DirEntry) -> Result<FileOptions, String> {
-    Ok(FileOptions::default())
-}
-
-#[cfg(target_family = "unix")]
-fn create_options(entry: &DirEntry) -> Result<FileOptions, String> {
-    use std::os::unix::fs::PermissionsExt;
-    let perms = entry
-        .metadata()
-        .map_err(|e| {
-            format!(
-                "Failed to read metadata for {path}: {e}",
-                path = entry.path().display()
-            )
-        })?
-        .permissions();
-    Ok(FileOptions::default().unix_permissions(perms.mode()))
-}
-
-fn create_zip(dir: &Path) -> Result<PathBuf, String> {
-    let zip_path = dir.with_extension("zip");
-    let mut zip = zip::ZipWriter::new(
-        std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&zip_path)
-            .map_err(|e| {
-                format!(
-                    "Failed to open {zip} for packing {dir} into: {e}",
-                    zip = zip_path.display(),
-                    dir = dir.display()
-                )
-            })?,
-    );
-    for entry in WalkDir::new(dir).contents_first(false).follow_links(true) {
-        let entry = entry.map_err(|e| {
-            format!(
-                "Walk failed while trying to create a zip of {dir}: {e}",
-                dir = dir.display()
-            )
-        })?;
-        if entry.path() == dir {
-            continue;
-        }
-        let rel_path = entry.path().strip_prefix(dir).map_err(|e| format!("{e}"))?;
-        let entry_bytes = <[u8]>::from_path(rel_path).ok_or_else(|| {
-            format!(
-                "Failed to convert {path} to a slice of bytes",
-                path = entry.path().display()
-            )
-        })?;
-        let entry_name = std::str::from_utf8(entry_bytes)
-            .map_err(|e| {
-                format!(
-                    "Failed to convert {path} to a zip entry name: {e}",
-                    path = entry.path().display()
-                )
-            })?
-            .to_string();
-        let options = create_options(&entry)?;
-        if entry.path().is_dir() {
-            debug!("Adding dir entry {entry}", entry = rel_path.display());
-            zip.add_directory(entry_name, options)
-                .map_err(|e| format!("{e}"))?;
-        } else {
-            zip.start_file(entry_name, options)
-                .map_err(|e| format!("{e}"))?;
-            if entry.path_is_symlink() {
-                debug!("Resolved symlink {entry}", entry = rel_path.display());
-            };
-            debug!("Adding file entry {entry}", entry = rel_path.display());
-            let mut file = std::fs::File::open(entry.path()).map_err(|e| format!("{e}"))?;
-            std::io::copy(&mut file, &mut zip).map_err(|e| format!("{e}"))?;
-        }
-    }
-    zip.finish().map_err(|e| {
-        format!(
-            "Failed to finalize zip {zip}: {e}",
-            zip = zip_path.display()
-        )
-    })?;
-    Ok(zip_path)
-}
-
-#[time("debug")]
-fn create_archive(
-    dir: &Path,
-    name: &str,
-    maybe_archive_type: Option<ArchiveType>,
-) -> Result<(PathBuf, ArchiveType), String> {
-    let archive_type = maybe_archive_type.unwrap_or(ArchiveType::Zip);
-    let directory = dir.join(name).canonicalize().map_err(|e| {
-        format!(
-            "Cannot create an {archive_type} archive from {name}: Directory does not exist: {e}",
-            archive_type = archive_type.as_ext()
-        )
-    })?;
-    if !directory.is_dir() {
-        return Err(format!(
-            "Cannot create an {archive_type} archive from {name}: {directory} is a file.",
-            archive_type = archive_type.as_ext(),
-            directory = directory.display()
-        ));
-    }
-
-    match archive_type {
-        ArchiveType::Zip => create_zip(&directory).map(|path| (path, ArchiveType::Zip)),
-        ArchiveType::Tar => {
-            todo!("TODO(John Sirois): Implement tar archive support for directories");
-        }
-        ArchiveType::CompressedTar(compression) => {
-            todo!(
-                "TODO(John Sirois): Implement tar {compression:?} archive support for directories"
-            );
-        }
-    }
-}
-
-#[time("debug")]
-fn index_files(mut config: Config) -> Result<(Config, Vec<(PathBuf, File)>), String> {
-    let dir = config.scie.path.parent().ok_or_else(|| {
-        format!(
-            "Failed to determine directory for lift manifest {file}",
-            file = config.scie.path.display()
-        )
-    })?;
-    let mut index = HashMap::new();
-    for entry in (std::fs::read_dir(dir).map_err(|e| {
-        format!(
-            "Failed to list the contents of {dir} for indexing: {e}",
-            dir = dir.display()
-        )
-    })?)
-    .flatten()
-    {
-        if let Ok(file_type) = entry.file_type() {
-            if file_type.is_file() {
-                let path = entry.path();
-                let hash = fingerprint::digest_file(&path)?;
-                let size = entry
-                    .metadata()
-                    .map_err(|e| {
-                        format!(
-                            "Failed to determine file size for {path}: {e}",
-                            path = path.display()
-                        )
-                    })?
-                    .len();
-                index.insert(hash, (path, size));
-            }
-        }
-    }
-    let mut files = vec![];
-    for file in config.scie.lift.files.iter_mut() {
-        let (hash, locator) = match file {
-            File::Archive(archive) => (archive.hash.clone(), archive.locator.clone()),
-            File::Blob(blob) => (blob.hash.clone(), blob.locator.clone()),
-            File::Directory(directory) => {
-                let (archive, archive_type) =
-                    create_archive(dir, directory.name.as_str(), directory.archive_type)?;
-                let hash = fingerprint::digest_file(&archive)?;
-                let size = std::fs::metadata(&archive)
-                    .map_err(|e| format!("{e}"))?
-                    .len();
-                index.insert(hash.clone(), (archive, size));
-                let locator = Locator::Size(size as usize);
-                directory.locator = Some(locator.clone());
-                directory.hash = Some(hash.clone());
-                directory.archive_type = Some(archive_type);
-                (hash, locator)
-            }
-        };
-        let (path, size) = index.get(&hash).ok_or_else(|| {
-            format!(
-                "Found no files in {dir} with hash {hash}.",
-                dir = dir.display()
-            )
-        })?;
-        if let Locator::Size(expected_size) = locator {
-            let actual_size = usize::try_from(*size).map_err(|e| {
-                format!(
-                    "Failed to convert actual file size of {path} to compare to the expected file \
-                    size of {file:?}: {e}",
-                    path = path.display()
-                )
-            })?;
-            if actual_size != expected_size {
-                return Err(format!(
-                    "Found a {size} byte file matching hash {hash} but the expected size was a \
-                        mismatch for entry {file:?}"
-                ));
-            }
-        }
-        files.push((path.to_path_buf(), file.clone()))
-    }
-    Ok((config, files))
+    Ok((lift, manifest_path))
 }
 
 #[cfg(target_family = "windows")]
@@ -277,14 +72,14 @@ fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
 
 #[time("debug")]
 fn pack(
-    config: Config,
-    scie_jump_path: &PathBuf,
+    lift: Lift,
+    manifest_path: &Path,
+    scie_jump_path: &Path,
     scie_jump_size: usize,
     single_line: bool,
 ) -> Result<PathBuf, String> {
-    let (config, index) = index_files(config)?;
     let binary_path = env::current_dir()
-        .map(|cwd| cwd.join(&config.scie.lift.name))
+        .map(|cwd| cwd.join(&lift.name))
         .map_err(|e| format!("Failed to determine the output directory for scies: {e}"))?;
     let mut binary = std::fs::OpenOptions::new()
         .write(true)
@@ -292,9 +87,8 @@ fn pack(
         .open(&binary_path)
         .map_err(|e| {
             format!(
-                "Failed to open binary {path} for writing {scie:?}: {e}",
+                "Failed to open binary {path} for writing {lift:?}: {e}",
                 path = binary_path.display(),
-                scie = config.scie
             )
         })?;
     let mut scie_jump = std::fs::File::open(scie_jump_path)
@@ -314,7 +108,12 @@ fn pack(
             binary = binary_path.display()
         )
     })?;
-    for (path, file) in index {
+    let resolve_base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
+    for file in &lift.files {
+        let path = match file {
+            File::Archive(archive) => resolve_base.join(&archive.name),
+            File::Blob(blob) => resolve_base.join(&blob.name),
+        };
         let mut blob = std::fs::File::open(&path).map_err(|e| {
             format!(
                 "Failed to open {src} / {file:?} for writing to {binary}: {e}",
@@ -330,6 +129,17 @@ fn pack(
             )
         })?;
     }
+    let config = Config {
+        scie: Scie {
+            jump: Some(Jump {
+                size: scie_jump_size,
+                version: "".to_string(), // TODO(John Sirois): XXX
+                bare: false,
+            }),
+            lift,
+        }
+        .into(),
+    };
     config.serialize(binary, !single_line).map_err(|e| {
         format!(
             "Failed to serialize the lift manifest to {binary}: {e}",
@@ -347,16 +157,17 @@ pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
             "-1" | "--single-lift-line" => single_line = true,
             "--no-single-lift-line" => single_line = false,
             _ => {
-                lifts.push(
-                    load_manifest(Path::new(arg.as_str()), &jump)
-                        .map_err(|e| Code::FAILURE.with_message(e))?,
-                );
+                let (lift, path) = load_manifest(Path::new(arg.as_str()), &jump)
+                    .map_err(|e| Code::FAILURE.with_message(e))?;
+                lifts.push((lift, path));
             }
         }
     }
     if lifts.is_empty() {
         if let Ok(cwd) = env::current_dir() {
-            lifts.push(load_manifest(&cwd, &jump).map_err(|e| Code::FAILURE.with_message(e))?);
+            let (lift, path) =
+                load_manifest(&cwd, &jump).map_err(|e| Code::FAILURE.with_message(e))?;
+            lifts.push((lift, path));
         }
     }
 
@@ -367,19 +178,19 @@ pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
                 named `lift.json`.",
         ));
     }
-
     let results = lifts
         .into_iter()
-        .map(|config| {
-            pack(config.clone(), &scie_jump_path, jump.size, single_line).map(|path| (config, path))
+        .map(|(lift, manifest)| {
+            pack(lift, &manifest, &scie_jump_path, jump.size, single_line)
+                .map(|binary| (manifest, binary))
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| Code::FAILURE.with_message(e))?;
-    for (config, path) in results {
+    for (manifest, binary) in results {
         println!(
             "{manifest}: {binary}",
-            manifest = config.scie.path.display(),
-            binary = path.display()
+            manifest = manifest.display(),
+            binary = binary.display()
         );
     }
     Code::SUCCESS.ok()

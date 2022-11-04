@@ -1,22 +1,19 @@
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::fingerprint;
-
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Locator {
     Size(usize),
     Entry(PathBuf),
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum Compression {
     Bzip2,
     Gzip,
@@ -25,7 +22,7 @@ pub enum Compression {
     Zstd,
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum ArchiveType {
     Zip,
     Tar,
@@ -106,48 +103,61 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Blob {
-    #[serde(flatten)]
-    pub locator: Locator,
-    pub hash: String,
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BaseFile {
     pub name: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    #[serde(default, flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locator: Option<Locator>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub always_extract: bool,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Blob(pub BaseFile);
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BaseArchive {
+    #[serde(flatten)]
+    pub base: BaseFile,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archive_type: Option<ArchiveType>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct JsonArchive {
-    #[serde(flatten)]
-    pub locator: Locator,
-    pub hash: String,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub archive_type: Option<ArchiveType>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub always_extract: bool,
-}
+#[serde(transparent)]
+struct JsonArchive(BaseArchive);
 
 impl From<Archive> for JsonArchive {
     fn from(value: Archive) -> Self {
-        JsonArchive {
-            locator: value.locator,
-            hash: value.hash,
-            name: value.name,
+        JsonArchive(BaseArchive {
+            base: BaseFile {
+                name: value.name,
+                key: value.key,
+                locator: value.locator,
+                hash: value.hash,
+                always_extract: value.always_extract,
+            },
             archive_type: Some(value.archive_type),
-            always_extract: value.always_extract,
-        }
+        })
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(into = "JsonArchive", try_from = "JsonArchive")]
 pub struct Archive {
-    pub locator: Locator,
-    pub hash: String,
     pub name: String,
+    pub key: Option<String>,
+    pub locator: Option<Locator>,
+    pub hash: Option<String>,
     pub archive_type: ArchiveType,
     pub always_extract: bool,
 }
@@ -156,11 +166,20 @@ impl TryFrom<JsonArchive> for Archive {
     type Error = String;
 
     fn try_from(value: JsonArchive) -> Result<Self, Self::Error> {
-        let archive_type = if let Some(archive_type) = value.archive_type {
+        let archive_type = if let Some(archive_type) = value.0.archive_type {
             archive_type
         } else {
-            let ext = match value.name.as_str().rsplitn(3, '.').collect::<Vec<_>>()[..] {
+            let ext = match value
+                .0
+                .base
+                .name
+                .as_str()
+                .rsplitn(3, '.')
+                .collect::<Vec<_>>()[..]
+            {
                 [_, "tar", stem] => value
+                    .0
+                    .base
                     .name
                     .as_str()
                     .trim_start_matches(stem)
@@ -170,7 +189,7 @@ impl TryFrom<JsonArchive> for Archive {
                     return Err(format!(
                         "This archive has no type declared and it could not be guessed from \
                         its name: {name}",
-                        name = value.name
+                        name = value.0.base.name
                     ))
                 }
             };
@@ -182,33 +201,20 @@ impl TryFrom<JsonArchive> for Archive {
             })?
         };
         Ok(Archive {
-            locator: value.locator,
-            hash: value.hash,
-            name: value.name,
+            name: value.0.base.name,
+            key: value.0.base.key,
+            locator: value.0.base.locator,
+            hash: value.0.base.hash,
             archive_type,
-            always_extract: value.always_extract,
+            always_extract: value.0.base.always_extract,
         })
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Directory {
-    pub name: String,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub locator: Option<Locator>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hash: Option<String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub archive_type: Option<ArchiveType>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_false")]
-    pub always_extract: bool,
-}
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Directory(pub BaseArchive);
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[serde(tag = "type")]
 pub enum File {
@@ -217,7 +223,7 @@ pub enum File {
     Directory(Directory),
 }
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum EnvVar {
     Default(String),
     Replace(String),
@@ -293,7 +299,7 @@ pub struct Cmd {
     pub description: Option<String>,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Jump {
     pub size: usize,
     #[serde(default)]
@@ -303,7 +309,7 @@ pub struct Jump {
     pub bare: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Boot {
     pub commands: HashMap<String, Cmd>,
     #[serde(default)]
@@ -315,10 +321,8 @@ fn default_base() -> PathBuf {
     PathBuf::from("~/.nce")
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Lift {
-    pub files: Vec<File>,
-    pub boot: Boot,
     pub name: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -329,42 +333,31 @@ pub struct Lift {
     pub size: usize,
     #[serde(default)]
     pub hash: String,
+    pub files: Vec<File>,
+    pub boot: Boot,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Scie {
     pub lift: Lift,
     #[serde(default)]
     pub jump: Option<Jump>,
-    #[serde(default)]
-    #[serde(skip_serializing)]
-    pub path: PathBuf,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub scie: Scie,
 }
 
 impl Config {
-    pub fn parse(data: &[u8], origin: &Path) -> Result<Self, String> {
-        let mut config: Self = serde_json::from_slice(data)
+    pub const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
+
+    pub fn parse(data: &[u8]) -> Result<Self, String> {
+        let config: Self = serde_json::from_slice(data)
             .map_err(|e| format!("Failed to decode scie lift manifest: {e}"))?;
-        config.scie.lift.size = data.len();
-        config.scie.lift.hash = fingerprint::digest(data);
-        config.scie.path = origin.to_path_buf();
         Ok(config)
     }
 
-    pub fn from_file(file: &Path) -> Result<Self, String> {
-        let data = std::fs::read(file).map_err(|e| {
-            format!(
-                "Failed to open lift manifest at {file}: {e}",
-                file = file.display()
-            )
-        })?;
-        Self::parse(data.as_slice(), file)
-    }
     pub fn serialize<W: Write>(&self, mut stream: W, pretty: bool) -> Result<(), String> {
         stream
             .write_all(if cfg!(windows) { "\r\n" } else { "\n" }.as_bytes())
@@ -384,8 +377,8 @@ mod tests {
     use std::collections::HashMap;
 
     use super::{
-        Archive, ArchiveType, Blob, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift,
-        Locator, Scie,
+        Archive, ArchiveType, BaseFile, Blob, Boot, Cmd, Compression, Config, EnvVar, File, Jump,
+        Lift, Locator, Scie,
     };
 
     #[test]
@@ -394,7 +387,6 @@ mod tests {
             "{}",
             serde_json::to_string_pretty(&Config {
                 scie: Scie {
-                    path: "/usr/bin/science".into(),
                     jump: Some(Jump {
                         version: "0.1.0".to_string(),
                         size: 37,
@@ -403,25 +395,28 @@ mod tests {
                     lift: Lift {
                         base: "~/.nce".into(),
                         files: vec![
-                            File::Blob(Blob {
-                                locator: Locator::Size(1137),
-                                hash: "abc".to_string(),
+                            File::Blob(Blob(BaseFile {
                                 name: "pants-client".to_string(),
+                                key: None,
+                                locator: Some(Locator::Size(1137)),
+                                hash: Some("abc".to_string()),
                                 always_extract: true
-                            }),
+                            })),
                             File::Archive(Archive {
-                                locator: Locator::Size(123),
-                                hash: "345".to_string(),
-                                archive_type: ArchiveType::CompressedTar(Compression::Zstd),
                                 name: "python".to_string(),
+                                key: None,
+                                locator: Some(Locator::Size(123)),
+                                hash: Some("345".to_string()),
+                                archive_type: ArchiveType::CompressedTar(Compression::Zstd),
                                 always_extract: false
                             }),
                             File::Archive(Archive {
-                                locator: Locator::Size(42),
-                                hash: "def".to_string(),
-                                archive_type: ArchiveType::Zip,
                                 name: "foo.zip".to_string(),
-                                always_extract: false
+                                key: None,
+                                locator: Some(Locator::Size(42)),
+                                hash: Some("def".to_string()),
+                                archive_type: ArchiveType::Zip,
+                                always_extract: false,
                             })
                         ],
                         boot: Boot {
@@ -474,21 +469,15 @@ mod tests {
                             "files": [
                                 {
                                     "type": "blob",
-                                    "name": "pants-client",
-                                    "size": 1,
-                                    "hash": "789"
+                                    "name": "pants-client"
                                 },
                                 {
                                     "type": "archive",
-                                    "name": "foo.tar.gz",
-                                    "size": 1137,
-                                    "hash": "abc"
+                                    "name": "foo.tar.gz"
                                 },
                                 {
-                                    "type": "archive",
                                     "name": "app.zip",
-                                    "size": 42,
-                                    "hash": "xyz"
+                                    "type": "archive"
                                 }
                             ],
                             "boot": {

@@ -290,6 +290,7 @@ dependencies = [
  "structure",
  "tar",
  "tuple",
+ "walkdir",
  "xz2",
  "zip",
  "zstd",
@@ -545,8 +546,6 @@ dependencies = [
  "logging_timer",
  "nix",
  "proc-exit",
- "walkdir",
- "zip",
 ]
 
 [[package]]

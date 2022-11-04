@@ -7,9 +7,9 @@
           "": {
             "env": {
               "NODE_PATH": "{node_modules}",
-              "=PATH": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64:{scie.env.PATH}"
+              "=PATH": "{node}/node-v18.12.0-win-x64:{scie.env.PATH}"
             },
-            "exe": "{node-v18.12.0-win-x64.zip}/node-v18.12.0-win-x64/node.exe",
+            "exe": "{node}/node-v18.12.0-win-x64/node.exe",
             "args": [
               "{node_modules}/cowsay/cli.js"
             ]
@@ -18,13 +18,13 @@
       },
       "files": [
         {
-          "hash": "56a3a49e0e4701f169bb742ea98f5006800229e2e3bf7e10493642f392416ac8",
           "name": "node-v18.12.0-win-x64.zip",
-          "size": 28276708,
+          "key": "node",
           "type": "archive"
         },
         {
           "name": "node_modules",
+          "key": "node_modules",
           "type": "directory"
         }
       ]

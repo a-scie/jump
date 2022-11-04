@@ -6,9 +6,9 @@ use std::path::{Component, Path, PathBuf};
 use bstr::ByteSlice;
 use logging_timer::time;
 
-use crate::config::{Cmd, File, Scie};
-use crate::placeholders;
-use crate::placeholders::{Item, Placeholder};
+use crate::config::{Cmd, Jump};
+use crate::lift::{File, Lift};
+use crate::placeholders::{self, Item, Placeholder};
 
 fn expanduser(path: PathBuf) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(&path)
@@ -76,41 +76,35 @@ fn try_as_str(os_str: &OsStr) -> Option<&str> {
 
 impl Context {
     #[time("debug")]
-    pub(crate) fn new(scie: Scie) -> Result<Self, String> {
-        let scie_jump_size = scie
-            .jump
-            .as_ref()
-            .ok_or_else(|| {
-                format!(
-                    "Creating a context requires a Scie with an identified Jump. Given {scie:?}"
-                )
-            })?
-            .size;
-
+    pub(crate) fn new(scie_path: PathBuf, jump: Jump, lift: Lift) -> Result<Self, String> {
+        let scie_jump_size = jump.size;
         let mut files_by_name = HashMap::new();
-        for file in &scie.lift.files {
+        for file in &lift.files {
             match file {
                 File::Archive(archive) => {
                     files_by_name.insert(archive.name.clone(), file.clone());
+                    if let Some(key) = archive.key.as_ref() {
+                        files_by_name.insert(key.clone(), file.clone());
+                    }
                 }
                 File::Blob(blob) => {
                     files_by_name.insert(blob.name.clone(), file.clone());
-                }
-                File::Directory(directory) => {
-                    files_by_name.insert(directory.name.clone(), file.clone());
+                    if let Some(key) = blob.key.as_ref() {
+                        files_by_name.insert(key.clone(), file.clone());
+                    }
                 }
             }
         }
         Ok(Context {
-            scie: scie.path,
-            description: scie.lift.description,
-            commands: scie.lift.boot.commands,
-            _bindings: scie.lift.boot.bindings,
-            base: expanduser(scie.lift.base)?,
+            scie: scie_path,
+            description: lift.description,
+            commands: lift.boot.commands,
+            _bindings: lift.boot.bindings,
+            base: expanduser(lift.base)?,
             files_by_name,
             scie_jump_size,
-            config_size: scie.lift.size,
-            files: scie.lift.files,
+            config_size: lift.size,
+            files: lift.files,
             replacements: HashSet::new(),
         })
     }
@@ -171,15 +165,6 @@ impl Context {
         match file {
             File::Archive(archive) => Ok(self.base.join(&archive.hash)),
             File::Blob(blob) => Ok(self.base.join(&blob.hash).join(&blob.name)),
-            File::Directory(directory) => {
-                let hash = &directory.hash.as_ref().ok_or_else(|| {
-                    format!(
-                        "Directory entries without a hash should never be present in an assembled \
-                        scie's lift manifest. Found unexpected: {directory:?}"
-                    )
-                })?;
-                Ok(self.base.join(hash))
-            }
         }
     }
 

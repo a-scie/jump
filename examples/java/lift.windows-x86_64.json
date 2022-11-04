@@ -6,29 +6,25 @@
         "commands": {
           "": {
             "env": {
-              "=JAVA_HOME": "{java}/jdk11.0.17_8",
-              "=PATH": "{java}/jdk11.0.17_8/bin:{scie.env.PATH}"
+              "=JAVA_HOME": "{jdk}/jdk11.0.17_8",
+              "=PATH": "{jdk}/jdk11.0.17_8/bin:{scie.env.PATH}"
             },
-            "exe": "{java}/jdk11.0.17_8/bin/java",
+            "exe": "{jdk}/jdk11.0.17_8/bin/java",
             "args": [
               "-jar",
-              "{coursier}"
+              "{coursier.jar}"
             ]
           }
         }
       },
       "files": [
         {
-          "archive_type": "zip",
-          "hash": "b90121919871a7345e0e62b013bfaa246a6bfa680bae4a8a10916cdf2f1b713b",
-          "name": "java",
-          "size": 187316832,
+          "name": "amazon-corretto-11.0.17.8.1-windows-x64-jdk.zip",
+          "key": "jdk",
           "type": "archive"
         },
         {
-          "hash": "a1799d6418fbcbad47ac9e388affc751b4fc2d8678f89c332df9592d2dd3a202",
-          "name": "coursier",
-          "size": 42284054,
+          "name": "coursier.jar",
           "type": "blob"
         }
       ]
