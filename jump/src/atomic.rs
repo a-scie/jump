@@ -19,27 +19,29 @@ impl Display for Target {
     }
 }
 
-fn check_exists(target: &Path, target_type: Target) -> Result<bool, String> {
-    match target_type {
-        Target::Directory => {
-            if target.is_dir() {
-                return Ok(true);
-            } else if !target.exists() {
-                return Ok(false);
+impl Target {
+    fn check_exists(&self, target: &Path) -> Result<bool, String> {
+        match self {
+            Target::Directory => {
+                if target.is_dir() {
+                    return Ok(true);
+                } else if !target.exists() {
+                    return Ok(false);
+                }
+            }
+            Target::_File => {
+                if target.is_file() {
+                    return Ok(true);
+                } else if !target.exists() {
+                    return Ok(false);
+                }
             }
         }
-        Target::_File => {
-            if target.is_file() {
-                return Ok(true);
-            } else if !target.exists() {
-                return Ok(false);
-            }
-        }
+        Err(format!(
+            "The target path {target} exists but is not a {self}.",
+            target = target.display()
+        ))
     }
-    Err(format!(
-        "The target path {target} exists but is not a {target_type}.",
-        target = target.display()
-    ))
 }
 
 /// Executes work to create the `target` path exactly once across threads and processes.
@@ -61,7 +63,7 @@ where
     // path creation.
 
     // First check.
-    if check_exists(target, target_type)? {
+    if target_type.check_exists(target)? {
         return Ok(());
     }
 
@@ -96,7 +98,7 @@ where
     let _write_lock = lock.write();
 
     // Second check.
-    if check_exists(target, target_type)? {
+    if target_type.check_exists(target)? {
         return Ok(());
     }
 
