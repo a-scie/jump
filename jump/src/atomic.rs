@@ -1,36 +1,90 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::path::Path;
 
-pub(crate) fn atomic_directory<E: Display, F>(target_dir: &Path, work: F) -> Result<(), String>
+use serde::Serializer;
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub(crate) enum Target {
+    Directory,
+    _File, // TODO(John Sirois): Use for run-once boot bindings.
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Target::Directory => f.serialize_str("directory"),
+            Target::_File => f.serialize_str("file"),
+        }
+    }
+}
+
+fn check_exists(target: &Path, target_type: Target) -> Result<bool, String> {
+    match target_type {
+        Target::Directory => {
+            if target.is_dir() {
+                return Ok(true);
+            } else if !target.exists() {
+                return Ok(false);
+            }
+        }
+        Target::_File => {
+            if target.is_file() {
+                return Ok(true);
+            } else if !target.exists() {
+                return Ok(false);
+            }
+        }
+    }
+    Err(format!(
+        "The target path {target} exists but is not a {target_type}.",
+        target = target.display()
+    ))
+}
+
+/// Executes work to create the `target` path exactly once across threads and processes.
+///
+/// If the `target_type` is `Target::Directory` and the `target` directory has not yet been created,
+/// then `work` is handed an empty work directory to populate. Upon success that directory will be
+/// renamed atomically to the `target` directory path. If the `target_type` is `Target::File` and
+/// the `target` file has not been created, then `work` is handed the path of a work file to create.
+/// That work file will not exist, but its parent directories will have been already created.
+pub(crate) fn atomic_path<E: Display, F>(
+    target: &Path,
+    target_type: Target,
+    work: F,
+) -> Result<(), String>
 where
     F: FnOnce(&Path) -> Result<(), E>,
 {
-    if !target_dir.is_absolute() {
+    // We use an atomic rename under a double-checked exclusive write lock to implement an atomic
+    // path creation.
+
+    // First check.
+    if check_exists(target, target_type)? {
+        return Ok(());
+    }
+
+    // Lock.
+    if !target.is_absolute() {
         return Err(format!(
             "The target_dir must be an absolute path, given: {}",
-            target_dir.display()
+            target.display()
         ));
     }
-    let (work_dir, lock_file) = {
-        if let Some(parent) = target_dir.parent() {
+    let (work_path, lock_file) = {
+        if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 format!(
-                    "Failed to establish parent directory if {target_dir}: {e}",
-                    target_dir = target_dir.display()
+                    "Failed to establish parent directory of {target}: {e}",
+                    target = target.display()
                 )
             })?;
         }
-        let lock_file = target_dir.with_extension("lck");
-        let work_dir = target_dir.with_extension("work");
+        let lock_file = target.with_extension("lck");
+        let work_dir = target.with_extension("work");
         (work_dir, lock_file)
     };
-
-    // We use an atomic rename under a double-checked exclusive write lock to implement an atomic
-    // directory creation.
-    if target_dir.exists() {
-        return Ok(());
-    }
 
     let lock_fd = File::create(&lock_file).map_err(|e| {
         format!(
@@ -40,27 +94,33 @@ where
     })?;
     let mut lock = fd_lock::RwLock::new(lock_fd);
     let _write_lock = lock.write();
-    if target_dir.exists() {
+
+    // Second check.
+    if check_exists(target, target_type)? {
         return Ok(());
     }
-    std::fs::create_dir_all(&work_dir).map_err(|e| {
-        format!(
-            "Failed to prepare workdir {work_dir}: {e}",
-            work_dir = work_dir.display()
-        )
-    })?;
-    work(&work_dir).map_err(|e| {
+
+    // Act.
+    if Target::Directory == target_type {
+        std::fs::create_dir(&work_path).map_err(|e| {
+            format!(
+                "Failed to prepare workdir {work_dir}: {e}",
+                work_dir = work_path.display()
+            )
+        })?;
+    }
+    work(&work_path).map_err(|e| {
         format!(
             "Failed to establish atomic directory {target_dir}. Population of work directory \
             failed: {e}",
-            target_dir = target_dir.display()
+            target_dir = target.display()
         )
     })?;
-    std::fs::rename(work_dir, target_dir).map_err(|e| {
+    std::fs::rename(work_path, target).map_err(|e| {
         format!(
             "Failed to establish atomic directory {target_dir}. Rename of work directory \
             failed: {e}",
-            target_dir = target_dir.display()
+            target_dir = target.display()
         )
     })
 }

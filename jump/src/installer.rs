@@ -6,7 +6,7 @@ use std::path::Path;
 
 use logging_timer::time;
 
-use crate::atomic::atomic_directory;
+use crate::atomic::{atomic_path, Target};
 use crate::config::{ArchiveType, Cmd, Compression, FileType};
 use crate::context::Context;
 use crate::process::{EnvVar, EnvVars, Process};
@@ -25,7 +25,7 @@ fn unpack_archive<R: Read + Seek>(
     bytes: R,
     dst: &Path,
 ) -> Result<(), String> {
-    atomic_directory(dst, |work_dir| match archive {
+    atomic_path(dst, Target::Directory, |work_dir| match archive {
         ArchiveType::Zip => {
             let mut zip = zip::ZipArchive::new(bytes)
                 .map_err(|e| format!("Failed to open {archive:?}: {e}"))?;
@@ -64,7 +64,7 @@ fn unpack_archive<R: Read + Seek>(
 #[time("debug")]
 fn unpack_blob<R: Read>(mut bytes: R, dst: &Path) -> Result<(), String> {
     let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
-    atomic_directory(parent_dir, |work_dir| {
+    atomic_path(parent_dir, Target::Directory, |work_dir| {
         let blob_dst = work_dir.join(dst.file_name().ok_or_else(|| {
             format!(
                 "Blob destination {dst} has no file name.",
