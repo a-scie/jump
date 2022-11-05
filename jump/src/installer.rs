@@ -9,8 +9,8 @@ use logging_timer::time;
 use crate::atomic::atomic_directory;
 use crate::config::{ArchiveType, Cmd, Compression, FileType};
 use crate::context::Context;
-use crate::fingerprint;
 use crate::process::{EnvVar, EnvVars, Process};
+use crate::{fingerprint, File};
 
 #[time("debug")]
 fn unpack_tar<R: Read>(archive_type: ArchiveType, tar_stream: R, dst: &Path) -> Result<(), String> {
@@ -95,6 +95,15 @@ fn unpack<R: Read + Seek>(file_type: FileType, bytes: R, dst: &Path) -> Result<(
     }
 }
 
+fn file_type_to_unpack(file: &File, dst: &Path) -> Option<FileType> {
+    match file.file_type {
+        archive_type @ FileType::Archive(_) if !dst.is_dir() => Some(archive_type),
+        FileType::Blob if !dst.is_file() => Some(FileType::Blob),
+        FileType::Directory if !dst.is_dir() => Some(FileType::Directory),
+        _ => None,
+    }
+}
+
 #[time("debug")]
 pub(crate) fn prepare(
     mut context: Context,
@@ -132,38 +141,63 @@ pub(crate) fn prepare(
         to_extract.insert(file.clone());
     }
 
+    let mut scie_tote = vec![];
     let mut location = 0;
     for file in &context.files {
         if to_extract.contains(file) {
-            let dst = context.get_path(file);
-            let file_type = match file.file_type {
-                archive_type @ FileType::Archive(_) if !dst.is_dir() => Some(archive_type),
-                FileType::Blob if !dst.is_file() => Some(FileType::Blob),
-                FileType::Directory if !dst.is_dir() => Some(FileType::Directory),
-                _ => None,
-            };
-            if let Some(file_type) = file_type {
-                let bytes = &payload[location..(location + file.size)];
-                let actual_hash = fingerprint::digest(bytes);
-                if file.hash != actual_hash {
-                    return Err(format!(
-                        "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
-                        size = file.size,
-                        dst = dst.display(),
-                    ));
+            if file.size == 0 {
+                scie_tote.push(file);
+            } else {
+                let dst = context.get_path(file);
+                if let Some(file_type) = file_type_to_unpack(file, &dst) {
+                    let bytes = &payload[location..(location + file.size)];
+                    let actual_hash = fingerprint::digest(bytes);
+                    if file.hash != actual_hash {
+                        return Err(format!(
+                            "Destination {dst} of size {size} had unexpected hash: {actual_hash}",
+                            size = file.size,
+                            dst = dst.display(),
+                        ));
+                    } else {
+                        debug!(
+                            "Destination {dst} of size {size} had expected hash",
+                            size = file.size,
+                            dst = dst.display()
+                        );
+                    }
+                    unpack(file_type, Cursor::new(bytes), &dst)?;
                 } else {
-                    debug!(
-                        "Destination {dst} of size {size} had expected hash",
-                        size = file.size,
-                        dst = dst.display()
-                    );
-                }
-                unpack(file_type, Cursor::new(bytes), &dst)?;
+                    debug!("Cache hit {dst} for {file:?}", dst = dst.display())
+                };
+            }
+        }
+        location += file.size;
+    }
+
+    if !scie_tote.is_empty() {
+        let tote_file = context.files.last().ok_or_else(|| {
+            format!(
+                "Expected the last file to be the scie-tote holding these files: {scie_tote:#?}"
+            )
+        })?;
+        let scie_tote_dst = context.get_path(tote_file);
+        let bytes = &payload[(location - tote_file.size)..location];
+        unpack(tote_file.file_type, Cursor::new(bytes), &scie_tote_dst)?;
+        for file in scie_tote {
+            let dst = context.get_path(file);
+            if let Some(file_type) = file_type_to_unpack(file, &dst) {
+                let src_path = scie_tote_dst.join(&file.name);
+                let src = std::fs::File::open(&src_path).map_err(|e| {
+                    format!(
+                        "Failed to open {file:?} at {src} from the unpacked scie-tote: {e}",
+                        src = src_path.display()
+                    )
+                })?;
+                unpack(file_type, &src, &dst)?;
             } else {
                 debug!("Cache hit {dst} for {file:?}", dst = dst.display())
             };
         }
-        location += file.size;
     }
 
     Ok(Process {

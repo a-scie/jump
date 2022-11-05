@@ -22,9 +22,6 @@
         {
           "name": "node-v18.12.0-linux-x64.tar.xz",
           "key": "node"
-        },
-        {
-          "name": "noop"
         }
       ]
     }

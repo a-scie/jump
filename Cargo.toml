@@ -35,6 +35,15 @@ bstr = "1.0"
 log = "0.4"
 logging_timer = "1.1"
 
+[workspace.dependencies.zip]
+version = "0.6"
+default-features = false
+# We specifically don't include "time" which is otherwise default. Without time, zip creation
+# always uses 1/1/1980 and gives us reproducible zip creation by default.
+# We also leave out non-standard forms of compression which net a ~40% increase in final binary
+# size as of this commit (~1.4MB -> 2MB).
+features = ["deflate"]
+
 [dependencies]
 bstr = { workspace = true }
 env_logger = { version = "0.9", default-features = false }
@@ -43,3 +52,5 @@ log = { workspace = true }
 logging_timer = { workspace = true }
 nix = "0.25"
 proc-exit = "2.0"
+tempfile = "3.3"
+zip = { workspace = true }

@@ -81,7 +81,7 @@ jobs:
           dist/scie-jump* examples/node/${{ matrix.node-lift }}
           
           # Use the built-in BusyBox functionality via binary base name.
-          cd examples/node && rm noop.zip && ln ../../node.js ${npm_exe}
+          cd examples/node && ln ../../node.js ${npm_exe}
           ./npm install cowsay
           
           # Build a scie from another scie's tip-embedded scie-jump.

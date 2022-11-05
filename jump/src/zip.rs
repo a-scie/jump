@@ -1,3 +1,7 @@
+use std::cmp::min;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::Path;
+
 use itertools::Itertools;
 
 // See "4.3.6 Overall .ZIP file format:" and "4.3.16  End of central directory record:"
@@ -5,17 +9,18 @@ use itertools::Itertools;
 // leveraged here.
 
 const EOCD_SIGNATURE: (&u8, &u8, &u8, &u8) = (&0x06, &0x05, &0x4b, &0x50);
+const EOCD_MIN_SIZE: usize = 22;
+const EOCD_MAX_SIZE: usize = EOCD_MIN_SIZE + u16::MAX as usize;
 
 pub(crate) fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String> {
     #[allow(clippy::too_many_arguments)]
     let eocd_struct = structure!("<4sHHHHIIH");
+    debug_assert!(EOCD_MIN_SIZE == eocd_struct.size());
 
-    let eocd_size = eocd_struct.size();
-    let maximum_eocd_size = eocd_size + u16::MAX as usize;
-    let max_scan = maximum_eocd_size + maximum_trailer_size;
-    let max_signature_position = data.len() - eocd_size + 4;
+    let max_scan = EOCD_MAX_SIZE + maximum_trailer_size;
+    let max_signature_position = data.len() - EOCD_MIN_SIZE + 4;
 
-    let offset_from_eof = eocd_size
+    let offset_from_eof = EOCD_MIN_SIZE
         + data[..max_signature_position]
             .iter()
             .rev()
@@ -29,7 +34,7 @@ pub(crate) fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usi
             )
             })?;
     let eocd_start = data.len() - offset_from_eof;
-    let eocd_end = eocd_start + eocd_size;
+    let eocd_end = eocd_start + EOCD_MIN_SIZE;
     let (
         _signature,
         _disk_no,
@@ -47,4 +52,39 @@ pub(crate) fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usi
             )
         })?;
     Ok(eocd_end + (zip_comment_size as usize))
+}
+
+pub fn check_is_zip(path: &Path) -> Result<(), String> {
+    let mut file = std::fs::File::open(path).map_err(|e| {
+        format!(
+            "Failed to open zip {zip} for reading: {e}",
+            zip = path.display()
+        )
+    })?;
+    let file_size = file
+        .metadata()
+        .map_err(|e| {
+            format!(
+                "Failed to determine the size of the file at {path}: {e}",
+                path = path.display()
+            )
+        })?
+        .len();
+    let seek = min(EOCD_MAX_SIZE, file_size as usize);
+    file.seek(SeekFrom::End(-(seek as i64))).map_err(|e| {
+        format!(
+            "Failed to reset stream pointer for {file_size} byte file {path} to position \
+                {seek} from the end: {e}",
+            path = path.display()
+        )
+    })?;
+    let mut buffer = Vec::with_capacity(seek);
+    file.read_to_end(&mut buffer).map_err(|e| {
+        format!(
+            "Failed to read last {seek} bytes of {path} to check for a zip end of central \
+            directory record: {e}",
+            path = path.display()
+        )
+    })?;
+    end_of_zip(&buffer, 0).map(|_| ())
 }

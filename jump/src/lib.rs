@@ -21,6 +21,7 @@ use std::path::PathBuf;
 
 use logging_timer::time;
 
+pub use crate::archive::create_options;
 pub use crate::config::Jump;
 pub use crate::context::Boot;
 use crate::context::Context;
@@ -28,6 +29,7 @@ use crate::context::Context;
 pub use crate::jump::EOF_MAGIC;
 pub use crate::lift::{load_lift, File, Lift, Scie};
 pub use crate::process::{execute, EnvVar, EnvVars, Process};
+pub use crate::zip::check_is_zip;
 
 pub struct SelectBoot {
     pub boots: Vec<Boot>,

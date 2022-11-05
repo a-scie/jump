@@ -22,9 +22,6 @@
         {
           "name": "node-v18.12.0-darwin-x64.tar.gz",
           "key": "node"
-        },
-        {
-          "name": "noop"
         }
       ]
     }

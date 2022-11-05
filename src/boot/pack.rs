@@ -1,11 +1,12 @@
 use std::env;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use jump::config::{Config, FileType};
-use jump::{load_lift, Jump, Lift, Scie};
+use jump::config::{ArchiveType, Config, FileType};
+use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift, Scie};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
+use zip::{CompressionMethod, ZipWriter};
 
 #[time("debug")]
 fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
@@ -70,9 +71,31 @@ fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
+struct ScieTote {
+    zip_file: std::fs::File,
+    zip_writer: ZipWriter<std::fs::File>,
+}
+
+impl ScieTote {
+    fn new() -> Result<Self, String> {
+        let zip_file = tempfile::tempfile().map_err(|e| {
+            format!("Failed to create a temporary file to built the scie-tote with: {e}")
+        })?;
+        let zip_writer = ZipWriter::new(
+            zip_file
+                .try_clone()
+                .map_err(|e| format!("Failed to dup temporary file fd: {e}"))?,
+        );
+        Ok(Self {
+            zip_file,
+            zip_writer,
+        })
+    }
+}
+
 #[time("debug")]
 fn pack(
-    lift: Lift,
+    mut lift: Lift,
     manifest_path: &Path,
     jump: &Jump,
     scie_jump_path: &Path,
@@ -110,7 +133,17 @@ fn pack(
         )
     })?;
     let resolve_base = manifest_path.parent().unwrap_or_else(|| Path::new(""));
-    for file in &lift.files {
+    let mut scie_tote: Option<ScieTote> = None;
+    if let Some(last_file) = lift.files.last() {
+        let mut path = resolve_base.join(&last_file.name);
+        if FileType::Directory == last_file.file_type {
+            path = path.with_extension("zip");
+        }
+        if check_is_zip(&path).is_err() {
+            scie_tote = Some(ScieTote::new()?)
+        }
+    }
+    for file in lift.files.iter_mut() {
         let mut path = resolve_base.join(&file.name);
         if FileType::Directory == file.file_type {
             path = path.with_extension("zip");
@@ -122,13 +155,71 @@ fn pack(
                 binary = binary_path.display()
             )
         })?;
-        std::io::copy(&mut blob, &mut binary).map_err(|e| {
+        if let Some(tote) = scie_tote.as_mut() {
+            let metadata = blob.metadata().map_err(|e| {
+                format!(
+                    "Failed to read metadata for {path}: {e}",
+                    path = path.display()
+                )
+            })?;
+            let options = create_options(&metadata)?.compression_method(CompressionMethod::Stored);
+            tote.zip_writer
+                .start_file(&file.name, options)
+                .map_err(|e| {
+                    format!(
+                        "Failed to start a scie-tote file entry for {path}: {e}",
+                        path = path.display()
+                    )
+                })?;
+            std::io::copy(&mut blob, &mut tote.zip_writer).map_err(|e| {
+                format!(
+                    "Failed to append {src} / {file:?} to {binary}: {e}",
+                    src = path.display(),
+                    binary = binary_path.display()
+                )
+            })?;
+            file.size = 0;
+        } else {
+            std::io::copy(&mut blob, &mut binary).map_err(|e| {
+                format!(
+                    "Failed to append {src} / {file:?} to {binary}: {e}",
+                    src = path.display(),
+                    binary = binary_path.display()
+                )
+            })?;
+        };
+    }
+    if let Some(tote) = scie_tote.as_mut() {
+        tote.zip_writer
+            .finish()
+            .map_err(|e| format!("Failed to finalize the scie-tote zip: {e}"))?;
+
+        tote.zip_file.seek(SeekFrom::Start(0)).map_err(|e| {
             format!(
-                "Failed to append {src} / {file:?} to {binary}: {e}",
-                src = path.display(),
+                "Failed to re-wind the scie-tote file to make a second pass calculation of \
+                    its hash: {e}"
+            )
+        })?;
+        let (size, hash) = fingerprint::digest_reader(&tote.zip_file)?;
+        let tote_file = File {
+            name: "scie-tote".to_string(),
+            key: None,
+            size,
+            hash,
+            file_type: FileType::Archive(ArchiveType::Zip),
+            always_extract: false,
+        };
+
+        tote.zip_file
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| format!("{e}"))?;
+        std::io::copy(&mut tote.zip_file, &mut binary).map_err(|e| {
+            format!(
+                "Failed to append {tote_file:?} to {binary}: {e}",
                 binary = binary_path.display()
             )
         })?;
+        lift.files.push(tote_file);
     }
     let config = Config {
         scie: Scie {

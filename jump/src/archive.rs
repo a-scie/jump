@@ -1,27 +1,20 @@
+use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 
 use log::debug;
 use logging_timer::time;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 use zip::write::FileOptions;
 
 #[cfg(not(target_family = "unix"))]
-fn create_options(_entry: &DirEntry) -> Result<FileOptions, String> {
+pub fn create_options(_metadata: &Metadata) -> Result<FileOptions, String> {
     Ok(FileOptions::default())
 }
 
 #[cfg(target_family = "unix")]
-fn create_options(entry: &DirEntry) -> Result<FileOptions, String> {
+pub fn create_options(metadata: &Metadata) -> Result<FileOptions, String> {
     use std::os::unix::fs::PermissionsExt;
-    let perms = entry
-        .metadata()
-        .map_err(|e| {
-            format!(
-                "Failed to read metadata for {path}: {e}",
-                path = entry.path().display()
-            )
-        })?
-        .permissions();
+    let perms = metadata.permissions();
     Ok(FileOptions::default().unix_permissions(perms.mode()))
 }
 
@@ -64,7 +57,12 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
             .collect::<Result<Vec<_>, _>>()?
             // N.B.: Zip archive entry names always use / as the directory separator.
             .join("/");
-        let options = create_options(&entry)?;
+        let options = create_options(&entry.metadata().map_err(|e| {
+            format!(
+                "Failed to read metadata for {path}: {e}",
+                path = entry.path().display()
+            )
+        })?)?;
         if entry.path().is_dir() {
             debug!("Adding dir entry {entry}", entry = rel_path.display());
             zip.add_directory(entry_name, options)

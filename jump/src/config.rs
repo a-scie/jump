@@ -118,6 +118,7 @@ pub struct File {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<usize>,
     #[serde(default)]
     pub hash: Option<String>,

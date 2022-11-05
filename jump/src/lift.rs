@@ -21,7 +21,10 @@ impl From<File> for crate::config::File {
         Self {
             name: value.name,
             key: value.key,
-            size: Some(value.size),
+            size: match value.size {
+                0 => None,
+                size => Some(size),
+            },
             hash: Some(value.hash),
             file_type: Some(value.file_type),
             always_extract: value.always_extract,
@@ -122,13 +125,15 @@ fn assemble(
             determine_file_type(&path)?
         };
 
-        let (size, hash) = if let (Some(size), Some(hash)) = (file.size, file.hash) {
-            (size, hash)
-        } else {
-            if FileType::Directory == file_type {
-                path = archive::create(resolve_base, &file.name)?;
+        let (size, hash) = match (file.size, file.hash) {
+            (Some(size), Some(hash)) => (size, hash),
+            (None, Some(hash)) => (0, hash),
+            _ => {
+                if FileType::Directory == file_type {
+                    path = archive::create(resolve_base, &file.name)?;
+                }
+                fingerprint::digest_file(&path)?
             }
-            fingerprint::digest_file(&path)?
         };
 
         files.push(File {
