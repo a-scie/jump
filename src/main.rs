@@ -69,11 +69,7 @@ fn main() -> ExitResult {
             let argv_skip = if argv1_consumed { 2 } else { 1 };
             exec(process.exe, process.args, argv_skip)
         }
-        Action::Inspect((jump, lift)) => {
-            jump::serialize(jump, lift, std::io::stdout()).map_err(|e| {
-                Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}"))
-            })
-        }
+        Action::Inspect((jump, lift)) => boot::inspect(jump, lift),
         Action::Split((jump, lift, scie_path)) => {
             todo!(
                 "Implement SCIE=split for {jump:?} {lift:?} {scie_path}",

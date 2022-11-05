@@ -1,8 +1,13 @@
-use jump::SelectBoot;
+use jump::{Jump, Lift, SelectBoot};
 use proc_exit::{Code, ExitResult};
 
 mod pack;
 pub(crate) use pack::set as pack;
+
+pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
+    jump::serialize(jump, lift, std::io::stdout())
+        .map_err(|e| Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}")))
+}
 
 pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
     Err(Code::FAILURE.with_message(format!(

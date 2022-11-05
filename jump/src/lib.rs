@@ -48,13 +48,13 @@ pub enum Action {
 }
 
 pub fn serialize<W: Write>(jump: Jump, lift: Lift, mut stream: W) -> Result<(), String> {
-    Config {
-        scie: crate::config::Scie {
+    let config = Config {
+        scie: config::Scie {
             jump: Some(jump),
             lift: lift.into(),
         },
-    }
-    .serialize(&mut stream, Fmt::new().pretty(true).trailing_newline(true))
+    };
+    config.serialize(&mut stream, Fmt::new().pretty(true).trailing_newline(true))
 }
 
 #[time("debug")]
