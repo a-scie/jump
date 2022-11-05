@@ -2,7 +2,7 @@ use std::env;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use jump::config::{ArchiveType, Config, FileType};
+use jump::config::{ArchiveType, Config, FileType, Fmt};
 use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift, Scie};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
@@ -228,7 +228,14 @@ fn pack(
         }
         .into(),
     };
-    config.serialize(binary, !single_line).map_err(|e| {
+    // We configure the lift manifest format to allow for easiest inspection via standard tools.
+    // In the single line case in particular, this configuration allows for inspection via
+    // `tail -1 scie` or `tail -1 scie | jq .` on systems with these common tools.
+    let fmt = Fmt::new()
+        .pretty(!single_line)
+        .leading_newline(true)
+        .trailing_newline(true);
+    config.serialize(binary, fmt).map_err(|e| {
         format!(
             "Failed to serialize the lift manifest to {binary}: {e}",
             binary = binary_path.display()

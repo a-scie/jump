@@ -243,6 +243,43 @@ pub struct Scie {
     pub jump: Option<Jump>,
 }
 
+pub struct Fmt {
+    pretty: bool,
+    leading_newline: bool,
+    trailing_newline: bool,
+}
+
+impl Fmt {
+    pub fn new() -> Self {
+        Fmt {
+            pretty: false,
+            leading_newline: false,
+            trailing_newline: false,
+        }
+    }
+
+    pub fn pretty(mut self, value: bool) -> Self {
+        self.pretty = value;
+        self
+    }
+
+    pub fn leading_newline(mut self, value: bool) -> Self {
+        self.leading_newline = value;
+        self
+    }
+
+    pub fn trailing_newline(mut self, value: bool) -> Self {
+        self.trailing_newline = value;
+        self
+    }
+}
+
+impl Default for Fmt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub scie: Scie,
@@ -250,6 +287,7 @@ pub struct Config {
 
 impl Config {
     pub const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
+    const NEWLINE: &'static [u8] = if cfg!(windows) { b"\r\n" } else { b"\n" };
 
     pub fn parse(data: &[u8]) -> Result<Self, String> {
         let config: Self = serde_json::from_slice(data)
@@ -257,17 +295,29 @@ impl Config {
         Ok(config)
     }
 
-    pub fn serialize<W: Write>(&self, mut stream: W, pretty: bool) -> Result<(), String> {
-        stream
-            .write_all(if cfg!(windows) { "\r\n" } else { "\n" }.as_bytes())
-            .map_err(|e| format!("Failed to write scie lift manifest: {e}"))?;
-        if pretty {
-            serde_json::to_writer_pretty(stream, self)
+    pub fn serialize<W: Write>(&self, mut stream: W, fmt: Fmt) -> Result<(), String> {
+        let mut write_bytes = |bytes| {
+            stream
+                .write_all(bytes)
                 .map_err(|e| format!("Failed to write scie lift manifest: {e}"))
-        } else {
-            serde_json::to_writer(stream, self)
-                .map_err(|e| format!("Failed to write scie lift manifest: {e}"))
+        };
+
+        if fmt.leading_newline {
+            write_bytes(Config::NEWLINE)?;
         }
+
+        let body = if fmt.pretty {
+            serde_json::to_vec_pretty(self)
+        } else {
+            serde_json::to_vec(self)
+        }
+        .map_err(|e| format!("Failed to serialize scie lift manifest: {e}"))?;
+        write_bytes(body.as_slice())?;
+
+        if fmt.trailing_newline {
+            write_bytes(Config::NEWLINE)?;
+        }
+        Ok(())
     }
 }
 

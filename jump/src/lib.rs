@@ -17,12 +17,14 @@ mod process;
 mod zip;
 
 use std::env;
+use std::io::Write;
 use std::path::PathBuf;
 
 use logging_timer::time;
 
 pub use crate::archive::create_options;
 pub use crate::config::Jump;
+use crate::config::{Config, Fmt};
 pub use crate::context::Boot;
 use crate::context::Context;
 // Exposed for the package crate post-processing of the scie-jump binary.
@@ -41,6 +43,18 @@ pub enum Action {
     BootPack((Jump, PathBuf)),
     BootSelect(SelectBoot),
     Execute((Process, bool)),
+    Inspect((Jump, Lift)),
+    Split((Jump, Lift, PathBuf)),
+}
+
+pub fn serialize<W: Write>(jump: Jump, lift: Lift, mut stream: W) -> Result<(), String> {
+    Config {
+        scie: crate::config::Scie {
+            jump: Some(jump),
+            lift: lift.into(),
+        },
+    }
+    .serialize(&mut stream, Fmt::new().pretty(true).trailing_newline(true))
 }
 
 #[time("debug")]
@@ -69,6 +83,23 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     if let Some(value) = env::var_os("SCIE") {
         if "boot-pack" == value {
             return Ok(Action::BootPack((jump, current_exe)));
+        } else if "inspect" == value {
+            return Ok(Action::Inspect((jump, lift)));
+        } else if "split" == value {
+            return Ok(Action::Split((jump, lift, current_exe)));
+        } else if !PathBuf::from(&value).exists() {
+            return Err(format!(
+                "The SCIE environment variable is set to {value:?} which is not a scie path \n\
+                    or one of the known SCIE boot commands.\n\
+                    \n\
+                    For SCIE=boot_command you can select from the following:\n\
+                    boot-pack: Pack the given lift manifests into scie executables. If no \n\
+                               manifests are given, looks for lift.json in the current directory.\n\
+                    inspect:   Pretty-print the current scie's lift manifest to stdout.\n\
+                    split:     Split this scie into its component files in the given directory \n\
+                               or else the current directory if no argument is given.\n\
+                    "
+            ));
         }
     }
 

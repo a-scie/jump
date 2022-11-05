@@ -62,12 +62,23 @@ fn main() -> ExitResult {
     })?;
 
     match action {
-        Action::BootPack((jump, path)) => boot::pack(jump, path),
+        Action::BootPack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path),
         Action::BootSelect(select_boot) => boot::select(select_boot),
         Action::Execute((process, argv1_consumed)) => {
             process.env.export();
             let argv_skip = if argv1_consumed { 2 } else { 1 };
             exec(process.exe, process.args, argv_skip)
+        }
+        Action::Inspect((jump, lift)) => {
+            jump::serialize(jump, lift, std::io::stdout()).map_err(|e| {
+                Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}"))
+            })
+        }
+        Action::Split((jump, lift, scie_path)) => {
+            todo!(
+                "Implement SCIE=split for {jump:?} {lift:?} {scie_path}",
+                scie_path = scie_path.display()
+            )
         }
     }
 }
