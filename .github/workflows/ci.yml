@@ -64,6 +64,14 @@ jobs:
             examples/prepare.sh java
           fi
           dist/scie-jump* examples/java/lift.${{ matrix.arch }}.json
+
+          SCIE=split ./coursier split
+          sha256sum coursier* > split/coursier.sha256sum
+          cd split && ./scie-jump
+          sha256sum --check coursier.sha256sum
+          sha256sum coursier* ../coursier*
+          cd ..
+
           time RUST_LOG=debug ./coursier version
           time ./coursier java-home
           time ./coursier launch org.pantsbuild:jar-tool:0.0.17 \
@@ -81,6 +89,13 @@ jobs:
           fi
           dist/scie-jump* examples/node/lift.${{ matrix.arch }}.json
           
+          SCIE=split ./node.js split
+          sha256sum node.js* > split/node.js.sha256sum
+          cd split && ./scie-jump
+          sha256sum --check node.js.sha256sum
+          sha256sum node.js* ../node.js*
+          cd ..
+
           # Use the built-in BusyBox functionality via binary base name.
           cd examples/node && ln ../../node.js ${npm_exe}
           ./npm install cowsay
@@ -89,3 +104,9 @@ jobs:
           SCIE=boot-pack ../../node.js ./cowsay-lift.${{ matrix.arch }}.json
           rm -rf npm node_modules* package*.json
           ./cowsay.js -b 'All the binaries belong to us!'
+          
+          SCIE=split ./cowsay.js split
+          sha256sum cowsay.js* > split/cowsay.js.sha256sum
+          cd split && ./scie-jump
+          sha256sum --check cowsay.js.sha256sum
+          sha256sum cowsay.js* ../cowsay.js*
