@@ -114,16 +114,6 @@ pub(crate) fn prepare(
     payload: &[u8],
 ) -> Result<Process, String> {
     let mut to_extract = HashSet::new();
-    for name in &command.additional_files {
-        let file = context.get_file(name.as_str()).ok_or_else(|| {
-            format!(
-                "The additional file {name} requested by {command:#?} was not found in this \
-                executable.",
-            )
-        })?;
-        to_extract.insert(file.clone());
-    }
-
     let exe = context.reify_string(&command.exe)?.into();
     let args = command
         .args
@@ -147,7 +137,7 @@ pub(crate) fn prepare(
     let mut scie_tote = vec![];
     let mut location = 0;
     for file in &context.files {
-        if to_extract.contains(file) {
+        if file.eager_extract || to_extract.contains(file) {
             if file.size == 0 {
                 scie_tote.push(file);
             } else {

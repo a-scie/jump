@@ -129,7 +129,7 @@ pub struct File {
     pub file_type: Option<FileType>,
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
-    pub always_extract: bool,
+    pub eager_extract: bool,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -200,9 +200,6 @@ pub struct Cmd {
     #[serde(default)]
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<EnvVar, String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub additional_files: Vec<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -354,7 +351,7 @@ mod tests {
                                 size: Some(1137),
                                 hash: Some("abc".to_string()),
                                 file_type: Some(FileType::Blob),
-                                always_extract: true
+                                eager_extract: true
                             },
                             File {
                                 name: "python".to_string(),
@@ -364,7 +361,7 @@ mod tests {
                                 file_type: Some(FileType::Archive(ArchiveType::CompressedTar(
                                     Compression::Zstd
                                 ))),
-                                always_extract: false
+                                eager_extract: false
                             },
                             File {
                                 name: "foo.zip".to_string(),
@@ -372,7 +369,7 @@ mod tests {
                                 size: Some(42),
                                 hash: Some("def".to_string()),
                                 file_type: Some(FileType::Archive(ArchiveType::Zip)),
-                                always_extract: false,
+                                eager_extract: false,
                             }
                         ],
                         boot: Boot {
@@ -393,7 +390,6 @@ mod tests {
                                     ]
                                     .into_iter()
                                     .collect(),
-                                    additional_files: Default::default(),
                                     description: None
                                 }
                             )]

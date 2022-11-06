@@ -211,7 +211,7 @@ fn pack(
             size,
             hash,
             file_type: FileType::Archive(ArchiveType::Zip),
-            always_extract: false,
+            eager_extract: false,
         };
 
         tote.zip_file

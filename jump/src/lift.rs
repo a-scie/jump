@@ -16,7 +16,7 @@ pub struct File {
     pub size: usize,
     pub hash: String,
     pub file_type: FileType,
-    pub always_extract: bool,
+    pub eager_extract: bool,
 }
 
 impl From<File> for crate::config::File {
@@ -30,7 +30,7 @@ impl From<File> for crate::config::File {
             },
             hash: Some(value.hash),
             file_type: Some(value.file_type),
-            always_extract: value.always_extract,
+            eager_extract: value.eager_extract,
         }
     }
 }
@@ -144,7 +144,7 @@ fn assemble(
             size,
             hash,
             file_type,
-            always_extract: file.always_extract,
+            eager_extract: file.eager_extract,
         });
     }
     Ok(files)
