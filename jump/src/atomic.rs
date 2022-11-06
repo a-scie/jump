@@ -1,3 +1,6 @@
+// Copyright 2022 Science project contributors.
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::path::Path;

@@ -1,3 +1,6 @@
+// Copyright 2022 Science project contributors.
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::cmp::min;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
