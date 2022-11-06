@@ -22,6 +22,17 @@ fn ensure_parent_dir(base: &Path, file: &File) -> Result<PathBuf, Exit> {
     Ok(dst)
 }
 
+#[cfg(not(target_family = "unix"))]
+fn executable_permissions() -> Option<Permissions> {
+    None
+}
+
+#[cfg(target_family = "unix")]
+fn executable_permissions() -> Option<Permissions> {
+    use std::os::unix::fs::PermissionsExt;
+    Some(Permissions::from_mode(0o755))
+}
+
 pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResult {
     let base = if let Some(base) = env::args().nth(1) {
         PathBuf::from(base)
@@ -57,14 +68,12 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
         .map_err(|e| {
             Code::FAILURE.with_message(format!("Failed to open scie-jump for extraction: {e}"))
         })?;
-    if cfg!(target_family = "unix") {
-        use std::os::unix::fs::PermissionsExt;
-        dst.set_permissions(Permissions::from_mode(0o755))
-            .map_err(|e| {
-                Code::FAILURE.with_message(format!(
-                    "Failed to open file metadata for the scie-jump: {e}"
-                ))
-            })?;
+    if let Some(permissions) = executable_permissions() {
+        dst.set_permissions(permissions).map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to open file metadata for the scie-jump: {e}"
+            ))
+        })?;
     }
     let mut src = scie
         .try_clone()
