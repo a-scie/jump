@@ -43,7 +43,7 @@ jobs:
         run: cargo test --all
       - name: Build & Package
         run: cargo run --release -p package dist
-      - name: Install coreutils for Mac
+      - name: Install coreutils for Mac (for sha256sum)
         if: matrix.os == 'macos-11'
         run: brew install coreutils
       - name: Python Example (Pants)
