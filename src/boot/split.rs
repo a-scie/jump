@@ -129,8 +129,10 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
                 .create_new(true)
                 .open(&dst)
                 .map_err(|e| {
-                    Code::FAILURE
-                        .with_message(format!("Failed to open scie-jump for extraction: {e}"))
+                    Code::FAILURE.with_message(format!(
+                        "Failed to open {dst} for extraction: {e}",
+                        dst = dst.display()
+                    ))
                 })?;
             let file_size = file.size as u64;
             let mut src = scie
