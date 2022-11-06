@@ -165,19 +165,17 @@ fn load(
     reconstitute: bool,
 ) -> Result<(Option<Jump>, Lift), String> {
     let config = Config::parse(data)?;
-    let resolve_base = manifest_path
+    let manifest_absolute_path = manifest_path.canonicalize().map_err(|e| {
+        format!(
+            "Failed to resolve an absolute path for the lift manifest {manifest}: {e}",
+            manifest = manifest_path.display()
+        )
+    })?;
+    let resolve_base = manifest_absolute_path
         .parent()
-        .unwrap_or_else(|| Path::new(""))
-        .canonicalize()
-        .map_err(|e| {
-            format!(
-                "Failed to resolve an absolute path for the parent directory of the lift \
-                manifest {manifest}: {e}",
-                manifest = manifest_path.display()
-            )
-        })?;
+        .unwrap_or_else(|| Path::new(""));
     let lift = config.scie.lift;
-    let files = assemble(&resolve_base, lift.files, reconstitute)?;
+    let files = assemble(resolve_base, lift.files, reconstitute)?;
     Ok((
         config.scie.jump,
         Lift {

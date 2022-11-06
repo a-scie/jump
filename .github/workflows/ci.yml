@@ -98,6 +98,9 @@ jobs:
           fi
           dist/scie-jump* examples/node/lift.${{ matrix.arch }}.json
           
+          # Get help on scie boot commands.          
+          SCIE=help ./pants
+
           # Verify byte-wise identical pack -> split -> pack round tripping.
           SCIE=split ./node.js split
           sha256sum node.js* > split/node.js.sha256sum
@@ -111,7 +114,7 @@ jobs:
           ./npm install cowsay
           
           # Build a scie from another scie's tip-embedded scie-jump.
-          SCIE=boot-pack ../../node.js ./cowsay-lift.${{ matrix.arch }}.json
+          SCIE=boot-pack ../../node.js cowsay-lift.${{ matrix.arch }}.json
           rm -rf npm node_modules* package*.json
           ./cowsay.js -b 'All the binaries belong to us!'
           
