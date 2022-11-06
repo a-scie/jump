@@ -51,7 +51,7 @@ boot-pack [lift manifest]*
 
 help: Display this help message.
 
-inspect: Pretty-print the current scie's lift manifest to stdout.
+inspect: Pretty-print this scie's lift manifest to stdout.
 
 split [directory]?
 
