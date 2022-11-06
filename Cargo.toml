@@ -8,7 +8,7 @@ name = "scie-jump"
 version = "0.1.2"
 description = "The self contained interpreted executable launcher."
 authors = [
-  "The Science developers <pantsbuild@gmail.com>",
+  "John Sirois <john.sirois@gmail.com>",
 ]
 edition = "2021"
 publish = false

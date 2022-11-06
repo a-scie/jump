@@ -3,7 +3,7 @@ name = "jump"
 version = "0.1.2"
 description = "The bulk of the scie-jump binary logic."
 authors = [
-    "The Science developers <pantsbuild@gmail.com>",
+    "John Sirois <john.sirois@gmail.com>",
 ]
 edition = "2021"
 publish = false

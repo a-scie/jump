@@ -3,7 +3,7 @@ name = "package"
 version = "0.1.1"
 description = "Packages the scie-jump binary into its final form."
 authors = [
-    "The Science developers <pantsbuild@gmail.com>",
+    "John Sirois <john.sirois@gmail.com>",
 ]
 edition = "2021"
 publish = false
