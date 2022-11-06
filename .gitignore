@@ -1,6 +1,7 @@
 # Cargo output.
 target/
 
-# IntelliJ project.
+# IntelliJ projects.
 .idea/
 *.iml
+*.ipr
