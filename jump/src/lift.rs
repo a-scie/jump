@@ -114,6 +114,7 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
 fn assemble(
     resolve_base: &Path,
     config_files: Vec<crate::config::File>,
+    reconstitute: bool,
 ) -> Result<Vec<File>, String> {
     let mut files = vec![];
     for file in config_files {
@@ -125,15 +126,13 @@ fn assemble(
             determine_file_type(&path)?
         };
 
+        if reconstitute && file_type == FileType::Directory {
+            path = archive::create(resolve_base, &file.name)?;
+        }
         let (size, hash) = match (file.size, file.hash) {
             (Some(size), Some(hash)) => (size, hash),
             (None, Some(hash)) => (0, hash),
-            _ => {
-                if FileType::Directory == file_type {
-                    path = archive::create(resolve_base, &file.name)?;
-                }
-                fingerprint::digest_file(&path)?
-            }
+            _ => fingerprint::digest_file(&path)?,
         };
 
         files.push(File {
@@ -151,7 +150,7 @@ fn assemble(
 #[time("debug")]
 pub(crate) fn load_scie(scie_path: &Path, scie_data: &[u8]) -> Result<(Jump, Lift), String> {
     let end_of_zip = crate::zip::end_of_zip(scie_data, Config::MAXIMUM_CONFIG_SIZE)?;
-    match load(scie_path, &scie_data[end_of_zip..])? {
+    match load(scie_path, &scie_data[end_of_zip..], false)? {
         (Some(jump), lift) => Ok((jump, lift)),
         _ => Err(format!(
             "The scie at {path} has a lift manifest with no scie-jump information.",
@@ -168,10 +167,14 @@ pub fn load_lift(manifest_path: &Path) -> Result<(Option<Jump>, Lift), String> {
             manifest = manifest_path.display()
         )
     })?;
-    load(manifest_path, &data)
+    load(manifest_path, &data, true)
 }
 
-fn load(manifest_path: &Path, data: &[u8]) -> Result<(Option<Jump>, Lift), String> {
+fn load(
+    manifest_path: &Path,
+    data: &[u8],
+    reconstitute: bool,
+) -> Result<(Option<Jump>, Lift), String> {
     let config = Config::parse(data)?;
     let resolve_base = manifest_path
         .parent()
@@ -185,7 +188,7 @@ fn load(manifest_path: &Path, data: &[u8]) -> Result<(Option<Jump>, Lift), Strin
             )
         })?;
     let lift = config.scie.lift;
-    let files = assemble(&resolve_base, lift.files)?;
+    let files = assemble(&resolve_base, lift.files, reconstitute)?;
     Ok((
         config.scie.jump,
         Lift {

@@ -144,6 +144,7 @@ fn pack(
         }
     }
     for file in lift.files.iter_mut() {
+        // let (path, _) = reconstitute(resolve_base, &file.name, Some(file.file_type))?;
         let mut path = resolve_base.join(&file.name);
         if FileType::Directory == file.file_type {
             path = path.with_extension("zip");

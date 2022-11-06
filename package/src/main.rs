@@ -19,8 +19,8 @@ fn main() -> ExitResult {
         let dst = dest_dir.join(src.file_name().ok_or_else(|| {
             Code::FAILURE.with_message(format!("Expected {} to end in a file name.", src.display()))
         })?);
-        if cfg!(windows) && dst.extension().is_none() {
-            dst.with_extension("exe")
+        if dst.extension().is_none() {
+            dst.with_extension(std::env::consts::EXE_EXTENSION)
         } else {
             dst
         }

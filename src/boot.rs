@@ -2,7 +2,9 @@ use jump::{Jump, Lift, SelectBoot};
 use proc_exit::{Code, ExitResult};
 
 mod pack;
+mod split;
 pub(crate) use pack::set as pack;
+pub(crate) use split::split;
 
 pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
     jump::serialize(jump, lift, std::io::stdout())

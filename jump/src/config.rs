@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
 use std::io::Write;
 use std::path::PathBuf;
@@ -129,7 +129,7 @@ pub struct File {
     pub always_extract: bool,
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum EnvVar {
     Default(String),
     Replace(String),
@@ -195,8 +195,8 @@ pub struct Cmd {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     #[serde(default)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub env: HashMap<EnvVar, String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<EnvVar, String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub additional_files: Vec<String>,
@@ -214,10 +214,10 @@ pub struct Jump {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Boot {
-    pub commands: HashMap<String, Cmd>,
+    pub commands: BTreeMap<String, Cmd>,
     #[serde(default)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub bindings: HashMap<String, Cmd>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub bindings: BTreeMap<String, Cmd>,
 }
 
 fn default_base() -> PathBuf {
@@ -323,7 +323,7 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift, Scie};
     use crate::config::FileType;
@@ -391,7 +391,7 @@ mod tests {
                                 }
                             )]
                             .into_iter()
-                            .collect::<HashMap<_, _>>(),
+                            .collect::<BTreeMap<_, _>>(),
                             bindings: Default::default()
                         },
                         name: "test".to_string(),

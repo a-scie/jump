@@ -5,7 +5,7 @@ use proc_exit::{Code, ExitResult};
 
 mod boot;
 
-use jump::Action;
+use jump::BootAction;
 
 #[cfg(target_family = "windows")]
 fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
@@ -57,24 +57,19 @@ fn main() -> ExitResult {
             "Failed to find path of the current executable: {e}"
         ))
     })?;
-    let action = jump::prepare_action(current_exe).map_err(|e| {
+    let action = jump::prepare_boot(current_exe).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
 
     match action {
-        Action::BootPack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path),
-        Action::BootSelect(select_boot) => boot::select(select_boot),
-        Action::Execute((process, argv1_consumed)) => {
+        BootAction::Execute((process, argv1_consumed)) => {
             process.env.export();
             let argv_skip = if argv1_consumed { 2 } else { 1 };
             exec(process.exe, process.args, argv_skip)
         }
-        Action::Inspect((jump, lift)) => boot::inspect(jump, lift),
-        Action::Split((jump, lift, scie_path)) => {
-            todo!(
-                "Implement SCIE=split for {jump:?} {lift:?} {scie_path}",
-                scie_path = scie_path.display()
-            )
-        }
+        BootAction::Inspect((jump, lift)) => boot::inspect(jump, lift),
+        BootAction::Pack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path),
+        BootAction::Select(select_boot) => boot::select(select_boot),
+        BootAction::Split((jump, lift, scie_path)) => boot::split(jump, lift, scie_path),
     }
 }

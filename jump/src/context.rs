@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
@@ -59,10 +59,10 @@ pub(crate) struct SelectedCmd {
 
 pub(crate) struct Context {
     scie: PathBuf,
-    commands: HashMap<String, Cmd>,
-    _bindings: HashMap<String, Cmd>,
+    commands: BTreeMap<String, Cmd>,
+    _bindings: BTreeMap<String, Cmd>,
     base: PathBuf,
-    files_by_name: HashMap<String, File>,
+    files_by_name: BTreeMap<String, File>,
     pub(crate) files: Vec<File>,
     pub(crate) replacements: HashSet<File>,
     pub(crate) description: Option<String>,
@@ -75,7 +75,7 @@ fn try_as_str(os_str: &OsStr) -> Option<&str> {
 impl Context {
     #[time("debug")]
     pub(crate) fn new(scie_path: PathBuf, lift: Lift) -> Result<Self, String> {
-        let mut files_by_name = HashMap::new();
+        let mut files_by_name = BTreeMap::new();
         for file in &lift.files {
             files_by_name.insert(file.name.clone(), file.clone());
             if let Some(key) = file.key.as_ref() {

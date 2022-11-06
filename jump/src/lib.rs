@@ -39,11 +39,11 @@ pub struct SelectBoot {
     pub error_message: Option<String>,
 }
 
-pub enum Action {
-    BootPack((Jump, PathBuf)),
-    BootSelect(SelectBoot),
+pub enum BootAction {
     Execute((Process, bool)),
     Inspect((Jump, Lift)),
+    Pack((Jump, PathBuf)),
+    Select(SelectBoot),
     Split((Jump, Lift, PathBuf)),
 }
 
@@ -58,7 +58,7 @@ pub fn serialize<W: Write>(jump: Jump, lift: Lift, mut stream: W) -> Result<(), 
 }
 
 #[time("debug")]
-pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
+pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
     let file = std::fs::File::open(&current_exe).map_err(|e| {
         format!(
             "Failed to open current exe at {exe} for reading: {e}",
@@ -71,7 +71,7 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
     };
 
     if let Some(jump) = jump::load(&data, &current_exe)? {
-        return Ok(Action::BootPack((jump, current_exe)));
+        return Ok(BootAction::Pack((jump, current_exe)));
     }
 
     let (jump, lift) = lift::load_scie(&current_exe, &data)?;
@@ -82,11 +82,11 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
 
     if let Some(value) = env::var_os("SCIE") {
         if "boot-pack" == value {
-            return Ok(Action::BootPack((jump, current_exe)));
+            return Ok(BootAction::Pack((jump, current_exe)));
         } else if "inspect" == value {
-            return Ok(Action::Inspect((jump, lift)));
+            return Ok(BootAction::Inspect((jump, lift)));
         } else if "split" == value {
-            return Ok(Action::Split((jump, lift, current_exe)));
+            return Ok(BootAction::Split((jump, lift, current_exe)));
         } else if !PathBuf::from(&value).exists() {
             return Err(format!(
                 "The SCIE environment variable is set to {value:?} which is not a scie path \n\
@@ -111,9 +111,12 @@ pub fn prepare_action(current_exe: PathBuf) -> Result<Action, String> {
         let process = installer::prepare(context, selected_command.cmd, payload)?;
         trace!("Prepared {process:#?}");
         env::set_var("SCIE", selected_command.scie.as_os_str());
-        Ok(Action::Execute((process, selected_command.argv1_consumed)))
+        Ok(BootAction::Execute((
+            process,
+            selected_command.argv1_consumed,
+        )))
     } else {
-        Ok(Action::BootSelect(SelectBoot {
+        Ok(BootAction::Select(SelectBoot {
             boots: context.boots(),
             description: context.description,
             error_message: result.err(),
