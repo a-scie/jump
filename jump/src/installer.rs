@@ -138,11 +138,11 @@ pub(crate) fn prepare(
     let mut location = 0;
     for file in &context.files {
         if file.eager_extract || to_extract.contains(file) {
-            if file.size == 0 {
-                scie_tote.push(file);
-            } else {
-                let dst = context.get_path(file);
-                if let Some(file_type) = file_type_to_unpack(file, &dst) {
+            let dst = context.get_path(file);
+            if let Some(file_type) = file_type_to_unpack(file, &dst) {
+                if file.size == 0 {
+                    scie_tote.push((file, file_type, dst.clone()));
+                } else {
                     let bytes = &payload[location..(location + file.size)];
                     let actual_hash = fingerprint::digest(bytes);
                     if file.hash != actual_hash {
@@ -159,9 +159,9 @@ pub(crate) fn prepare(
                         );
                     }
                     unpack(file_type, Cursor::new(bytes), &dst)?;
-                } else {
-                    debug!("Cache hit {dst} for {file:?}", dst = dst.display())
-                };
+                }
+            } else {
+                debug!("Cache hit {dst} for {file:?}", dst = dst.display())
             }
         }
         location += file.size;
@@ -173,23 +173,21 @@ pub(crate) fn prepare(
                 "Expected the last file to be the scie-tote holding these files: {scie_tote:#?}"
             )
         })?;
-        let scie_tote_dst = context.get_path(tote_file);
+        let scie_tote_tmpdir = tempfile::TempDir::new().map_err(|e| {
+            format!("Failed to create a temporary directory to extract the scie-tote to: {e}")
+        })?;
+        let scie_tote_path = scie_tote_tmpdir.path().join(&tote_file.name);
         let bytes = &payload[(location - tote_file.size)..location];
-        unpack(tote_file.file_type, Cursor::new(bytes), &scie_tote_dst)?;
-        for file in scie_tote {
-            let dst = context.get_path(file);
-            if let Some(file_type) = file_type_to_unpack(file, &dst) {
-                let src_path = scie_tote_dst.join(&file.name);
-                let src = std::fs::File::open(&src_path).map_err(|e| {
-                    format!(
-                        "Failed to open {file:?} at {src} from the unpacked scie-tote: {e}",
-                        src = src_path.display()
-                    )
-                })?;
-                unpack(file_type, &src, &dst)?;
-            } else {
-                debug!("Cache hit {dst} for {file:?}", dst = dst.display())
-            };
+        unpack(tote_file.file_type, Cursor::new(bytes), &scie_tote_path)?;
+        for (file, file_type, dst) in scie_tote {
+            let src_path = scie_tote_path.join(&file.name);
+            let src = std::fs::File::open(&src_path).map_err(|e| {
+                format!(
+                    "Failed to open {file:?} at {src} from the unpacked scie-tote: {e}",
+                    src = src_path.display()
+                )
+            })?;
+            unpack(file_type, &src, &dst)?;
         }
     }
 

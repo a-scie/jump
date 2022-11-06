@@ -307,6 +307,7 @@ dependencies = [
  "sha2",
  "structure",
  "tar",
+ "tempfile",
  "tuple",
  "walkdir",
  "xz2",

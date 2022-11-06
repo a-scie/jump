@@ -34,6 +34,7 @@ strip = "symbols"
 bstr = "1.0"
 log = "0.4"
 logging_timer = "1.1"
+tempfile = "3.3"
 
 [workspace.dependencies.zip]
 version = "0.6"
@@ -52,5 +53,5 @@ log = { workspace = true }
 logging_timer = { workspace = true }
 nix = "0.25"
 proc-exit = "2.0"
-tempfile = "3.3"
+tempfile = { workspace = true }
 zip = { workspace = true }
