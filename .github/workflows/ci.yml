@@ -70,7 +70,7 @@ jobs:
           cd split && ./scie-jump
           sha256sum --check coursier.sha256sum
           sha256sum coursier* ../coursier*
-          cd ..
+          cd .. && rm -rf split
 
           time RUST_LOG=debug ./coursier version
           time ./coursier java-home
@@ -94,7 +94,7 @@ jobs:
           cd split && ./scie-jump
           sha256sum --check node.js.sha256sum
           sha256sum node.js* ../node.js*
-          cd ..
+          cd .. && rm -rf split
 
           # Use the built-in BusyBox functionality via binary base name.
           cd examples/node && ln ../../node.js ${npm_exe}
@@ -110,3 +110,4 @@ jobs:
           cd split && ./scie-jump
           sha256sum --check cowsay.js.sha256sum
           sha256sum cowsay.js* ../cowsay.js*
+          cd .. && rm -rf split
