@@ -41,8 +41,27 @@ pub struct SelectBoot {
     pub error_message: Option<String>,
 }
 
+const HELP: &str = "\
+For SCIE=<boot_command> you can select from the following:
+
+boot-pack [lift manifest]*
+
+    Pack the given lift manifests into scie executables. If no manifests
+    are given, looks for `lift.json` in the current directory.
+
+help: Display this help message.
+
+inspect: Pretty-print the current scie's lift manifest to stdout.
+
+split [directory]?
+
+    Split this scie into its component files in the given directory or
+    else the current directory if no argument is given.
+";
+
 pub enum BootAction {
     Execute((Process, bool)),
+    Help((String, i32)),
     Inspect((Jump, Lift)),
     Pack((Jump, PathBuf)),
     Select(SelectBoot),
@@ -80,23 +99,21 @@ pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
     if let Some(value) = env::var_os("SCIE") {
         if "boot-pack" == value {
             return Ok(BootAction::Pack((jump, current_exe)));
+        } else if "help" == value {
+            return Ok(BootAction::Help((format!("{HELP}\n"), 0)));
         } else if "inspect" == value {
             return Ok(BootAction::Inspect((jump, lift)));
         } else if "split" == value {
             return Ok(BootAction::Split((jump, lift, current_exe)));
         } else if !PathBuf::from(&value).exists() {
-            return Err(format!(
-                "The SCIE environment variable is set to {value:?} which is not a scie path \n\
-                    or one of the known SCIE boot commands.\n\
-                    \n\
-                    For SCIE=boot_command you can select from the following:\n\
-                    boot-pack: Pack the given lift manifests into scie executables. If no \n\
-                               manifests are given, looks for lift.json in the current directory.\n\
-                    inspect:   Pretty-print the current scie's lift manifest to stdout.\n\
-                    split:     Split this scie into its component files in the given directory \n\
-                               or else the current directory if no argument is given.\n\
-                    "
-            ));
+            let help_message = format!(
+                "The SCIE environment variable is set to {value:?} which is not a scie path\n\
+                or one of the known SCIE boot commands.\n\
+                \n\
+                {HELP}\
+                "
+            );
+            return Ok(BootAction::Help((help_message, 1)));
         }
     }
 

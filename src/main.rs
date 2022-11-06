@@ -70,6 +70,7 @@ fn main() -> ExitResult {
             let argv_skip = if argv1_consumed { 2 } else { 1 };
             exec(process.exe, process.args, argv_skip)
         }
+        BootAction::Help((message, exit_code)) => boot::help(message, exit_code),
         BootAction::Inspect((jump, lift)) => boot::inspect(jump, lift),
         BootAction::Pack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path),
         BootAction::Select(select_boot) => boot::select(select_boot),

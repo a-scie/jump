@@ -10,6 +10,16 @@ mod split;
 pub(crate) use pack::set as pack;
 pub(crate) use split::split;
 
+pub(crate) fn help(message: String, exit_code: i32) -> ExitResult {
+    let code = Code::from(exit_code);
+    if code.is_err() {
+        Err(code.with_message(message))
+    } else {
+        print!("{}", message);
+        code.ok()
+    }
+}
+
 pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
     let config = jump::config(jump, lift);
     let fmt = Fmt::new().pretty(true).trailing_newline(true);
