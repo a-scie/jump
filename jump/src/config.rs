@@ -287,7 +287,11 @@ pub struct Config {
 
 impl Config {
     pub const MAXIMUM_CONFIG_SIZE: usize = 0xFFFF;
-    const NEWLINE: &'static [u8] = if cfg!(windows) { b"\r\n" } else { b"\n" };
+    const NEWLINE: &'static [u8] = if cfg!(target_family = "windows") {
+        b"\r\n"
+    } else {
+        b"\n"
+    };
 
     pub fn parse(data: &[u8]) -> Result<Self, String> {
         let config: Self = serde_json::from_slice(data)

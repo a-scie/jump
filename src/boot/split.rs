@@ -57,7 +57,7 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
         .map_err(|e| {
             Code::FAILURE.with_message(format!("Failed to open scie-jump for extraction: {e}"))
         })?;
-    if cfg!(unix) {
+    if cfg!(target_family = "unix") {
         use std::os::unix::fs::PermissionsExt;
         dst.set_permissions(Permissions::from_mode(0o755))
             .map_err(|e| {
