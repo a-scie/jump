@@ -99,7 +99,7 @@ jobs:
           dist/scie-jump* examples/node/lift.${{ matrix.arch }}.json
           
           # Get help on scie boot commands.          
-          SCIE=help ./pants
+          SCIE=help ./node.js
 
           # Verify byte-wise identical pack -> split -> pack round tripping.
           SCIE=split ./node.js split
