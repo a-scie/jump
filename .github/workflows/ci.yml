@@ -12,7 +12,7 @@ concurrency:
 jobs:
   org-check:
     name: Check GitHub Organization
-    if: ${{ github.repository_owner == 'a-scie' }}
+    if: github.repository_owner == 'a-scie'
     runs-on: ubuntu-20.04
     steps:
       - name: Noop
@@ -43,8 +43,11 @@ jobs:
         run: cargo test --all
       - name: Build & Package
         run: cargo run --release -p package dist
+      - name: Install coreutils for Mac
+        if: ${matrix.os} == 'macos-11'
+        run: brew install coreutils
       - name: Python Example (Pants)
-        if: ${{ contains(matrix.examples, 'python') }}
+        if: contains(matrix.examples, 'python')
         run: |
           set -x
           examples/prepare.sh python
@@ -55,7 +58,7 @@ jobs:
           # Use the built-in BusyBox functionality via env var.
           SCIE_BOOT=inspect ./pants interpreter --verbose --indent 2
       - name: Java Example (Coursier)
-        if: ${{ contains(matrix.examples, 'java') }}
+        if: contains(matrix.examples, 'java')
         run: |
           set -x
           if [ "windows-2022" == "${{ matrix.os }}" ]; then
@@ -77,7 +80,7 @@ jobs:
           time ./coursier launch org.pantsbuild:jar-tool:0.0.17 \
             -M org.pantsbuild.tools.jar.Main -- -h
       - name: Node Example (npm and cowsay)
-        if: ${{ contains(matrix.examples, 'node') }}
+        if: contains(matrix.examples, 'node')
         run: |
           set -x
           if [ "windows-2022" == "${{ matrix.os }}" ]; then
