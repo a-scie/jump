@@ -44,7 +44,7 @@ jobs:
       - name: Build & Package
         run: cargo run --release -p package dist
       - name: Install coreutils for Mac
-        if: ${matrix.os} == 'macos-11'
+        if: matrix.os == 'macos-11'
         run: brew install coreutils
       - name: Python Example (Pants)
         if: contains(matrix.examples, 'python')
