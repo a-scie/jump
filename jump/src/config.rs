@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum Compression {
@@ -115,6 +116,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct File {
     pub name: String,
     #[serde(default)]
@@ -192,6 +194,7 @@ impl<'de> Deserialize<'de> for EnvVar {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Cmd {
     pub exe: String,
     #[serde(default)]
@@ -206,6 +209,7 @@ pub struct Cmd {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Jump {
     pub size: usize,
     #[serde(default)]
@@ -213,6 +217,7 @@ pub struct Jump {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Boot {
     pub commands: BTreeMap<String, Cmd>,
     #[serde(default)]
@@ -225,6 +230,7 @@ fn default_base() -> PathBuf {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Lift {
     pub name: String,
     #[serde(default)]
@@ -237,6 +243,7 @@ pub struct Lift {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Scie {
     pub lift: Lift,
     #[serde(default)]
@@ -281,8 +288,16 @@ impl Default for Fmt {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Other {
+    #[serde(flatten)]
+    other: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub scie: Scie,
+    #[serde(flatten)]
+    pub(crate) other: Option<Other>,
 }
 
 impl Config {
@@ -292,6 +307,16 @@ impl Config {
 
     #[cfg(target_family = "unix")]
     const NEWLINE: &'static [u8] = b"\n";
+
+    pub fn new<L: Into<Lift>>(jump: Jump, lift: L, other: Option<Other>) -> Self {
+        Self {
+            scie: Scie {
+                jump: Some(jump),
+                lift: lift.into(),
+            },
+            other,
+        }
+    }
 
     pub fn parse(data: &[u8]) -> Result<Self, String> {
         let config: Self = serde_json::from_slice(data)
@@ -329,79 +354,78 @@ impl Config {
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift, Scie};
+    use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift};
     use crate::config::FileType;
 
     #[test]
     fn test_serialized_form() {
         eprintln!(
             "{}",
-            serde_json::to_string_pretty(&Config {
-                scie: Scie {
-                    jump: Some(Jump {
-                        version: "0.1.0".to_string(),
-                        size: 37,
-                    }),
-                    lift: Lift {
-                        base: "~/.nce".into(),
-                        files: vec![
-                            File {
-                                name: "pants-client".to_string(),
-                                key: None,
-                                size: Some(1137),
-                                hash: Some("abc".to_string()),
-                                file_type: Some(FileType::Blob),
-                                eager_extract: true
-                            },
-                            File {
-                                name: "python".to_string(),
-                                key: None,
-                                size: Some(123),
-                                hash: Some("345".to_string()),
-                                file_type: Some(FileType::Archive(ArchiveType::CompressedTar(
-                                    Compression::Zstd
-                                ))),
-                                eager_extract: false
-                            },
-                            File {
-                                name: "foo.zip".to_string(),
-                                key: None,
-                                size: Some(42),
-                                hash: Some("def".to_string()),
-                                file_type: Some(FileType::Archive(ArchiveType::Zip)),
-                                eager_extract: false,
-                            }
-                        ],
-                        boot: Boot {
-                            commands: vec![(
-                                "".to_string(),
-                                Cmd {
-                                    exe: "bob/exe".to_string(),
-                                    args: Default::default(),
-                                    env: [
-                                        (
-                                            EnvVar::Default("DEFAULT".to_string()),
-                                            "default".to_string()
-                                        ),
-                                        (
-                                            EnvVar::Replace("REPLACE".to_string()),
-                                            "replace".to_string()
-                                        )
-                                    ]
-                                    .into_iter()
-                                    .collect(),
-                                    description: None
-                                }
-                            )]
-                            .into_iter()
-                            .collect::<BTreeMap<_, _>>(),
-                            bindings: Default::default()
-                        },
-                        name: "test".to_string(),
-                        description: None
-                    }
+            serde_json::to_string_pretty(&Config::new(
+                Jump {
+                    version: "0.1.0".to_string(),
+                    size: 37,
                 },
-            })
+                Lift {
+                    base: "~/.nce".into(),
+                    files: vec![
+                        File {
+                            name: "pants-client".to_string(),
+                            key: None,
+                            size: Some(1137),
+                            hash: Some("abc".to_string()),
+                            file_type: Some(FileType::Blob),
+                            eager_extract: true
+                        },
+                        File {
+                            name: "python".to_string(),
+                            key: None,
+                            size: Some(123),
+                            hash: Some("345".to_string()),
+                            file_type: Some(FileType::Archive(ArchiveType::CompressedTar(
+                                Compression::Zstd
+                            ))),
+                            eager_extract: false
+                        },
+                        File {
+                            name: "foo.zip".to_string(),
+                            key: None,
+                            size: Some(42),
+                            hash: Some("def".to_string()),
+                            file_type: Some(FileType::Archive(ArchiveType::Zip)),
+                            eager_extract: false,
+                        }
+                    ],
+                    boot: Boot {
+                        commands: vec![(
+                            "".to_string(),
+                            Cmd {
+                                exe: "bob/exe".to_string(),
+                                args: Default::default(),
+                                env: [
+                                    (
+                                        EnvVar::Default("DEFAULT".to_string()),
+                                        "default".to_string()
+                                    ),
+                                    (
+                                        EnvVar::Replace("REPLACE".to_string()),
+                                        "replace".to_string()
+                                    )
+                                ]
+                                .into_iter()
+                                .collect(),
+                                description: None
+                            }
+                        )]
+                        .into_iter()
+                        .collect::<BTreeMap<_, _>>(),
+                        bindings: Default::default()
+                    },
+                    name: "test".to_string(),
+                    description: None
+                },
+                None,
+            ))
             .unwrap()
         )
     }

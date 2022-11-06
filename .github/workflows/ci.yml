@@ -68,6 +68,12 @@ jobs:
           fi
           dist/scie-jump* examples/java/lift.${{ matrix.arch }}.json
 
+          # Verify arbitrary json is allowed and preserved outside the root "scie" key.
+          test "moremoremore" = "$(
+            SCIE=inspect ./coursier | jq -r '.custom.arbitrary * .more[1]'
+          )"
+
+          # Verify byte-wise identical pack -> split -> pack round tripping.
           SCIE=split ./coursier split
           sha256sum coursier* > split/coursier.sha256sum
           cd split && ./scie-jump
@@ -92,6 +98,7 @@ jobs:
           fi
           dist/scie-jump* examples/node/lift.${{ matrix.arch }}.json
           
+          # Verify byte-wise identical pack -> split -> pack round tripping.
           SCIE=split ./node.js split
           sha256sum node.js* > split/node.js.sha256sum
           cd split && ./scie-jump
@@ -108,6 +115,7 @@ jobs:
           rm -rf npm node_modules* package*.json
           ./cowsay.js -b 'All the binaries belong to us!'
           
+          # Verify byte-wise identical pack -> split -> pack round tripping.
           SCIE=split ./cowsay.js split
           sha256sum cowsay.js* > split/cowsay.js.sha256sum
           cd split && ./scie-jump

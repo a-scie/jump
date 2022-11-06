@@ -20,19 +20,18 @@ mod process;
 mod zip;
 
 use std::env;
-use std::io::Write;
 use std::path::PathBuf;
 
 use logging_timer::time;
 
 pub use crate::archive::create_options;
+use crate::config::Config;
 pub use crate::config::Jump;
-use crate::config::{Config, Fmt};
 pub use crate::context::Boot;
 use crate::context::Context;
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
-pub use crate::lift::{load_lift, File, Lift, Scie};
+pub use crate::lift::{load_lift, File, Lift};
 pub use crate::process::{execute, EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
 
@@ -50,14 +49,9 @@ pub enum BootAction {
     Split((Jump, Lift, PathBuf)),
 }
 
-pub fn serialize<W: Write>(jump: Jump, lift: Lift, mut stream: W) -> Result<(), String> {
-    let config = Config {
-        scie: config::Scie {
-            jump: Some(jump),
-            lift: lift.into(),
-        },
-    };
-    config.serialize(&mut stream, Fmt::new().pretty(true).trailing_newline(true))
+pub fn config(jump: Jump, mut lift: Lift) -> Config {
+    let other = lift.other.take();
+    Config::new(jump, lift, other)
 }
 
 #[time("debug")]

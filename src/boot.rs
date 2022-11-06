@@ -1,6 +1,7 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use jump::config::Fmt;
 use jump::{Jump, Lift, SelectBoot};
 use proc_exit::{Code, ExitResult};
 
@@ -10,7 +11,10 @@ pub(crate) use pack::set as pack;
 pub(crate) use split::split;
 
 pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
-    jump::serialize(jump, lift, std::io::stdout())
+    let config = jump::config(jump, lift);
+    let fmt = Fmt::new().pretty(true).trailing_newline(true);
+    config
+        .serialize(std::io::stdout(), fmt)
         .map_err(|e| Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}")))
 }
 

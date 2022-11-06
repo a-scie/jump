@@ -6,7 +6,7 @@ use std::fs::Permissions;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use jump::config::{Config, FileType, Fmt, Scie};
+use jump::config::{FileType, Fmt};
 use jump::{File, Jump, Lift};
 use log::debug;
 use proc_exit::{Code, Exit, ExitResult};
@@ -171,20 +171,17 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
         .map_err(|e| {
             Code::FAILURE.with_message(format!("Failed to open lift manifest for writing: {e}"))
         })?;
-    Config {
-        scie: Scie {
-            jump: Some(jump),
-            lift: lift.into(),
-        },
-    }
-    .serialize(
-        manifest,
-        Fmt::new()
-            .pretty(true)
-            .leading_newline(false)
-            .trailing_newline(true),
-    )
-    .map_err(|e| Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}")))?;
+    jump::config(jump, lift)
+        .serialize(
+            manifest,
+            Fmt::new()
+                .pretty(true)
+                .leading_newline(false)
+                .trailing_newline(true),
+        )
+        .map_err(|e| {
+            Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}"))
+        })?;
 
     Code::SUCCESS.ok()
 }

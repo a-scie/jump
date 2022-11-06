@@ -5,8 +5,8 @@ use std::env;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use jump::config::{ArchiveType, Config, FileType, Fmt};
-use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift, Scie};
+use jump::config::{ArchiveType, FileType, Fmt};
+use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
 use zip::{CompressionMethod, ZipWriter};
@@ -225,13 +225,7 @@ fn pack(
         })?;
         lift.files.push(tote_file);
     }
-    let config = Config {
-        scie: Scie {
-            jump: Some(jump.clone()),
-            lift,
-        }
-        .into(),
-    };
+    let config = jump::config(jump.clone(), lift);
     // We configure the lift manifest format to allow for easiest inspection via standard tools.
     // In the single line case in particular, this configuration allows for inspection via
     // `tail -1 scie` or `tail -1 scie | jq .` on systems with these common tools.

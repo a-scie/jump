@@ -27,5 +27,9 @@
         }
       ]
     }
-  }
+  },
+  "custom": {
+    "arbitrary": 3
+  },
+  "more": ["and", "more"]
 }

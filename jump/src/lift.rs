@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use bstr::ByteSlice;
 use logging_timer::time;
 
-use crate::config::{ArchiveType, Boot, Config, FileType, Jump};
+use crate::config::{ArchiveType, Boot, Config, FileType, Jump, Other};
 use crate::{archive, fingerprint};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -44,6 +44,7 @@ pub struct Lift {
     pub hash: String,
     pub boot: Boot,
     pub files: Vec<File>,
+    pub(crate) other: Option<Other>,
 }
 
 impl From<Lift> for crate::config::Lift {
@@ -58,21 +59,6 @@ impl From<Lift> for crate::config::Lift {
                 .into_iter()
                 .map(|file| file.into())
                 .collect::<Vec<_>>(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Scie {
-    pub jump: Option<Jump>,
-    pub lift: Lift,
-}
-
-impl From<Scie> for crate::config::Scie {
-    fn from(value: Scie) -> Self {
-        crate::config::Scie {
-            jump: value.jump,
-            lift: value.lift.into(),
         }
     }
 }
@@ -202,6 +188,7 @@ fn load(
             size: data.len(),
             hash: fingerprint::digest(data),
             files,
+            other: config.other,
         },
     ))
 }
