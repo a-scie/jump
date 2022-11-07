@@ -113,6 +113,8 @@ workflows:
       - gh/release:
           requires:
             - package
+          context:
+            - GITHUB_CREDS
           draft: false
           prerelease: false
           files: dist/scie-jump*
