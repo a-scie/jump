@@ -12,7 +12,7 @@ pub fn digest(data: &[u8]) -> String {
     format!("{digest:x}", digest = Sha256::digest(data))
 }
 
-pub(crate) fn digest_file(path: &Path) -> Result<(usize, String), String> {
+pub fn digest_file(path: &Path) -> Result<(usize, String), String> {
     let file = std::fs::File::open(path).map_err(|e| {
         format!(
             "Failed to open {path} for digesting: {e}",
