@@ -98,6 +98,17 @@ jobs:
             sha256sum --check cowsay.js.sha256sum
             sha256sum cowsay.js* ../cowsay.js*
             cd .. && rm -rf split
+  release:
+    docker:
+      - image: 'cimg/base:stable'
+    steps:
+      - gh/setup
+      - attach_workspace:
+          at: dist
+      - run:
+          name: Upload scie-jump-linux-aarch64 to << pipeline.parameters.GHA_Meta >> Github Release
+          command: |
+            gh release upload << pipeline.parameters.GHA_Meta >> dist/scie-jump* --repo a-scie/jump
 workflows:
   ci:
     jobs:
@@ -112,7 +123,7 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - gh/release:
+      - release:
           filters:
             tags:
               only: /^v.*/
@@ -120,8 +131,4 @@ workflows:
             - package
           context:
             - GITHUB_CREDS
-          draft: false
-          prerelease: false
-          files: dist/scie-jump*
-          tag: << pipeline.parameters.GHA_Meta >>
 
