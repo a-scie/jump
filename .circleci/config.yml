@@ -104,11 +104,11 @@ jobs:
 
 workflows:
   - ci:
-    jobs:
-      - package-and-test
+      jobs:
+        - package-and-test
   - release:
-    when:
-      equal: [ "release", << pipeline.parameters.GHA_Event >> ]
-    jobs:
-      - release
+      when:
+        equal: [ "release", << pipeline.parameters.GHA_Event >> ]
+      jobs:
+        - release
 
