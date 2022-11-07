@@ -106,8 +106,7 @@ workflows:
           requires:
             - package
   release:
-    when:
-      equal: [ "release", << pipeline.parameters.GHA_Event >> ]
+    when: << pipeline.parameters.GHA_Action >>
     jobs:
       - package
       - gh/release:
