@@ -72,7 +72,7 @@ jobs:
           files: dist/scie-jump*
           fail_on_unmatched_files: true
       - name: Trigger aarch64 release
-        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.0
+        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.0.5
         with:
           GHA_Meta: "${{ needs.determine-tag.outputs.release-tag }}"
         env:
