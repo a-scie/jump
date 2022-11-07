@@ -39,6 +39,7 @@ jobs:
       image: ubuntu-2004:current
     resource_class: arm.medium
     steps:
+      - checkout
       - attach_workspace:
           at: dist
       - run:
