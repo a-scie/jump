@@ -18,7 +18,6 @@ jobs:
       - run:
           name: Java Example (Coursier)
           command: |
-            set -x
             examples/prepare.sh java
             dist/scie-jump* examples/java/lift.linux-aarch64.json
 
@@ -42,14 +41,7 @@ jobs:
       - run:
           name: Node Example (npm and cowsay)
           command: |
-            set -x
-            if [ "windows-2022" == "${{ matrix.os }}" ]; then
-              pwsh examples/prepare.ps1 node
-              npm_exe=npm.exe
-            else
-              examples/prepare.sh node
-              npm_exe=npm
-            fi
+            examples/prepare.sh node
             dist/scie-jump* examples/node/lift.linux-aarch64.json
 
             # Get help on scie boot commands.
