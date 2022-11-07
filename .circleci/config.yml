@@ -96,7 +96,7 @@ jobs:
           version: nightly
       - rust/cargo-run:
           package: --release -p package dist
-      - gh/release:
+      - github-cli/release:
           draft: false
           prerelease: false
           files: dist/scie-jump*
