@@ -32,6 +32,8 @@ jobs:
           package: --release -p package dist
       - persist_to_workspace:
           root: dist
+          paths:
+            - scie-jump*
   test:
     machine:
       image: ubuntu-2004:current
