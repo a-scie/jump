@@ -14,7 +14,7 @@ jobs:
       - rust/install:
           version: nightly
       - rust/cargo-run:
-          package: --release -p package .
+          package: --release -p package dist
       - run:
           name: Java Example (Coursier)
           command: |
