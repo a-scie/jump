@@ -1,7 +1,22 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
+parameters:
+  GHA_Actor:
+    type: string
+    default: ""
+  GHA_Action:
+    type: string
+    default: ""
+  GHA_Event:
+    type: string
+    default: ""
+  GHA_Meta:
+    type: string
+    default: ""
+
 orbs:
+  github-cli: circleci/github-cli@2.1.1
   rust: circleci/rust@1.6.0
 
 jobs:
@@ -71,9 +86,29 @@ jobs:
             sha256sum --check cowsay.js.sha256sum
             sha256sum cowsay.js* ../cowsay.js*
             cd .. && rm -rf split
+  release:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: arm.medium
+    steps:
+      - checkout
+      - rust/install:
+          version: nightly
+      - rust/cargo-run:
+          package: --release -p package dist
+      - gh/release:
+          draft: false
+          prerelease: false
+          files: dist/scie-jump*
+          tag: << pipeline.parameters.GHA_Meta >>
 
 workflows:
-  ci-workflow:
+  - ci:
     jobs:
       - package-and-test
+  - release:
+    when:
+      equal: [ "release", << pipeline.parameters.GHA_Event >> ]
+    jobs:
+      - release
 
