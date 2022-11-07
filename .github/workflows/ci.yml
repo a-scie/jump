@@ -46,6 +46,11 @@ jobs:
       - name: Install coreutils for Mac (for sha256sum)
         if: matrix.os == 'macos-11'
         run: brew install coreutils
+      - name: Check Hash
+        run: |
+          cd dist
+          sha256sum --check *.sha256
+          rm *.sha256
       - name: Python Example (Pants)
         if: contains(matrix.examples, 'python')
         run: |

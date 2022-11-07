@@ -43,6 +43,12 @@ jobs:
       - attach_workspace:
           at: dist
       - run:
+          name: Check Hash
+          command: |
+            cd dist
+            sha256sum --check *.sha256
+            rm *.sha256
+      - run:
           name: Java Example (Coursier)
           command: |
             examples/prepare.sh java
