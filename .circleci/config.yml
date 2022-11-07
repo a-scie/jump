@@ -20,7 +20,7 @@ orbs:
   rust: circleci/rust@1.6.0
 
 jobs:
-  package-and-test:
+  package:
     machine:
       image: ubuntu-2004:current
     resource_class: arm.medium
@@ -30,6 +30,15 @@ jobs:
           version: nightly
       - rust/cargo-run:
           package: --release -p package dist
+      - persist_to_workspace:
+          root: dist
+  test:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: arm.medium
+    steps:
+      - attach_workspace:
+          at: dist
       - run:
           name: Java Example (Coursier)
           command: |
@@ -86,29 +95,23 @@ jobs:
             sha256sum --check cowsay.js.sha256sum
             sha256sum cowsay.js* ../cowsay.js*
             cd .. && rm -rf split
-  release:
-    machine:
-      image: ubuntu-2004:current
-    resource_class: arm.medium
-    steps:
-      - checkout
-      - rust/install:
-          version: nightly
-      - rust/cargo-run:
-          package: --release -p package dist
-      - gh/release:
-          draft: false
-          prerelease: false
-          files: dist/scie-jump*
-          tag: << pipeline.parameters.GHA_Meta >>
-
 workflows:
   ci:
     jobs:
-      - package-and-test
+      - package
+      - test:
+          requires:
+            - package
   release:
     when:
       equal: [ "release", << pipeline.parameters.GHA_Event >> ]
     jobs:
-      - release
+      - package
+      - gh/release:
+          requires:
+            - package
+          draft: false
+          prerelease: false
+          files: dist/scie-jump*
+          tag: << pipeline.parameters.GHA_Meta >>
 
