@@ -30,6 +30,9 @@ jobs:
           - os: macos-11
             arch: macos-x86_64
             examples: [python, java, node]
+          - os: macos-13-aarch64
+            arch: macos-aarch64
+            examples: [java, node]
           - os: windows-2022
             arch: windows-x86_64
             examples: [java, node]

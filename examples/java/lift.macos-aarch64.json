@@ -1,0 +1,35 @@
+{
+  "scie": {
+    "lift": {
+      "name": "coursier",
+      "boot": {
+        "commands": {
+          "": {
+            "env": {
+              "=JAVA_HOME": "{jdk}/amazon-corretto-11.jdk/Contents/Home",
+              "=PATH": "{jdk}/amazon-corretto-11.jdk/Contents/Home/bin:{scie.env.PATH}"
+            },
+            "exe": "{jdk}/amazon-corretto-11.jdk/Contents/Home/bin/java",
+            "args": [
+              "-jar",
+              "{coursier.jar}"
+            ]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "amazon-corretto-11.0.17.8.1-macosx-aarch64.tar.gz",
+          "key": "jdk"
+        },
+        {
+          "name": "coursier.jar"
+        }
+      ]
+    }
+  },
+  "custom": {
+    "arbitrary": 3
+  },
+  "more": ["and", "more"]
+}

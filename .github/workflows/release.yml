@@ -45,7 +45,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macos-11, windows-2022 ]
+        os: [ ubuntu-20.04, macos-11, macos-13-aarch64, windows-2022 ]
     environment: Release
     steps:
       - name: Checkout scie-jump ${{ needs.determine-tag.outputs.release-tag }}
