@@ -103,12 +103,12 @@ jobs:
           tag: << pipeline.parameters.GHA_Meta >>
 
 workflows:
-  - ci:
-      jobs:
-        - package-and-test
-  - release:
-      when:
-        equal: [ "release", << pipeline.parameters.GHA_Event >> ]
-      jobs:
-        - release
+  ci:
+    jobs:
+      - package-and-test
+  release:
+    when:
+      equal: [ "release", << pipeline.parameters.GHA_Event >> ]
+    jobs:
+      - release
 
