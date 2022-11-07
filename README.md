@@ -11,7 +11,7 @@ together that way. More about that nce bit below.
 
 # What is a scie-jump?
 
-A scie-jump is a dual-purpose native binary that can either create scie (itself a native binary of
+A scie-jump is a dual-purpose native binary that can either create a scie (itself a native binary of
 a sort) or launch one. Best to start with two observations:
 
 1. Executable binary formats for all major computer operating systems today accept arbitrary 
@@ -23,9 +23,11 @@ a sort) or launch one. Best to start with two observations:
 
 So if you write a binary that knows how zip works, you can concatenate a zip to that binary and do
 magic. This general idea is almost as old as the zip file format at least and has been put to use
-in one form or another in various ways. One prominent way that brought all this to my attention is
-in setuptools implementation of Python console scripts for Windows. In that case the console script
-executable is made up from the following sandwich:
+in one form or another in various ways.
+
+One prominent way that brought all this to my attention is in [setuptools implementation of Python
+console scripts for Windows](https://github.com/pypa/setuptools/blob/main/launcher.c). In that case
+the console script executable is made up from the following sandwich:
 
 ```
 [ launcher stub binary ]
@@ -35,12 +37,13 @@ executable is made up from the following sandwich:
 
 Since the sandwich is a Windows PE32 executable by dint of its launcher stub header, the launcher
 stub executes when the sandwich is run. It immediately searches for the shebang line in the middle
-of the sandwich, using knowledge of the zip format to help find it quickly. It then calculates the
-Python interpreter to use with the information in the shebang and then re-executes using that Python
-interpreter as the executable and itself inserted as the first argument. Now it turns out that
-Python interpreters know nothing about PE32 binaries, but they do know about zips and can run zips
-that contain a `__main__.py` file and import any other Python modules inside the zip as well. This
-is all a bit crazy, but definitely ingenious.
+of the sandwich. It then calculates the Python interpreter to use with the information in the
+shebang and then re-executes using that Python interpreter as the executable and itself inserted as
+the first argument. Now it turns out that Python interpreters know nothing about PE32 binaries, but
+[they do know about zips](
+https://docs.python.org/3/library/zipapp.html#the-python-zip-application-archive-format) and can run
+zips that contain a `__main__.py` file and import any other Python modules inside the zip as well.
+This is all a bit crazy, but definitely ingenious.
 
 A scie-jump binary in its launcher role works quite a bit like the setuptools console script
 launcher stub binary. Its sandwich is constructed a bit differently though:
@@ -67,8 +70,8 @@ transformed by the scie-jump into a non-compact executable.
 
 ## Format
 
-The format was driven by the properties of executable binaries and zip files as discussed above and
-a few design goals:
+The format was driven by the properties of executable binaries and zip files as discussed above with
+a few design goals guiding the rest:
 
 1. I wanted to be able to assemble a scie with just a scie-jump binary, `curl`, `vi` and `cat` or
    similar foundational / ever-present command line tools.
@@ -79,15 +82,18 @@ unambiguously find the 1st byte of the lift manifest so that it can read it.
 
 This all leads to the only real choice made, which is that the last file in a scie is always a zip.
 The zip format can accept arbitrary header content because it has its central directory at its end.
-This allows for a quick search backwards from the end of the file  of no more than ~65KB to
-definitively identify the zip and calculate its last byte. We know the lift manifest starts at the
-next byte and runs to the end of the file. This means assembly of the scie just involves:
+This allows for a quick search backwards from the end of the file of no more than ~65KB (a zip end
+of central directory record is 22 bytes plus an optional zip comment of up to 65535 bytes) to
+definitively identify the zip and calculate the position of its last byte. We know the lift manifest
+starts at the next byte and runs to the end of the file.
+
+This means assembly of the scie just involves:
 
 1. Write a lift manifest json file.
 2. `cat scie-jump file1 file2 ... fileN lift.json > my-scie-binary`
 
 The zip trailer also gives transparency. Generally, the interpreter code will live in that zip; so
-tools like zipinfo and unzip can be used against the scie directly to inspect / extract the
+tools like `zipinfo` and `unzip` can be used against the scie directly to inspect / extract the
 application code.
 
 If the ever more ubiquitous `jq` tool is included in the list of ever-present command line tools,
@@ -107,7 +113,17 @@ there are fiddly bits here to get an easily inspectable lift manifest not to men
 hashes, which are required by the scie-jump to find the internal files and then verify them on
 extraction. As such, the scie-jump launcher will act in a boot-pack role when its bare (not in a
 scie sandwich) and accept one or more lift manifest files as input from which it will build scies
-for you with --single-lift-line manifests for easy inspectability.
+for you with `--single-lift-line` manifests for easy inspectability.
+
+## Performance
+
+The process described above for locating the lift manifest and the subsequent parsing, checking for
+file extractions and finally dispatching the selected command is fast. Generally sub-millisecond.
+Since the primary use case for a scie is packaging a self-contained executable for interpreter code,
+the latency overhead introduced by adding a scie-jump launcher is likely very far in the noise for
+most projects that might consider packaging their applications this way. This certainly applies for
+the three current [examples](examples) which are Node.js, Java and Python scies, the fastest of
+which is roughly 50ms.
 
 ## Building
 
