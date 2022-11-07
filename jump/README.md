@@ -114,3 +114,6 @@ scie-jump intrinsic command. The checking proceeds in order:
 3. Check if `SCIE` is defined as an intrinsic command to run and dispatch if so.
 4. Construct an execution [Context](src/context.rs) and ask it to calculate the selected
    user-defined command to execute. This may result in no selection in the case of a BusyBox scie.
+5. If a user command was selected, have the [installer](src/installer.rs) prepare it by extracting
+   any files not yet extracted and substituting their paths into placeholders in the command
+   definition.
