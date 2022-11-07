@@ -141,3 +141,9 @@ The binary will have an `-<os>-<arch>` suffix that you are free to remove with a
 The project is at an early stage with more documentation to be fleshed out. Right now it's probably
 best to inspect the [examples](examples/README.md) first and then dive into the [jump crate](
 jump/README.md) for more details.
+
+# Contribute
+
+See the [contribution guide](CONTRIBUTING.md) if you're interested in hacking on the scie-jump or
+improving its documentation.
+
