@@ -77,8 +77,8 @@ jobs:
           dist/scie-jump* examples/java/lift.${{ matrix.arch }}.json
 
           # Verify arbitrary json is allowed and preserved outside the root "scie" key.
-          test "moremoremore" = "$(
-            SCIE=inspect ./coursier | jq -r '.custom.arbitrary * .more[1]'
+          test "3more" = "$(
+            SCIE=inspect ./coursier | jq -r '(.custom.arbitrary | tostring) + .more[1]'
           )"
 
           # Verify byte-wise identical pack -> split -> pack round tripping.
