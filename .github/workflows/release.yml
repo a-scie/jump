@@ -74,6 +74,6 @@ jobs:
       - name: Trigger aarch64 release
         uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.0
         with:
-          GHA_Meta: ${{ needs.determine-tag.outputs.release-tag }}
+          GHA_Meta: "${{ needs.determine-tag.outputs.release-tag }}"
         env:
           CCI_TOKEN: ${{ secrets.CCI_TOKEN }}
