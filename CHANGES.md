@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.1.11
+
+The 1st release including macOS aarch64 binaries.
+
 ## 0.1.10
 
 The 1st public release of the project.
