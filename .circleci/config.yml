@@ -1,0 +1,87 @@
+# See: https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
+
+orbs:
+  rust: circleci/rust@1.6.0
+
+jobs:
+  package-and-test:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: arm.medium
+    steps:
+      - checkout
+      - rust/install:
+          version: nightly
+      - rust/cargo-run:
+          package: --release -p package .
+      - run:
+          name: Java Example (Coursier)
+          command: |
+            set -x
+            examples/prepare.sh java
+            dist/scie-jump* examples/java/lift.linux-aarch64.json
+
+            # Verify arbitrary json is allowed and preserved outside the root "scie" key.
+            test "moremoremore" = "$(
+              SCIE=inspect ./coursier | jq -r '.custom.arbitrary * .more[1]'
+            )"
+
+            # Verify byte-wise identical pack -> split -> pack round tripping.
+            SCIE=split ./coursier split
+            sha256sum coursier* > split/coursier.sha256sum
+            cd split && ./scie-jump
+            sha256sum --check coursier.sha256sum
+            sha256sum coursier* ../coursier*
+            cd .. && rm -rf split
+
+            time RUST_LOG=debug ./coursier version
+            time ./coursier java-home
+            time ./coursier launch org.pantsbuild:jar-tool:0.0.17 \
+            -M org.pantsbuild.tools.jar.Main -- -h
+      - run:
+          name: Node Example (npm and cowsay)
+          command: |
+            set -x
+            if [ "windows-2022" == "${{ matrix.os }}" ]; then
+              pwsh examples/prepare.ps1 node
+              npm_exe=npm.exe
+            else
+              examples/prepare.sh node
+              npm_exe=npm
+            fi
+            dist/scie-jump* examples/node/lift.linux-aarch64.json
+
+            # Get help on scie boot commands.
+            SCIE=help ./node.js
+
+            # Verify byte-wise identical pack -> split -> pack round tripping.
+            SCIE=split ./node.js split
+            sha256sum node.js* > split/node.js.sha256sum
+            cd split && ./scie-jump
+            sha256sum --check node.js.sha256sum
+            sha256sum node.js* ../node.js*
+            cd .. && rm -rf split
+
+            # Use the built-in BusyBox functionality via binary base name.
+            cd examples/node && ln ../../node.js npm
+            ./npm install cowsay
+
+            # Build a scie from another scie's tip-embedded scie-jump.
+            SCIE=boot-pack ../../node.js cowsay-lift.linux-aarch64.json
+            rm -rf npm node_modules* package*.json
+            ./cowsay.js -b 'All the binaries belong to us!'
+
+            # Verify byte-wise identical pack -> split -> pack round tripping.
+            SCIE=split ./cowsay.js split
+            sha256sum cowsay.js* > split/cowsay.js.sha256sum
+            cd split && ./scie-jump
+            sha256sum --check cowsay.js.sha256sum
+            sha256sum cowsay.js* ../cowsay.js*
+            cd .. && rm -rf split
+
+workflows:
+  ci-workflow:
+    jobs:
+      - package-and-test
+

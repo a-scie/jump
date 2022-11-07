@@ -1,0 +1,30 @@
+{
+  "scie": {
+    "lift": {
+      "name": "cowsay.js",
+      "boot": {
+        "commands": {
+          "": {
+            "env": {
+              "NODE_PATH": "{node_modules}",
+              "=PATH": "{node}/node-v18.12.0-linux-arm64/bin:{scie.env.PATH}"
+            },
+            "exe": "{node}/node-v18.12.0-linux-arm64/bin/node",
+            "args": [
+              "{node_modules}/cowsay/cli.js"
+            ]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "node-v18.12.0-linux-arm64.tar.xz",
+          "key": "node"
+        },
+        {
+          "name": "node_modules"
+        }
+      ]
+    }
+  }
+}
