@@ -294,17 +294,19 @@ impl<'a> Context<'a> {
                     )?);
                 }
                 Item::Placeholder(Placeholder::ScieBindingCmd(name)) => {
-                    let boot_binding = Binding {
-                        target: self.base.join(&self.lift.hash).join("locks").join(name),
-                        process: self.prepare_process(
-                            self.lift
-                                .boot
-                                .bindings
-                                .get(*name)
-                                .ok_or_else(|| format!("No boot binding named {name}."))?,
-                        )?,
-                    };
-                    self.bindings.insert(name, boot_binding);
+                    if !self.bindings.contains_key(name) {
+                        let boot_binding = Binding {
+                            target: self.base.join(&self.lift.hash).join("locks").join(name),
+                            process: self.prepare_process(
+                                self.lift
+                                    .boot
+                                    .bindings
+                                    .get(*name)
+                                    .ok_or_else(|| format!("No boot binding named {name}."))?,
+                            )?,
+                        };
+                        self.bindings.insert(name, boot_binding);
+                    }
                     reified.push_str(path_to_str(
                         &self.base.join(&self.lift.hash).join("bindings"),
                     )?);
