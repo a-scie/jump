@@ -53,9 +53,11 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
         .map_err(|e| format!("{e}"))
 }
 
+#[derive(Debug)]
 pub(crate) enum FileEntry {
     Skip(usize),
     Install((File, PathBuf)),
+    ScieTote((File, Vec<(File, PathBuf)>)),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -152,14 +154,34 @@ impl<'a> Context<'a> {
     fn prepare(&mut self, cmd: &'a Cmd) -> Result<(Process, Vec<Binding>, Vec<FileEntry>), String> {
         let process = self.prepare_process(cmd)?;
 
+        let mut scie_tote = vec![];
         let mut file_entries = vec![];
-        for file in &self.lift.files {
+        for (index, file) in self.lift.files.iter().enumerate() {
             if self.replacements.contains(&file) {
                 let path = self.get_path(file);
-                file_entries.push(FileEntry::Install((file.clone(), path)))
-            } else {
+                if file.size == 0 {
+                    scie_tote.push((file.clone(), path));
+                } else {
+                    file_entries.push(FileEntry::Install((file.clone(), path)));
+                }
+            } else if index < self.lift.files.len() - 1 || scie_tote.is_empty() {
                 file_entries.push(FileEntry::Skip(file.size))
             }
+        }
+        if !scie_tote.is_empty() {
+            let tote_file = self
+                .lift
+                .files
+                .last()
+                .ok_or_else(|| {
+                    format!(
+                        "The lift manifest contains scie-tote entries (0 size) but no scie-tote \
+                    holder:\n{files:#?}",
+                        files = self.lift.files
+                    )
+                })?
+                .clone();
+            file_entries.push(FileEntry::ScieTote((tote_file, scie_tote)));
         }
 
         Ok((
