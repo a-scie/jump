@@ -6,7 +6,7 @@ use std::process::{Command, ExitStatus};
 
 use crate::config::EnvVar as ConfigEnvVar;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnvVar {
     Default(OsString),
     Replace(OsString),
@@ -21,7 +21,7 @@ impl From<&ConfigEnvVar> for EnvVar {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnvVars {
     pub vars: Vec<(EnvVar, OsString)>,
 }
@@ -67,7 +67,7 @@ where
         .map_err(|e| format!("Spawned {exe:?} {args:?} but failed to gather its exit status: {e}"))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Process {
     pub env: EnvVars,
     pub exe: OsString,
@@ -75,7 +75,7 @@ pub struct Process {
 }
 
 impl Process {
-    pub fn _execute(self, process: Process) -> Result<ExitStatus, String> {
-        execute_with_env(process.exe, process.args, 1, process.env.into_env_vars())
+    pub fn execute(self) -> Result<ExitStatus, String> {
+        execute_with_env(self.exe, self.args, usize::MAX, self.env.into_env_vars())
     }
 }

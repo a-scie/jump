@@ -216,7 +216,7 @@ pub struct Jump {
     pub version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Boot {
     pub commands: BTreeMap<String, Cmd>,
@@ -287,7 +287,7 @@ impl Default for Fmt {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Other {
     #[serde(flatten)]
     other: BTreeMap<String, Value>,

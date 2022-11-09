@@ -60,11 +60,13 @@ jobs:
           set -x
           examples/prepare.sh python
           dist/scie-jump* examples/python/lift.${{ matrix.arch }}.json
-          time RUST_LOG=trace ./pants --no-pantsd -V
-          time ./pants --no-pantsd -V
+          
+          touch BUILDROOT
+          time RUST_LOG=trace ./scie-pants --no-pantsd -V
+          time RUST_LOG=debug ./scie-pants --no-pantsd -V
           
           # Use the built-in BusyBox functionality via env var.
-          SCIE_BOOT=inspect ./pants interpreter --verbose --indent 2
+          SCIE_BOOT=repl ./scie-pants -c 'from pants.util import strutil; print(strutil.__file__)'
       - name: Java Example (Coursier)
         if: contains(matrix.examples, 'java')
         run: |

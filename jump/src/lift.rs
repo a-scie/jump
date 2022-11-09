@@ -9,7 +9,7 @@ use logging_timer::time;
 use crate::config::{ArchiveType, Boot, Config, FileType, Jump, Other};
 use crate::{archive, fingerprint};
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct File {
     pub name: String,
     pub key: Option<String>,
@@ -35,7 +35,7 @@ impl From<File> for crate::config::File {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Lift {
     pub name: String,
     pub description: Option<String>,
@@ -45,6 +45,24 @@ pub struct Lift {
     pub boot: Boot,
     pub files: Vec<File>,
     pub(crate) other: Option<Other>,
+}
+
+pub struct ScieBoot {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+impl Lift {
+    pub(crate) fn boots(&self) -> Vec<ScieBoot> {
+        self.boot
+            .commands
+            .iter()
+            .map(|(name, cmd)| ScieBoot {
+                name: name.to_string(),
+                description: cmd.description.clone(),
+            })
+            .collect::<Vec<_>>()
+    }
 }
 
 impl From<Lift> for crate::config::Lift {

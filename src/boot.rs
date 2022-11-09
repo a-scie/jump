@@ -53,6 +53,9 @@ pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
             })
             .collect::<Vec<_>>()
             .join("\n"),
-        error_message = select_boot.error_message.unwrap_or_default()
+        error_message = select_boot
+            .error_message
+            .map(|err| format!("\nERROR: {err}"))
+            .unwrap_or_default()
     )))
 }

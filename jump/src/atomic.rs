@@ -10,14 +10,14 @@ use serde::Serializer;
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Target {
     Directory,
-    _File, // TODO(John Sirois): Use for run-once boot bindings.
+    File, // TODO(John Sirois): Use for run-once boot bindings.
 }
 
 impl Display for Target {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Target::Directory => f.serialize_str("directory"),
-            Target::_File => f.serialize_str("file"),
+            Target::File => f.serialize_str("file"),
         }
     }
 }
@@ -32,7 +32,7 @@ impl Target {
                     return Ok(false);
                 }
             }
-            Target::_File => {
+            Target::File => {
                 if target.is_file() {
                     return Ok(true);
                 } else if !target.exists() {
@@ -67,6 +67,10 @@ where
 
     // First check.
     if target_type.check_exists(target)? {
+        debug!(
+            "The atomic {target_type} at {path} has already been established.",
+            path = target.display()
+        );
         return Ok(());
     }
 
@@ -102,6 +106,11 @@ where
 
     // Second check.
     if target_type.check_exists(target)? {
+        debug!(
+            "The atomic {target_type} at {path} has already been established \
+            (lost double-check race).",
+            path = target.display()
+        );
         return Ok(());
     }
 
