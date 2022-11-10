@@ -75,7 +75,7 @@ a few design goals guiding the rest:
 
 1. I wanted to be able to assemble a scie with just a scie-jump binary, `curl`, `vi` and `cat` or
    similar foundational / ever-present command line tools.
-2. I wanted an assembled scie to be inspectable, again using standard tools.
+2. I wanted an assembled scie to be easily inspected, again using standard tools.
 
 An unstated constraint here so far is that the scie-jump needs to be able to quickly and
 unambiguously find the 1st byte of the lift manifest so that it can read it.
@@ -97,7 +97,7 @@ tools like `zipinfo` and `unzip` can be used against the scie directly to inspec
 application code.
 
 If the ever more ubiquitous `jq` tool is included in the list of ever-present command line tools,
-then the lift manifest also becomes inspectable. You change assembly to:
+then the lift manifest also becomes easy to inspect. You change assembly to:
 ```
 cat scie-jump file1 file2 ... fileN <(echo) <(jq -c . lift.json) > my-scie-binary
 ```
@@ -109,11 +109,11 @@ tail -1 my-scie-binary | jq .
 ```
 
 Despite scies admitting to assembly by hand like this, tools are not always available (Windows) and
-there are fiddly bits here to get an easily inspectable lift manifest not to mention file sizes and
+there are fiddly bits here to get an easy to inspect lift manifest not to mention file sizes and
 hashes, which are required by the scie-jump to find the internal files and then verify them on
 extraction. As such, the scie-jump launcher will act in a boot-pack role when its bare (not in a
 scie sandwich) and accept one or more lift manifest files as input from which it will build scies
-for you with `--single-lift-line` manifests for easy inspectability.
+for you with `--single-lift-line` manifests that are easy to inspect.
 
 ## Performance
 
@@ -134,7 +134,7 @@ cargo run --release -p package .
 ```
 
 That will deposit a scie-jump binary in the current directory after building it and packaging it.
-The binary will have an `-<os>-<arch>` suffix that you are free to remove with a rename.
+The binary will have an `-<os>-<arch>` suffix that you are free to remove.
 
 ## Learn More
 
@@ -142,7 +142,7 @@ The project is at an early stage with more documentation to be fleshed out. Righ
 best to inspect the [examples](examples/README.md) first and then dive into the [jump crate](
 jump/README.md) for more details.
 
-# Contribute
+## Contribute
 
 See the [contribution guide](CONTRIBUTING.md) if you're interested in hacking on the scie-jump or
 improving its documentation.

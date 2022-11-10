@@ -28,6 +28,9 @@
       ]
     }
   },
+  "fetch": [
+    "https://corretto.aws/downloads/resources/11.0.17.8.1/amazon-corretto-11.0.17.8.1-macosx-aarch64.tar.gz"
+  ],
   "custom": {
     "arbitrary": 3
   },
