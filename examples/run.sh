@@ -20,12 +20,14 @@ done
 function calculate_os_arch() {
   local os arch
 
-  os="$(uname -o)"
+  os="$(uname -s)"
   if [[ "${os}" =~ [Ll]inux ]]; then
     os="linux"
   elif [[ "${os}" =~ [Dd]arwin ]]; then
     os="macos"
-  elif [[ "${os}" =~ [Ww]in|[Mm]sys ]]; then
+  elif [[ "${os}" =~ [Ww]in|[Mm][Ii][Nn][Gg] ]]; then
+    # Powershell reports something like: Windows_NT
+    # Git ash reports something like: MINGW64_NT-10.0-22621
     os="windows"
   else
     die "Integration tests are not supported for this operating system (${os})."
