@@ -13,7 +13,7 @@ COMMON="${EXAMPLE_DIR}/common.sh"
 source "${COMMON}"
 export COMMON
 
-for cmd in basename cargo jq uname; do
+for cmd in basename jq uname; do
   check_cmd "${cmd}"
 done
 
