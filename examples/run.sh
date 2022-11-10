@@ -27,7 +27,7 @@ function calculate_os_arch() {
     os="macos"
   elif [[ "${os}" =~ [Ww]in|[Mm][Ii][Nn][Gg] ]]; then
     # Powershell reports something like: Windows_NT
-    # Git ash reports something like: MINGW64_NT-10.0-22621
+    # Git bash reports something like: MINGW64_NT-10.0-22621
     os="windows"
   else
     die "Integration tests are not supported for this operating system (${os})."
