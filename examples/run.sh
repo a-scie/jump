@@ -119,13 +119,20 @@ done
 
 ARCH="$(calculate_arch)"
 OS_ARCH="${OS}-${ARCH}"
+LIFT="lift.${OS_ARCH}.json"
 DIST_DIR="${REPO_ROOT}/dist"
-SCIE_JUMP="${DIST_DIR}/scie-jump-${OS_ARCH}"
+SCIE_JUMP_NAME="scie-jump-${OS_ARCH}"
+SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
 if [[ ! -e "${SCIE_JUMP}" ]]; then
   cargo run --release -p package "${DIST_DIR}"
 fi
+(
+  cd "${DIST_DIR}"
+  sha256 --check "${SCIE_JUMP_NAME}.sha256"
+)
 
-export ARCH OS OS_ARCH SCIE_JUMP
+
+export ARCH LIFT OS OS_ARCH SCIE_JUMP
 
 if (( "${#_EXAMPLE_PATHS[@]}" == 0 )); then
   for path in *; do
@@ -137,12 +144,16 @@ fi
 
 for example_path in "${_EXAMPLE_PATHS[@]}"; do
   example="$(basename "${example_path}")"
-  log
-  log "*** Running ${example} example ***"
-  log
-  fetch "${example}"
-  (
-    cd "${example}"
-    bash -eou pipefail test.sh
-  )
+  if [[ ! -f "${example}/${LIFT}" ]]; then
+    warn "Skipping ${example} example, it has no lift manifest for this platform."
+  else
+    log
+    log "*** Running ${example} example ***"
+    log
+    fetch "${example}"
+    (
+      cd "${example}"
+      bash -eou pipefail test.sh
+    )
+  fi
 done

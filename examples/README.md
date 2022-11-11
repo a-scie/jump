@@ -15,16 +15,18 @@ If writing a new example, use a  top-level `.fetch` file like this to list the U
 platform-independent items that should be fetched for the example. Java jars are a good example of
 this sort of artifact.
 
-The `run.sh` script then looks for an `example/lift.<os>-<arch>.json` lift manifest in the example
-directory where `<os>` is currently one of `linux`, `macos` or `windows` and `<arch>` is currently
-one of `aarch64` or `x86_64`. If that lift manifest has a top-level "fetch" key, it's expected to
-have a list of URL string values and all of those will be fetched. Use this facility when writing a
-new example to ensure platform-specific artifacts are fetched - typically the interpreter
-distribution being used by the example.
+The `run.sh` script then looks for the default lift manifest for the example the current platform.
+That is, `lift.<os>-<arch>.json` in the example directory where `<os>` is currently one of `linux`,
+`macos` or `windows` and `<arch>` is currently one of `aarch64` or `x86_64`. If that lift manifest
+has a top-level "fetch" key, it's expected to have a list of URL string values and all of those will
+be fetched. Use this facility when writing a new example to ensure platform-specific artifacts are
+fetched - typically the interpreter distribution being used by the example.
 
 Inside the example's directory there should be a `test.sh` bash script that need not be executable.
 It will be run by the `run.sh` script using `bash -eou pipefail test.sh` with the example's
-directory as the `PWD`. The script will have the following available in the environment:
+directory as the `PWD` if there is a default lift manifest for the current platform; otherwise the
+example will be skipped with a warning. The script will have the following available in the
+environment when run:
 
 + `OS`: This is the `<os>` value described above for the current operating system.
 + `ARCH`: This is the `<arch>` value described above for the current processor architecture.
@@ -33,6 +35,7 @@ directory as the `PWD`. The script will have the following available in the envi
 + `COMMON`: The absolute path of the [`common.sh`](common.sh) script for sourcing. This script is a
   sibling of `run.sh` and contains useful functions for the test to use.
 + `SCIE_JUMP`: The absolute path of a `scie-jump` binary built for the current platform.
++ `LIFT`: The relative path of the default lift manifest for the current platform.
 
 # Use
 

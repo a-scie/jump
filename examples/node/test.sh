@@ -5,9 +5,7 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd sha256sum
-
-"${SCIE_JUMP}" "lift.${OS_ARCH}.json"
+"${SCIE_JUMP}" "${LIFT}"
 gc "${PWD}/node.js"
 
 # Get help on scie boot commands.
@@ -17,10 +15,10 @@ SCIE="help" ./node.js
 SCIE="split" ./node.js split
 gc "${PWD}/split"
 
-sha256sum node.js* > split/node.js.sha256sum
+sha256 node.js* > split/node.js.sha256
 cd split && ./scie-jump
-sha256sum --check node.js.sha256sum
-sha256sum node.js* ../node.js*
+sha256 --check node.js.sha256
+sha256 node.js* ../node.js*
 cd .. && rm -rf split
 
 # Use the built-in BusyBox functionality via binary base name.
@@ -41,7 +39,7 @@ rm -rf npm node_modules* package*.json
 
 # Verify byte-wise identical pack -> split -> pack round tripping.
 SCIE="split" ./cowsay.js split
-sha256sum cowsay.js* > split/cowsay.js.sha256sum
+sha256 cowsay.js* > split/cowsay.js.sha256
 cd split && ./scie-jump
-sha256sum --check cowsay.js.sha256sum
-sha256sum cowsay.js* ../cowsay.js*
+sha256 --check cowsay.js.sha256
+sha256 cowsay.js* ../cowsay.js*

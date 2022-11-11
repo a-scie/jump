@@ -5,9 +5,7 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd sha256sum
-
-"${SCIE_JUMP}" "lift.${OS_ARCH}.json"
+"${SCIE_JUMP}" "${LIFT}"
 gc "${PWD}/coursier"
 
 
@@ -20,10 +18,10 @@ test "3more" = "$(
 SCIE="split" ./coursier split
 gc "${PWD}/split"
 
-sha256sum coursier* > split/coursier.sha256sum
+sha256 coursier* > split/coursier.sha256
 cd split && ./scie-jump
-sha256sum --check coursier.sha256sum
-sha256sum coursier* ../coursier*
+sha256 --check coursier.sha256
+sha256 coursier* ../coursier*
 
 time RUST_LOG=debug ./coursier version
 time ./coursier java-home

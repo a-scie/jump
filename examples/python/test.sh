@@ -5,7 +5,7 @@
 source "${COMMON}"
 trap gc EXIT
 
-"${SCIE_JUMP}" "lift.${OS_ARCH}.json"
+"${SCIE_JUMP}" "${LIFT}"
 gc "${PWD}/pants" "${PWD}/.pants.d" "${PWD}/.pids"
 
 time RUST_LOG=trace ./pants --no-pantsd -V

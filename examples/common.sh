@@ -31,3 +31,11 @@ function gc() {
     fi
   fi
 }
+
+function sha256() {
+  if [[ "${OS}" == "macos" ]]; then
+    shasum --algorithm 256 "$@"
+  else
+    sha256sum "$@"
+  fi
+}

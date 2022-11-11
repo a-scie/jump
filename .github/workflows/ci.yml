@@ -26,16 +26,12 @@ jobs:
         include:
           - os: ubuntu-20.04
             arch: linux-x86_64
-            examples: [python, java, node]
           - os: macos-11
             arch: macos-x86_64
-            examples: [python, java, node]
           - os: macos-13-aarch64
             arch: macos-aarch64
-            examples: [java, node]
           - os: windows-2022
             arch: windows-x86_64
-            examples: [java, node]
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
@@ -46,13 +42,5 @@ jobs:
         run: cargo test --all
       - name: Build & Package
         run: cargo run --release -p package dist
-      - name: Install coreutils for Mac (for sha256sum)
-        if: matrix.os == 'macos-11'
-        run: brew install coreutils
-      - name: Check Hash
-        run: |
-          cd dist
-          sha256sum --check *.sha256
-          rm *.sha256
       - name: Integration Tests
-        run: examples/run.sh ${{ join(matrix.examples, ' ') }}
+        run: examples/run.sh

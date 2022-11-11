@@ -43,14 +43,8 @@ jobs:
       - attach_workspace:
           at: dist
       - run:
-          name: Check Hash
-          command: |
-            cd dist
-            sha256sum --check *.sha256
-            rm *.sha256
-      - run:
           name: Integration Tests
-          command: examples/run.sh java node
+          command: examples/run.sh
   release:
     docker:
       - image: 'cimg/base:stable'
