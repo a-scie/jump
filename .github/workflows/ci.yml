@@ -42,7 +42,7 @@ jobs:
         run: cargo fmt --check --all
       - name: Lint
         run: cargo clippy --all
-      - name: Test
+      - name: Unit Tests
         run: cargo test --all
       - name: Build & Package
         run: cargo run --release -p package dist
@@ -54,82 +54,5 @@ jobs:
           cd dist
           sha256sum --check *.sha256
           rm *.sha256
-      - name: Python Example (Pants)
-        if: contains(matrix.examples, 'python')
-        run: |
-          set -x
-          examples/prepare.sh python
-          dist/scie-jump* examples/python/lift.${{ matrix.arch }}.json
-          time RUST_LOG=trace ./pants --no-pantsd -V
-          time ./pants --no-pantsd -V
-          
-          # Use the built-in BusyBox functionality via env var.
-          SCIE_BOOT=inspect ./pants interpreter --verbose --indent 2
-      - name: Java Example (Coursier)
-        if: contains(matrix.examples, 'java')
-        run: |
-          set -x
-          if [ "windows-2022" == "${{ matrix.os }}" ]; then
-            pwsh examples/prepare.ps1 java
-          else
-            examples/prepare.sh java
-          fi
-          dist/scie-jump* examples/java/lift.${{ matrix.arch }}.json
-
-          # Verify arbitrary json is allowed and preserved outside the root "scie" key.
-          test "3more" = "$(
-            SCIE=inspect ./coursier | jq -r '(.custom.arbitrary | tostring) + .more[1]'
-          )"
-
-          # Verify byte-wise identical pack -> split -> pack round tripping.
-          SCIE=split ./coursier split
-          sha256sum coursier* > split/coursier.sha256sum
-          cd split && ./scie-jump
-          sha256sum --check coursier.sha256sum
-          sha256sum coursier* ../coursier*
-          cd .. && rm -rf split
-
-          time RUST_LOG=debug ./coursier version
-          time ./coursier java-home
-          time ./coursier launch org.pantsbuild:jar-tool:0.0.17 \
-            -M org.pantsbuild.tools.jar.Main -- -h
-      - name: Node Example (npm and cowsay)
-        if: contains(matrix.examples, 'node')
-        run: |
-          set -x
-          if [ "windows-2022" == "${{ matrix.os }}" ]; then
-            pwsh examples/prepare.ps1 node
-            npm_exe=npm.exe
-          else
-            examples/prepare.sh node
-            npm_exe=npm
-          fi
-          dist/scie-jump* examples/node/lift.${{ matrix.arch }}.json
-          
-          # Get help on scie boot commands.          
-          SCIE=help ./node.js
-
-          # Verify byte-wise identical pack -> split -> pack round tripping.
-          SCIE=split ./node.js split
-          sha256sum node.js* > split/node.js.sha256sum
-          cd split && ./scie-jump
-          sha256sum --check node.js.sha256sum
-          sha256sum node.js* ../node.js*
-          cd .. && rm -rf split
-
-          # Use the built-in BusyBox functionality via binary base name.
-          cd examples/node && ln ../../node.js ${npm_exe}
-          ./npm install cowsay
-          
-          # Build a scie from another scie's tip-embedded scie-jump.
-          SCIE=boot-pack ../../node.js cowsay-lift.${{ matrix.arch }}.json
-          rm -rf npm node_modules* package*.json
-          ./cowsay.js -b 'All the binaries belong to us!'
-          
-          # Verify byte-wise identical pack -> split -> pack round tripping.
-          SCIE=split ./cowsay.js split
-          sha256sum cowsay.js* > split/cowsay.js.sha256sum
-          cd split && ./scie-jump
-          sha256sum --check cowsay.js.sha256sum
-          sha256sum cowsay.js* ../cowsay.js*
-          cd .. && rm -rf split
+      - name: Integration Tests
+        run: examples/run.sh ${{ join(matrix.examples, ' ') }}

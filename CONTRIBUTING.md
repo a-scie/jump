@@ -1,17 +1,18 @@
 # Contributing
 
-The scie-jump is intended to be a simple, fast, and robust executable launcher and help pushing
+The scie-jump is intended to be a simple, fast, and robust executable launcher. Any help pushing
 forward those goals is very welcome. Thank you in advance for your time and effort.
 
 ## Development Environment
 
 You'll need just a few tools to hack on the scie-jump:
-+ If you're new to Rust you'll need to ensure you have its toolchain availble to you. You might
-  start with [rustup](https://rustup.rs/).
-+ Integration tests are currently bash/~coreutils and jq driven. If you're on Windows you'll also 
-  need pwsh. The bash environment that comes with [Git for Windows](https://gitforwindows.org/) will
-  suffice. If you're on a Unix system, you'll just need bash / ~coreutils which you almost certainly
-  already have. In either case you can get [jq here](https://stedolan.github.io/jq/download/).
++ If you're new to Rust you'll need to ensure you have its toolchain available to you. You might
+  start with [`rustup`](https://rustup.rs/).
++ Integration tests are currently `bash`/~coreutils and `jq` driven. If you're on Windows you'll
+  also need `pwsh`. The `bash` environment that comes with [Git for Windows](
+  https://gitforwindows.org/) will suffice. If you're on a Unix system, you'll just need
+  `bash`/~coreutils which you almost certainly already have. In either case you can get [`jq` here](
+  https://stedolan.github.io/jq/download/).
 
 ## Development Cycle
 
@@ -19,10 +20,13 @@ You might want to open a [discussion](https://github.com/a-scie/jump/discussions
 https://github.com/a-scie/jump/issues) to vet your idea first. It can often save overall
 effort and lead to a better end result.
 
-The code is run through the standard cargo gamut. Before sending off changes you'll to have:
+The code is run through the standard `cargo` gamut. Before sending off changes you should have:
 + Formatted the code: `cargo fmt --all`
 + Linted the code: `cargo clippy --all`
 + Tested the code: `cargo test --all`
+
+Additionally, you can run any existing integration tests using [`examples/run.sh`](examples/run.sh).
+Learn more about those in the [README](examples/README.md).
 
 The scie-jump binary can be built via `cargo build` but that does not produce a fully featured
 scie-jump. For that you should instead use `cargo run -p package .`. The `.` can be any directory
@@ -38,7 +42,7 @@ https://github.com/a-scie/jump/pulls).
 ## Guiding Principles
 
 There are just a few guiding principles to keep in mind as alluded to in the [README](README.md):
-+ The scie-jump should be fast: It's currently launches warm scies in less than a milliseocnd and
++ The scie-jump should be fast: It's currently launches warm scies in less than a millisecond and
   that should only improve.
 + The scie-jump should be small: It's currently ~1.5MB on Linux (the largest binary). It would be
   nice to not grow much larger.
