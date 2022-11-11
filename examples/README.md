@@ -14,7 +14,7 @@ example, use a  top-level `.fetch` file like this to list the URLS of platform-i
 that should be fetched for the example. Java jars are a good example of this sort of artifact.
 
 The script then looks for an `example/lift.<os>-<arch>.json` lift manifest in the example directory
-where `<os>` is currently one of `linux`, `macos` or `windows` and `<arch> is currently one of
+where `<os>` is currently one of `linux`, `macos` or `windows` and `<arch>` is currently one of
 `aarch64` or `x86_64`. If that lift manifest has a top-level "fetch" key, it's expected to have a
 list of URL string values and all of those will be fetched. Use this facility when writing a new
 example to ensure platform-specific artifacts are fetched - typically the interpreter distribution
