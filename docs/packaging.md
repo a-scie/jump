@@ -234,9 +234,14 @@ matches a contained BusyBox command name, that command will be run.
 
 ## Using `cat` to build a scie
 
-You can use the `cat` utility to build the scie we built above as well. The big difference is that
-the lift manifest needs to be fully specified like the one shown above via `SCIE-inspect coursier`.
-Having written a fully specified lift manifest like that by hand though, scie assembly is just:
+You can use the `cat` utility to build the scie we built above as well. The big differences are:
+
+1. The lift manifest needs to be fully specified like the one shown above via
+   `SCIE-inspect coursier`.
+2. The last file in the "files" list must be a zip[^2]. This is a requirement of the scie format.
+
+Having written a fully specified lift manifest like the one above by hand though, and having ensured
+the last file is a zip, scie assembly is just:
 ```
 cat \
    amazon-corretto-11.0.17.8.1-linux-x64.tar.gz \
@@ -244,6 +249,7 @@ cat \
    lift.json > coursier
 chmod +x coursier
 ```
+
 That scie will have the lift manifest in pretty-printed form as its tail. That's not very friendly
 for command line inspection unless you know how many lines it takes up, so you can
 `tail -<N> coursier | jq .`. To package the scie for easier inspection, you could  modify the `cat`
@@ -256,6 +262,7 @@ cat \
    <(jq -c . lift.json) > coursier
 chmod +x coursier
 ```
+
 That extra bit of typing adds the lift manifest as a single line JSON document on its own line and
 gains the ability to blindly issue `tail -1 coursier | jq .` to inspect the lift manifest of the
 scie. Either way though, since the scie is powered by a `scie-jump` in its tip, you can also issue
@@ -275,3 +282,9 @@ along with the Coursier executable jar. Those binaries are also much faster, ~10
 runs Coursier, the JVM startup and warmup overheads are high. You pay that cost in painfully obvious
 ways in a command line app that runs quicly and exits! This is all just to point out you should
 analyze and measure your use case for applicability when considering making a scie of it.
+
+[^2]: The `scie-jump` has some smarts when it comes to file lists that do not end in a zip. It
+creates an extra file called the `scie-tote` that is a zip that stores all the files above it inside
+as STORED (uncompressed) entries. You need not be aware of this, the scie still functions like you'd
+expect. Its only when using a tool like `zipinfo` to inspect your scie executable that you'll notice
+a zip file entry for each of the files you specified.
