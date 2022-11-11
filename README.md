@@ -125,7 +125,12 @@ most projects that might consider packaging their applications this way. This ce
 the three current [examples](examples) which are Node.js, Java and Python scies, the fastest of
 which is roughly 50ms.
 
-## Building
+## Building a scie executable
+
+See the [packaging guide](docs/packaging.md) for an example of how to build a scie executable out
+of your application.
+
+## Building the `scie-jump`
 
 To build an executable scie-jump you'll need the [Rust suite of tools](https://rustup.rs/) 
 installed. With that done, simply:
