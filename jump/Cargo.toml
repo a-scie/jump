@@ -15,6 +15,7 @@ bzip2 = "0.4"
 dirs = "4.0"
 fd-lock = "3.0"
 flate2 = "1.0"  # For gz support.
+indexmap = "1.9"
 itertools = "0.10"
 log = { workspace = true }
 logging_timer = { workspace = true }

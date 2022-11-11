@@ -6,8 +6,9 @@
 pub(crate) enum Placeholder<'a> {
     FileName(&'a str),
     Scie,
-    ScieBoot,
-    ScieBootCmd(&'a str),
+    ScieBindings,
+    ScieBindingCmd(&'a str),
+    ScieLift,
     Env(&'a str),
 }
 
@@ -74,11 +75,14 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                 }
                 match symbol.splitn(3, '.').collect::<Vec<_>>()[..] {
                     ["scie"] => items.push(Item::Placeholder(Placeholder::Scie)),
-                    ["scie", "boot"] => items.push(Item::Placeholder(Placeholder::ScieBoot)),
-                    ["scie", "boot", cmd] => {
-                        items.push(Item::Placeholder(Placeholder::ScieBootCmd(cmd)))
+                    ["scie", "bindings"] => {
+                        items.push(Item::Placeholder(Placeholder::ScieBindings))
+                    }
+                    ["scie", "bindings", cmd] => {
+                        items.push(Item::Placeholder(Placeholder::ScieBindingCmd(cmd)))
                     }
                     ["scie", "env", name] => items.push(Item::Placeholder(Placeholder::Env(name))),
+                    ["scie", "lift"] => items.push(Item::Placeholder(Placeholder::ScieLift)),
                     _ => items.push(Item::Placeholder(Placeholder::FileName(symbol))),
                 }
                 previous_char = Some('}');
@@ -135,37 +139,42 @@ mod tests {
     }
 
     #[test]
-    fn scie_boot() {
+    fn scie_bindings() {
         assert_eq!(
-            vec![Item::Placeholder(Placeholder::ScieBoot)],
-            parse("{scie.boot}").unwrap().items
-        );
-        assert_eq!(
-            vec![Item::Text("A "), Item::Placeholder(Placeholder::ScieBoot)],
-            parse("A {scie.boot}").unwrap().items
+            vec![Item::Placeholder(Placeholder::ScieBindings)],
+            parse("{scie.bindings}").unwrap().items
         );
         assert_eq!(
             vec![
                 Item::Text("A "),
-                Item::Placeholder(Placeholder::ScieBoot),
+                Item::Placeholder(Placeholder::ScieBindings)
+            ],
+            parse("A {scie.bindings}").unwrap().items
+        );
+        assert_eq!(
+            vec![
+                Item::Text("A "),
+                Item::Placeholder(Placeholder::ScieBindings),
                 Item::Text(" warmer")
             ],
-            parse("A {scie.boot} warmer").unwrap().items
+            parse("A {scie.bindings} warmer").unwrap().items
         );
     }
 
     #[test]
-    fn scie_boot_cmd() {
+    fn scie_bindings_cmd() {
         assert_eq!(
-            vec![Item::Placeholder(Placeholder::ScieBootCmd("do"))],
-            parse("{scie.boot.do}").unwrap().items
+            vec![Item::Placeholder(Placeholder::ScieBindingCmd("do"))],
+            parse("{scie.bindings.do}").unwrap().items
         );
         assert_eq!(
             vec![
-                Item::Placeholder(Placeholder::ScieBootCmd("dotted.cmd.name")),
+                Item::Placeholder(Placeholder::ScieBindingCmd("dotted.cmd.name")),
                 Item::Text("/venv/pex"),
             ],
-            parse("{scie.boot.dotted.cmd.name}/venv/pex").unwrap().items
+            parse("{scie.bindings.dotted.cmd.name}/venv/pex")
+                .unwrap()
+                .items
         );
     }
 

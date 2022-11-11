@@ -9,7 +9,7 @@ trap gc EXIT
 gc "${PWD}/pants" "${PWD}/.pants.d" "${PWD}/.pids"
 
 time RUST_LOG=trace ./pants --no-pantsd -V
-time ./pants --no-pantsd -V
+time RUST_LOG=debug ./pants --no-pantsd -V
 
 # Use the built-in BusyBox functionality via env var.
-SCIE_BOOT="inspect" ./pants interpreter --verbose --indent 2
+SCIE_BOOT=repl ./pants -c 'from pants.util import strutil; print(strutil.__file__)'

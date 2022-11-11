@@ -10,20 +10,38 @@
             "env": {
               "=PATH": "{cpython}/python/bin:{scie.env.PATH}"
             },
-            "exe": "{cpython}/python/bin/python3.9",
+            "exe": "{scie.bindings.venv}/venv/bin/python3.9",
             "args": [
-              "{pants.2.14.0.pex}"
+              "{scie.bindings.venv}/venv/pex"
             ]
           },
-          "inspect": {
-            "description": "PEX tools for Pants.",
+          "repl": {
+            "description": "A Python repl with Pants (minus plugins) available for inspection.",
             "env": {
               "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
               "PEX_TOOLS": "1"
             },
+            "exe": "{scie.bindings.venv}/venv/bin/python3.9"
+          }
+        },
+        "bindings": {
+          "venv": {
+            "description": "Installs Pants in a venv and pre-compiles .pyc.",
+            "env": {
+              "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
+              "PEX_TOOLS": "1",
+              "PEX_ROOT": "{scie.bindings}/pex_root"
+            },
             "exe": "{cpython}/python/bin/python3.9",
             "args": [
-              "{pants.2.14.0.pex}"
+              "{pants.2.14.0.pex}",
+              "venv",
+              "--bin-path",
+              "prepend",
+              "--compile",
+              "--rm",
+              "all",
+              "{scie.bindings}/venv"
             ]
           }
         }
@@ -31,13 +49,10 @@
       "files": [
         {
           "name": "cpython-3.9.14+20221002-x86_64-unknown-linux-gnu-install_only.tar.gz",
-          "key": "cpython",
-          "hash": "e63d0c00a499e0202ba7a0f53ce69fca6d30237af39af9bc3c76bce6c7bf14d7",
-          "size": 26761725
+          "key": "cpython"
         },
         {
-          "name": "pants.2.14.0.pex",
-          "type": "zip"
+          "name": "pants.2.14.0.pex"
         }
       ]
     }

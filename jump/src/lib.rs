@@ -27,16 +27,14 @@ use logging_timer::time;
 pub use crate::archive::create_options;
 use crate::config::Config;
 pub use crate::config::Jump;
-pub use crate::context::Boot;
-use crate::context::Context;
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
-pub use crate::lift::{load_lift, File, Lift};
+pub use crate::lift::{load_lift, File, Lift, ScieBoot};
 pub use crate::process::{execute, EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
 
 pub struct SelectBoot {
-    pub boots: Vec<Boot>,
+    pub boots: Vec<ScieBoot>,
     pub description: Option<String>,
     pub error_message: Option<String>,
 }
@@ -118,21 +116,24 @@ pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
     }
 
     let manifest_size = lift.size;
-    let context = Context::new(current_exe, lift)?;
-    let result = context.select_command();
+    let result = context::select_command(&current_exe, &jump, &lift);
     if let Ok(Some(selected_command)) = result {
         let payload = &data[jump.size..data.len() - manifest_size];
-        let process = installer::prepare(context, selected_command.cmd, payload)?;
+        installer::install(&selected_command.files, payload)?;
+        let process = selected_command.process;
         trace!("Prepared {process:#?}");
-        env::set_var("SCIE", selected_command.scie.as_os_str());
+        for binding in selected_command.bindings {
+            binding.execute()?;
+        }
+        env::set_var("SCIE", current_exe.as_os_str());
         Ok(BootAction::Execute((
             process,
             selected_command.argv1_consumed,
         )))
     } else {
         Ok(BootAction::Select(SelectBoot {
-            boots: context.boots(),
-            description: context.description,
+            boots: lift.boots(),
+            description: lift.description,
             error_message: result.err(),
         }))
     }

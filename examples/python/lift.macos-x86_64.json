@@ -10,20 +10,38 @@
             "env": {
               "=PATH": "{cpython}/python/bin:{scie.env.PATH}"
             },
-            "exe": "{cpython}/python/bin/python3.9",
+            "exe": "{scie.bindings.venv}/venv/bin/python3.9",
             "args": [
-              "{pants.2.14.0.pex}"
+              "{scie.bindings.venv}/venv/pex"
             ]
           },
-          "inspect": {
-            "description": "PEX tools for Pants.",
+          "repl": {
+            "description": "A Python repl with Pants (minus plugins) available for inspection.",
             "env": {
               "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
               "PEX_TOOLS": "1"
             },
+            "exe": "{scie.bindings.venv}/venv/bin/python3.9"
+          }
+        },
+        "bindings": {
+          "venv": {
+            "description": "Installs Pants in a venv and pre-compiles .pyc.",
+            "env": {
+              "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
+              "PEX_TOOLS": "1",
+              "PEX_ROOT": "{scie.bindings}/pex_root"
+            },
             "exe": "{cpython}/python/bin/python3.9",
             "args": [
-              "{pants.2.14.0.pex}"
+              "{pants.2.14.0.pex}",
+              "venv",
+              "--bin-path",
+              "prepend",
+              "--compile",
+              "--rm",
+              "all",
+              "{scie.bindings}/venv"
             ]
           }
         }
