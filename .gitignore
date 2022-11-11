@@ -5,3 +5,7 @@ target/
 .idea/
 *.iml
 *.ipr
+
+# Integration Test output.
+dist/
+
