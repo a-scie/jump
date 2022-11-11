@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 function log() {
-  echo >&2 "$@"
+  echo -e >&2 "$@"
 }
 
 function warn() {
@@ -22,10 +22,12 @@ function check_cmd() {
 _GC=()
 
 function gc() {
-  if (( $# > 0 )); then
-    check_cmd rm
-    _GC+=("$@")
-  else
-    rm -rf "${_GC[@]}"
+  if [[ -z "${NO_GC:-}" ]]; then
+    if (( $# > 0 )); then
+      check_cmd rm
+      _GC+=("$@")
+    else
+      rm -rf "${_GC[@]}"
+    fi
   fi
 }
