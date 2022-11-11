@@ -90,7 +90,7 @@ function fetch() {
   jq -r '.fetch[]?' "${example}/lift.${OS_ARCH}.json" | fetch_all "${example}"
 }
 
-_USAGE="$(
+function usage() {
   cat << EOF
 Usage: $0 [--no-gc] [example]*
 
@@ -100,20 +100,20 @@ Runs all examples by default. List example directory names to run specific ones.
          This is useful for experimenting or test development."
 
 EOF
-)"
+}
 
 _EXAMPLE_PATHS=()
 for arg in "$@"; do
   if [[ "${arg}" =~ -h|--help ]]; then
-    echo "${_USAGE}"
+    usage
     exit 0
   elif [[ "${arg}" =~ --no-gc ]]; then
     export NO_GC=1
   elif [[ -d "${arg}" ]]; then
     _EXAMPLE_PATHS+=("${arg}")
   else
-    log "${_USAGE}"
-    die "\nERROR: ${arg} is not a recognized option or an example directory."
+    usage
+    die "ERROR: ${arg} is not a recognized option or an example directory."
   fi
 done
 
