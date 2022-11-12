@@ -71,6 +71,7 @@ jobs:
           prerelease: false
           files: dist/scie-jump*
           fail_on_unmatched_files: true
+          discussion_category_name: Announcements
   aarch64-release-trigger:
     name: Trigger Circle CI Linux aarch64 Github Release
     needs:
