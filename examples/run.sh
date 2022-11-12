@@ -129,11 +129,9 @@ if [[ "${OS}" == "windows" ]]; then
   NEWLINE="\r\n"
 fi
 
+cargo run --release -p package "${DIST_DIR}"
 SCIE_JUMP_NAME="scie-jump-${OS_ARCH}${EXE_EXT}"
 SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
-if [[ ! -e "${SCIE_JUMP}" ]]; then
-  cargo run --release -p package "${DIST_DIR}"
-fi
 (
   cd "${DIST_DIR}"
   sha256 --check "${SCIE_JUMP_NAME}.sha256"
