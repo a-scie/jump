@@ -15,12 +15,12 @@ If writing a new example, use a  top-level `.fetch` file like this to list the U
 platform-independent items that should be fetched for the example. Java jars are a good example of
 this sort of artifact.
 
-The `run.sh` script then looks for the default lift manifest for the example the current platform.
-That is, `lift.<os>-<arch>.json` in the example directory where `<os>` is currently one of `linux`,
-`macos` or `windows` and `<arch>` is currently one of `aarch64` or `x86_64`. If that lift manifest
-has a top-level "fetch" key, it's expected to have a list of URL string values and all of those will
-be fetched. Use this facility when writing a new example to ensure platform-specific artifacts are
-fetched - typically the interpreter distribution being used by the example.
+The `run.sh` script then looks for the default lift manifest for the example. The default lift
+manifest is named `lift.<os>-<arch>.json` in the example directory where `<os>` is currently one of
+`linux`, `macos` or `windows` and `<arch>` is currently one of `aarch64` or `x86_64`. If that lift
+manifest has a top-level "fetch" key, it's expected to have a list of URL string values and all of
+those will be fetched. Use this facility when writing a new example to ensure platform-specific
+artifacts are fetched - typically the interpreter distribution being used by the example.
 
 Inside the example's directory there should be a `test.sh` bash script that need not be executable.
 It will be run by the `run.sh` script using `bash -eou pipefail test.sh` with the example's

@@ -137,7 +137,6 @@ SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
   sha256 --check "${SCIE_JUMP_NAME}.sha256"
 )
 
-
 export ARCH EXE_EXT LIFT NEWLINE OS OS_ARCH SCIE_JUMP
 
 if (( "${#_EXAMPLE_PATHS[@]}" == 0 )); then
