@@ -133,6 +133,22 @@ variable name that begins with "=" will have the "=" stripped and will overwrite
 environment variable of the same name. Without the leading "=" the environment variable will be set
 only if not already present in the ambient runtime environment.
 
+You can also supply a list of commands under "scie.lift.boot.bindings". These commands are objects
+with the same format as the "scie.lift.boot.commands" but they are not directly runnable by the end
+user of the scie. Instead, they serve the role of performing 1-time installation actions that can be
+requested by other commands that rely upon them via a `{scie.bindings.<binding command name>}`
+placeholder. The named binding command will be run (successfully) exactly once as tracked by a lock
+file maintained by the scie jump. The binding command will generally want to use the
+`{scie.bindings}` to request the path of a directory (housed in the `~/.nce` and namespaced by the
+lift manifest hash) set aside for that scie alone. The binding command is guaranteed it will be the
+only command operating against that directory when it is invoked.
+
+N.B.: Since the scie-jump only maintains cooperative control over the contents of the `~/.nce`, care
+should be taken when designing boot binding commands. If the scie is run in a Docker container build
+step, you have a wider guaranty of non-interference. If the scie is run in an open environment
+though, you may need to account for conflicting processes running in parallel to your binding
+command and invalidating its work or assumptions about the state of the wider filesystem.
+
 ### Executing the boot pack
 
 With a `scie-jump` in hand, your application files downloaded and the lift manifest written,
@@ -261,7 +277,7 @@ As an alternative to using the boot pack, you can use the `cat` utility to build
 above as well. The big differences are:
 
 1. The lift manifest needs to be fully specified like the one shown above via
-   `SCIE-inspect coursier`. In particular file size and hashes must be present as well as the
+   `SCIE=inspect coursier`. In particular file size and hashes must be present as well as the
    information describing the scie-jump you're using in the "scie.jump" field.
 2. The last file in the "files" list must be a zip[^2]. This is a requirement of the scie format.
 
@@ -291,7 +307,7 @@ chmod +x coursier
 That extra bit of typing adds the lift manifest as a single line JSON document on its own line which
 gains the ability to blindly issue `tail -1 coursier | jq .` to inspect the lift manifest of the
 scie. Either way though, since the scie is powered by a `scie-jump` in its tip, you can also issue
-`SCIE-inspect coursier` as in the boot-pack example.
+`SCIE=inspect coursier` as in the boot-pack example.
 
 ## Advanced placeholders
 
