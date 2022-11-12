@@ -30,7 +30,7 @@ function scie_cat() {
     "${SCIE_JUMP}" \
     "${JDK}" \
     cowsay-1.1.0.jar \
-    <(echo) \
+    <(echo -en "${NEWLINE}") \
     <(
       jq -c "
       setpath([\"scie\", \"jump\", \"size\"]; ${SCIE_JUMP_SIZE})
