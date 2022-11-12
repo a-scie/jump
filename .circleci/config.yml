@@ -40,13 +40,11 @@ jobs:
     resource_class: arm.medium
     steps:
       - checkout
-      - rust/install:
-          version: nightly
       - attach_workspace:
           at: dist
       - run:
           name: Integration Tests
-          command: examples/run.sh
+          command: examples/run.sh --no-package
   release:
     docker:
       - image: 'cimg/base:stable'

@@ -92,23 +92,28 @@ function fetch() {
 
 function usage() {
   cat << EOF
-Usage: $0 [--no-gc] [example]*
+Usage: $0 [--no-gc] [--no-package] [example]*
 
 Runs all examples by default. List example directory names to run specific ones.
 
 --no-gc: Prevents example artifacts generated during the run from being garbage collected.
          This is useful for experimenting or test development."
 
+--no-package: Do not re-build the scie-jump, just use whatever has been packaged to `dist/` already.
+
 EOF
 }
 
+_PACKAGE="1"
 _EXAMPLE_PATHS=()
 for arg in "$@"; do
   if [[ "${arg}" =~ -h|--help ]]; then
     usage
     exit 0
-  elif [[ "${arg}" =~ --no-gc ]]; then
+  elif [[ "${arg}" == "--no-gc" ]]; then
     export NO_GC=1
+  elif [[ "${arg}" == "--no-package" ]]; then
+    _PACKAGE=""
   elif [[ -d "${arg}" ]]; then
     _EXAMPLE_PATHS+=("${arg}")
   else
@@ -129,7 +134,9 @@ if [[ "${OS}" == "windows" ]]; then
   NEWLINE="\r\n"
 fi
 
-cargo run --release -p package "${DIST_DIR}"
+if [[ -n "${_PACKAGE}" ]]; then
+  cargo run --release -p package "${DIST_DIR}"
+fi
 SCIE_JUMP_NAME="scie-jump-${OS_ARCH}${EXE_EXT}"
 SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
 (
