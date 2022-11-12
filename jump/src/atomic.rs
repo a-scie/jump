@@ -10,7 +10,7 @@ use serde::Serializer;
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Target {
     Directory,
-    File, // TODO(John Sirois): Use for run-once boot bindings.
+    File,
 }
 
 impl Display for Target {
