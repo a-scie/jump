@@ -40,6 +40,8 @@ jobs:
     resource_class: arm.medium
     steps:
       - checkout
+      - rust/install:
+          version: nightly
       - attach_workspace:
           at: dist
       - run:
