@@ -22,14 +22,14 @@
       "boot": {
         "commands": {
           "": {
-            "exe": "{jdk}/jdk-19.0.1/bin/java",
+            "exe": "{jdk}/jdk-19.0.1.jdk/Contents/Home/bin/java",
             "args": [
               "-jar",
               "{cowsay.jar}"
             ],
             "env": {
-              "=JAVA_HOME": "{jdk}/jdk-19.0.1",
-              "=PATH": "{jdk}/jdk-19.0.1/bin:{scie.env.PATH}"
+              "=JAVA_HOME": "{jdk}/jdk-19.0.1.jdk/Contents/Home",
+              "=PATH": "{jdk}/jdk-19.0.1.jdk/Contents/Home/bin:{scie.env.PATH}"
             }
           }
         }
