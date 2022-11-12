@@ -16,7 +16,8 @@ publish = false
 [profile.release]
 opt-level = "s"
 strip = "symbols"
-lto = "thin"
+lto = "fat"
+codegen-units = 1
 
 # N.B.: The `package` psuedo-crate serves as a cross-platform build-step
 # to post-process this root crate's binary by adding a 64 bit magic
@@ -29,6 +30,7 @@ lto = "thin"
 [profile.release.build-override]
 opt-level = "s"
 strip = "symbols"
+codegen-units = 1
 
 [workspace.dependencies]
 bstr = "1.0"
