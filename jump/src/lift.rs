@@ -149,7 +149,7 @@ fn assemble(
                 size: None,
                 hash: Some(hash),
                 ..
-            } => (0, hash),  // A scie-tote entry.
+            } => (0, hash), // A scie-tote entry.
             _ if reconstitute => fingerprint::digest_file(&path)?,
             file => {
                 return Err(format!(
