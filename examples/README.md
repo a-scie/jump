@@ -3,7 +3,7 @@
 The top level directories each contain an example of a scie that can be assembled and run using the
 `scie-jump`.
 
-# Structure
+## Structure
 
 There is a [`run.sh`](run.sh) script that can be used to run the examples. By default, it will run
 all of them, but you can pass specific example directory names to have it just run those. Some
@@ -41,7 +41,7 @@ environment when run:
 + `NEWLINE`: The newline characters for the current OS. This is "\n" except for Windows where it's
              "\r\n"
 
-# Use
+## Use
 
 Simply run `examples/run.sh [example name]*`. You can also pass `--no-gc` if you want artifacts
 created during the test run to stick around for inspection. Do note that these will likely need to
