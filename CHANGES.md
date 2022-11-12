@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.2.0
+
+This release brings support for boot bindings: commands that will be run exactly once to perform
+any needed installation operations.
+
 ## 0.1.11
 
 The 1st release including macOS aarch64 binaries.
