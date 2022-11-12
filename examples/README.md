@@ -36,7 +36,8 @@ environment when run:
   sibling of `run.sh` and contains useful functions for the test to use.
 + `SCIE_JUMP`: The absolute path of a `scie-jump` binary built for the current platform.
 + `LIFT`: The relative path of the default lift manifest for the current platform.
-
++ `EXE_EXT`: The extension to append to binaries. This is blank ("") except for Windows where it's
+             ".exe".
 # Use
 
 Simply run `examples/run.sh [example name]*`. You can also pass `--no-gc` if you want artifacts

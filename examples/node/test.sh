@@ -22,11 +22,7 @@ sha256 node.js* ../node.js*
 cd .. && rm -rf split
 
 # Use the built-in BusyBox functionality via binary base name.
-if [[ "${OS_ARCH}" =~ windows ]]; then
-  ln node.js npm.exe
-else
-  ln node.js npm
-fi
+ln node.js "npm${EXE_EXT}"
 ./npm install cowsay
 gc "${PWD}/npm" "${PWD}/node_modules" "${PWD}/package.json" "${PWD}/package-lock.json"
 
