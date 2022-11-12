@@ -129,17 +129,33 @@ fn assemble(
 
         let file_type = if let Some(file_type) = file.file_type {
             file_type
-        } else {
+        } else if reconstitute {
             determine_file_type(&path)?
+        } else {
+            return Err(format!("A file type is required. Found: {file:?}"));
         };
 
         if reconstitute && file_type == FileType::Directory {
             path = archive::create(resolve_base, &file.name)?;
         }
-        let (size, hash) = match (file.size, file.hash) {
-            (Some(size), Some(hash)) => (size, hash),
-            (None, Some(hash)) => (0, hash),
-            _ => fingerprint::digest_file(&path)?,
+
+        let (size, hash) = match file {
+            crate::config::File {
+                size: Some(size),
+                hash: Some(hash),
+                ..
+            } => (size, hash),
+            crate::config::File {
+                size: None,
+                hash: Some(hash),
+                ..
+            } => (0, hash), // A scie-tote entry.
+            _ if reconstitute => fingerprint::digest_file(&path)?,
+            file => {
+                return Err(format!(
+                    "Both file size and hash are required. Found: {file:?}"
+                ));
+            }
         };
 
         files.push(File {
@@ -157,7 +173,13 @@ fn assemble(
 #[time("debug")]
 pub(crate) fn load_scie(scie_path: &Path, scie_data: &[u8]) -> Result<(Jump, Lift), String> {
     let end_of_zip = crate::zip::end_of_zip(scie_data, Config::MAXIMUM_CONFIG_SIZE)?;
-    match load(scie_path, &scie_data[end_of_zip..], false)? {
+    let result = load(scie_path, &scie_data[end_of_zip..], false).map_err(|e| {
+        format!(
+            "The scie at {scie_path} has missing information in its lift manifest: {e}",
+            scie_path = scie_path.display()
+        )
+    })?;
+    match result {
         (Some(jump), lift) => Ok((jump, lift)),
         _ => Err(format!(
             "The scie at {path} has a lift manifest with no scie-jump information.",

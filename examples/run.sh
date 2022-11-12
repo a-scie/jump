@@ -123,8 +123,10 @@ LIFT="lift.${OS_ARCH}.json"
 DIST_DIR="${REPO_ROOT}/dist"
 
 EXE_EXT=""
+NEWLINE="\n"
 if [[ "${OS}" == "windows" ]]; then
   EXE_EXT=".exe"
+  NEWLINE="\r\n"
 fi
 
 SCIE_JUMP_NAME="scie-jump-${OS_ARCH}${EXE_EXT}"
@@ -138,7 +140,7 @@ fi
 )
 
 
-export ARCH EXE_EXT LIFT OS OS_ARCH SCIE_JUMP
+export ARCH EXE_EXT LIFT NEWLINE OS OS_ARCH SCIE_JUMP
 
 if (( "${#_EXAMPLE_PATHS[@]}" == 0 )); then
   for path in *; do

@@ -38,6 +38,9 @@ environment when run:
 + `LIFT`: The relative path of the default lift manifest for the current platform.
 + `EXE_EXT`: The extension to append to binaries. This is blank ("") except for Windows where it's
              ".exe".
++ `NEWLINE`: The newline characters for the current OS. This is "\n" except for Windows where it's
+             "\r\n"
+
 # Use
 
 Simply run `examples/run.sh [example name]*`. You can also pass `--no-gc` if you want artifacts
