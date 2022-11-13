@@ -92,19 +92,12 @@ fn unpack_archive<R: Read + Seek>(
 
 #[time("debug")]
 fn unpack_blob<R: Read + Seek>(bytes: R, expected_hash: &str, dst: &Path) -> Result<(), String> {
-    let parent_dir = dst.parent().ok_or_else(|| "".to_owned())?;
-    atomic_path(parent_dir, Target::Directory, |work_dir| {
+    atomic_path(dst, Target::File, |blob_dst| {
         let mut hashed_bytes = check_hash("blob", bytes, expected_hash, dst)?;
-        let blob_dst = work_dir.join(dst.file_name().ok_or_else(|| {
-            format!(
-                "Blob destination {dst} has no file name.",
-                dst = dst.display()
-            )
-        })?);
         let mut blob_out = OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&blob_dst)
+            .open(blob_dst)
             .map_err(|e| {
                 format!(
                     "Failed to open blob destination {blob_dst} for writing: {e}",
