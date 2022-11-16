@@ -1,0 +1,56 @@
+{
+  "scie": {
+    "lift": {
+      "name": "cowsay",
+      "base": "~/.nce",
+      "files": [
+        {
+          "name": "get.sh"
+        },
+        {
+          "name": "cowsay-1.1.0.jar",
+          "key": "cowsay.jar",
+          "size": 1724250,
+          "hash": "212ee64546eb8b5074572fed4107d850eb90bc462aa3099c0ac8ea63fdca7811",
+          "type": "blob",
+          "source": "curl"
+        },
+        {
+          "name": "openjdk-19.0.1_macos-aarch64_bin.tar.gz",
+          "key": "jdk",
+          "size": 190630653,
+          "hash": "915054b18fc17216410cea7aba2321c55b82bd414e1ef3c7e1bafc7beb6856c8",
+          "type": "tar.gz",
+          "source": "curl"
+        }
+      ],
+      "boot": {
+        "commands": {
+          "": {
+            "exe": "{jdk}/jdk-19.0.1.jdk/Contents/Home/bin/java",
+            "args": [
+              "-jar",
+              "{cowsay.jar}"
+            ],
+            "env": {
+              "=JAVA_HOME": "{jdk}/jdk-19.0.1.jdk/Contents/Home",
+              "=PATH": "{jdk}/jdk-19.0.1.jdk/Contents/Home/bin:{scie.env.PATH}"
+            }
+          }
+        },
+        "bindings": {
+          "curl": {
+            "exe": "{get.sh}",
+            "args": [
+              "{scie.lift}"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "get": {
+    "openjdk-19.0.1_macos-aarch64_bin.tar.gz": "https://download.java.net/java/GA/jdk19.0.1/afdd2e245b014143b62ccb916125e3ce/10/GPL/openjdk-19.0.1_macos-aarch64_bin.tar.gz",
+    "cowsay-1.1.0.jar": "https://repo1.maven.org/maven2/com/github/ricksbrown/cowsay/1.1.0/cowsay-1.1.0.jar"
+  }
+}

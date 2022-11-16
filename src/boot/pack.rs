@@ -6,7 +6,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
-use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift};
+use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift, Source};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
 use zip::{CompressionMethod, ZipWriter};
@@ -147,7 +147,9 @@ fn pack(
         }
     }
     for file in lift.files.iter_mut() {
-        // let (path, _) = reconstitute(resolve_base, &file.name, Some(file.file_type))?;
+        if Source::Scie != file.source {
+            continue;
+        }
         let mut path = resolve_base.join(&file.name);
         if FileType::Directory == file.file_type {
             path = path.with_extension("zip");
@@ -212,6 +214,7 @@ fn pack(
             hash,
             file_type: FileType::Archive(ArchiveType::Zip),
             eager_extract: false,
+            source: Source::Scie,
         };
 
         tote.zip_file

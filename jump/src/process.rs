@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::ffi::OsString;
-use std::process::{Command, ExitStatus};
+use std::process::{Child, Command, ExitStatus, Stdio};
 
 use crate::config::EnvVar as ConfigEnvVar;
 
@@ -58,9 +58,9 @@ where
     E: Iterator<Item = (OsString, OsString)>,
 {
     Command::new(&exe)
-        .envs(env)
         .args(&args)
         .args(std::env::args().skip(argv_skip))
+        .envs(env)
         .spawn()
         .map_err(|e| format!("Failed to spawn {exe:?} {args:?}: {e}"))?
         .wait()
@@ -77,5 +77,22 @@ pub struct Process {
 impl Process {
     pub fn execute(self) -> Result<ExitStatus, String> {
         execute_with_env(self.exe, self.args, usize::MAX, self.env.into_env_vars())
+    }
+
+    pub fn spawn_stdout(&self, args: &[&str]) -> Result<Child, String> {
+        Command::new(&self.exe)
+            .args(&self.args)
+            .args(args)
+            .envs(self.env.clone().into_env_vars())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                format!(
+                    "Failed to spawn {exe:?} {args:?}: {e}",
+                    exe = self.exe,
+                    args = self.args
+                )
+            })
     }
 }

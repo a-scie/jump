@@ -10,6 +10,12 @@ use crate::config::{ArchiveType, Boot, Config, FileType, Jump, Other};
 use crate::{archive, fingerprint};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum Source {
+    Scie,
+    LoadBinding(String),
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct File {
     pub name: String,
     pub key: Option<String>,
@@ -17,6 +23,7 @@ pub struct File {
     pub hash: String,
     pub file_type: FileType,
     pub eager_extract: bool,
+    pub source: Source,
 }
 
 impl From<File> for crate::config::File {
@@ -31,6 +38,10 @@ impl From<File> for crate::config::File {
             hash: Some(value.hash),
             file_type: Some(value.file_type),
             eager_extract: value.eager_extract,
+            source: match value.source {
+                Source::Scie => None,
+                Source::LoadBinding(binding_name) => Some(binding_name),
+            },
         }
     }
 }
@@ -165,6 +176,10 @@ fn assemble(
             hash,
             file_type,
             eager_extract: file.eager_extract,
+            source: match file.source {
+                None => Source::Scie,
+                Some(binding_name) => Source::LoadBinding(binding_name),
+            },
         });
     }
     Ok(files)
@@ -216,12 +231,17 @@ fn load(
         .unwrap_or_else(|| Path::new(""));
     let lift = config.scie.lift;
     let files = assemble(resolve_base, lift.files, reconstitute)?;
+    let base = if let Ok(base) = std::env::var("SCIE_BASE") {
+        PathBuf::from(base)
+    } else {
+        lift.base
+    };
     Ok((
         config.scie.jump,
         Lift {
             name: lift.name,
             description: lift.description,
-            base: lift.base,
+            base,
             boot: lift.boot,
             size: data.len(),
             hash: fingerprint::digest(data),
