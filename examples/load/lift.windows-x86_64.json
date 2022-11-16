@@ -20,7 +20,7 @@
           "key": "jdk",
           "size": 194441800,
           "hash": "adb1a33c07b45c39b926bdeeadf800f701be9c3d04e0deb543069e5f09856185",
-          "type": "tar.gz",
+          "type": "zip",
           "source": "get"
         }
       ],
