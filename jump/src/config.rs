@@ -130,6 +130,9 @@ pub struct File {
     #[serde(default, rename = "type")]
     pub file_type: Option<FileType>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executable: Option<bool>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub eager_extract: bool,
     #[serde(default)]
@@ -378,6 +381,7 @@ mod tests {
                             size: Some(1137),
                             hash: Some("abc".to_string()),
                             file_type: Some(FileType::Blob),
+                            executable: Some(true),
                             eager_extract: true,
                             source: None,
                         },
@@ -389,6 +393,7 @@ mod tests {
                             file_type: Some(FileType::Archive(ArchiveType::CompressedTar(
                                 Compression::Zstd
                             ))),
+                            executable: None,
                             eager_extract: false,
                             source: None,
                         },
@@ -398,6 +403,7 @@ mod tests {
                             size: Some(42),
                             hash: Some("def".to_string()),
                             file_type: Some(FileType::Archive(ArchiveType::Zip)),
+                            executable: None,
                             eager_extract: false,
                             source: None,
                         }

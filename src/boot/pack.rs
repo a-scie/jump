@@ -213,6 +213,7 @@ fn pack(
             size,
             hash,
             file_type: FileType::Archive(ArchiveType::Zip),
+            executable: None,
             eager_extract: false,
             source: Source::Scie,
         };
