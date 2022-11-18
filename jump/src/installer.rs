@@ -119,7 +119,7 @@ where
             })?;
         std::io::copy(&mut hashed_bytes, &mut blob_out)
             .map(|_| ())
-            .map_err(|e| format!("{e}"))?;
+            .map_err(|e| format!("Failed to unpack blob to {dst}: {e}", dst = dst.display()))?;
         Ok::<T, String>(result)
     })
 }
@@ -168,12 +168,18 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                         file = file.name,
                         exe = binding.exe
                     );
-                    let mut buffer = tempfile::tempfile().map_err(|e| format!("{e}"))?;
+                    let mut buffer = tempfile::tempfile().map_err(|e| {
+                        format!(
+                            "Failed to establish a temporary file buffer for loading {file:?} via \
+                            {binding:?}: {e}"
+                        )
+                    })?;
                     let mut child = binding.spawn_stdout(vec![file.name.as_str()].as_slice())?;
                     let mut stdout = child.stdout.take().ok_or_else(|| {
                         format!("Failed to grab stdout attempting to load {file:?} via binding.")
                     })?;
-                    std::io::copy(&mut stdout, &mut buffer).map_err(|e| format!("{e}"))?;
+                    std::io::copy(&mut stdout, &mut buffer)
+                        .map_err(|e| format!("Failed to load {file:?} via {binding:?}: {e}"))?;
                     buffer.seek(SeekFrom::Start(0)).map_err(|e| {
                         format!(
                             "Failed to re-wind temp file for reading {file:?} loaded by \
@@ -185,7 +191,11 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                 if let Some(mut child) =
                     unpack(file.file_type, buffer_source, file.hash.as_str(), dst)?
                 {
-                    let exit_status = child.wait().map_err(|e| format!("{e}"))?;
+                    let exit_status = child.wait().map_err(|e| {
+                        format!(
+                            "Failed to await termination of {binding:?} when loading {file:?}: {e}"
+                        )
+                    })?;
                     if !exit_status.success() {
                         return Err(format!("Failed to load file {file:?}: {exit_status:?}"));
                     }
