@@ -132,6 +132,9 @@ pub struct File {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub eager_extract: bool,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -375,7 +378,8 @@ mod tests {
                             size: Some(1137),
                             hash: Some("abc".to_string()),
                             file_type: Some(FileType::Blob),
-                            eager_extract: true
+                            eager_extract: true,
+                            source: None,
                         },
                         File {
                             name: "python".to_string(),
@@ -385,7 +389,8 @@ mod tests {
                             file_type: Some(FileType::Archive(ArchiveType::CompressedTar(
                                 Compression::Zstd
                             ))),
-                            eager_extract: false
+                            eager_extract: false,
+                            source: None,
                         },
                         File {
                             name: "foo.zip".to_string(),
@@ -394,6 +399,7 @@ mod tests {
                             hash: Some("def".to_string()),
                             file_type: Some(FileType::Archive(ArchiveType::Zip)),
                             eager_extract: false,
+                            source: None,
                         }
                     ],
                     boot: Boot {

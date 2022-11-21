@@ -29,7 +29,7 @@ use crate::config::Config;
 pub use crate::config::Jump;
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
-pub use crate::lift::{load_lift, File, Lift, ScieBoot};
+pub use crate::lift::{load_lift, File, Lift, ScieBoot, Source};
 pub use crate::process::{execute, EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
 

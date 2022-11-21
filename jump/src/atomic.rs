@@ -47,6 +47,19 @@ impl Target {
     }
 }
 
+fn clean(path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    if path.is_dir() {
+        std::fs::remove_dir(path)
+    } else {
+        std::fs::remove_file(path)
+    }
+    .map_err(|e| format!("Failed to remove path {path}: {e}", path = path.display()))
+}
+
 /// Executes work to create the `target` path exactly once across threads and processes.
 ///
 /// If the `target_type` is `Target::Directory` and the `target` directory has not yet been created,
@@ -54,13 +67,13 @@ impl Target {
 /// renamed atomically to the `target` directory path. If the `target_type` is `Target::File` and
 /// the `target` file has not been created, then `work` is handed the path of a work file to create.
 /// That work file will not exist, but its parent directories will have been already created.
-pub(crate) fn atomic_path<E: Display, F>(
+pub(crate) fn atomic_path<E: Display, T, F>(
     target: &Path,
     target_type: Target,
     work: F,
-) -> Result<(), String>
+) -> Result<Option<T>, String>
 where
-    F: FnOnce(&Path) -> Result<(), E>,
+    F: FnOnce(&Path) -> Result<T, E>,
 {
     // We use an atomic rename under a double-checked exclusive write lock to implement an atomic
     // path creation.
@@ -71,7 +84,7 @@ where
             "The atomic {target_type} at {path} has already been established.",
             path = target.display()
         );
-        return Ok(());
+        return Ok(None);
     }
 
     // Lock.
@@ -111,19 +124,27 @@ where
             (lost double-check race).",
             path = target.display()
         );
-        return Ok(());
+        return Ok(None);
     }
 
     // Act.
+
+    // N.B.: Prior work may have been terminated in ways outside the Rust runtime control (panic
+    // handling not installed, signals of various sorts); so, with the lock in hand, we clean up any
+    // stray work path before proceeding. Since we need to do this up front anyway, we do not attach
+    // cleanup to the work error path.
+    clean(&work_path)?;
+
     if Target::Directory == target_type {
         std::fs::create_dir(&work_path).map_err(|e| {
             format!(
                 "Failed to prepare workdir {work_dir}: {e}",
                 work_dir = work_path.display()
             )
-        })?;
+        })?
     }
-    work(&work_path).map_err(|e| {
+
+    let result = work(&work_path).map_err(|e| {
         format!(
             "Failed to establish atomic directory {target_dir}. Population of work directory \
             failed: {e}",
@@ -136,5 +157,6 @@ where
             failed: {e}",
             target_dir = target.display()
         )
-    })
+    })?;
+    Ok(Some(result))
 }

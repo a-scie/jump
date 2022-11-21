@@ -15,7 +15,7 @@ use crate::config::{Cmd, Fmt};
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder};
 use crate::process::{EnvVar, Process};
-use crate::{config, EnvVars, Jump};
+use crate::{config, EnvVars, Jump, Source};
 
 fn expanduser(path: &Path) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(path)
@@ -57,6 +57,7 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
 pub(crate) enum FileEntry {
     Skip(usize),
     Install((File, PathBuf)),
+    LoadAndInstall((Process, File, PathBuf)),
     ScieTote((File, Vec<(File, PathBuf)>)),
 }
 
@@ -67,7 +68,7 @@ pub(crate) struct Binding {
 }
 
 impl Binding {
-    pub(crate) fn execute(self) -> Result<(), String> {
+    pub(crate) fn execute(self) -> Result<Option<()>, String> {
         atomic_path(&self.target.clone(), Target::File, |lock| {
             trace!("Installing boot binding {binding:#?}", binding = &self);
             match self.process.execute() {
@@ -154,6 +155,24 @@ impl<'a> Context<'a> {
     fn prepare(&mut self, cmd: &'a Cmd) -> Result<(Process, Vec<Binding>, Vec<FileEntry>), String> {
         let process = self.prepare_process(cmd)?;
 
+        let mut load_entries = vec![];
+        for file in &self.lift.files {
+            if let Source::LoadBinding(binding_name) = &file.source {
+                let path = self.get_path(file);
+                load_entries.push(FileEntry::LoadAndInstall((
+                    self.prepare_process(
+                        self.lift
+                            .boot
+                            .bindings
+                            .get(binding_name)
+                            .ok_or_else(|| format!("No boot binding named {binding_name}."))?,
+                    )?,
+                    file.clone(),
+                    path,
+                )))
+            }
+        }
+
         let mut scie_tote = vec![];
         let mut file_entries = vec![];
         for (index, file) in self.lift.files.iter().enumerate() {
@@ -161,7 +180,7 @@ impl<'a> Context<'a> {
                 let path = self.get_path(file);
                 if file.size == 0 {
                     scie_tote.push((file.clone(), path));
-                } else {
+                } else if Source::Scie == file.source {
                     file_entries.push(FileEntry::Install((file.clone(), path)));
                 }
             } else if index < self.lift.files.len() - 1 || scie_tote.is_empty() {
@@ -176,13 +195,17 @@ impl<'a> Context<'a> {
                 .ok_or_else(|| {
                     format!(
                         "The lift manifest contains scie-tote entries (0 size) but no scie-tote \
-                    holder:\n{files:#?}",
+                        holder:\n{files:#?}",
                         files = self.lift.files
                     )
                 })?
                 .clone();
             file_entries.push(FileEntry::ScieTote((tote_file, scie_tote)));
         }
+
+        // Load external files last since these may need files in the scie itself to 1st be
+        // extracted for use in the load process.
+        file_entries.append(&mut load_entries);
 
         Ok((
             process,
@@ -327,6 +350,5 @@ pub(crate) fn select_command(
     lift: &Lift,
 ) -> Result<Option<SelectedCmd>, String> {
     let mut context = Context::new(scie, jump, lift)?;
-    context.record_lift_manifest()?;
     context.select_command()
 }
