@@ -22,6 +22,7 @@ pub struct File {
     pub size: usize,
     pub hash: String,
     pub file_type: FileType,
+    pub executable: Option<bool>,
     pub eager_extract: bool,
     pub source: Source,
 }
@@ -37,6 +38,7 @@ impl From<File> for crate::config::File {
             },
             hash: Some(value.hash),
             file_type: Some(value.file_type),
+            executable: value.executable,
             eager_extract: value.eager_extract,
             source: match value.source {
                 Source::Scie => None,
@@ -128,6 +130,23 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
     ))
 }
 
+#[cfg(not(target_family = "unix"))]
+fn is_executable(_path: &Path) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(target_family = "unix")]
+fn is_executable(path: &Path) -> Result<bool, String> {
+    use std::os::unix::fs::PermissionsExt;
+    let metadata = path.metadata().map_err(|e| {
+        format!(
+            "Failed to read metadata for {path}: {e}",
+            path = path.display()
+        )
+    })?;
+    Ok(metadata.permissions().mode() & 0o111 != 0)
+}
+
 #[time("debug")]
 fn assemble(
     resolve_base: &Path,
@@ -169,12 +188,21 @@ fn assemble(
             }
         };
 
+        let executable = if let Some(executable) = file.executable {
+            Some(executable)
+        } else if reconstitute && path.is_file() && is_executable(&path)? {
+            Some(true)
+        } else {
+            None
+        };
+
         files.push(File {
             name: file.name,
             key: file.key,
             size,
             hash,
             file_type,
+            executable,
             eager_extract: file.eager_extract,
             source: match file.source {
                 None => Source::Scie,

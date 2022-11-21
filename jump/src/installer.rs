@@ -1,7 +1,7 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::fs::OpenOptions;
+use std::fs::{OpenOptions, Permissions};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
 
@@ -95,8 +95,20 @@ where
     })
 }
 
+#[cfg(not(target_family = "unix"))]
+fn executable_permissions() -> Option<Permissions> {
+    None
+}
+
+#[cfg(target_family = "unix")]
+fn executable_permissions() -> Option<Permissions> {
+    use std::os::unix::fs::PermissionsExt;
+    Some(Permissions::from_mode(0o755))
+}
+
 #[time("debug")]
 fn unpack_blob<R: Read + Seek, T, F>(
+    executable: bool,
     bytes_source: F,
     expected_hash: &str,
     dst: &Path,
@@ -117,6 +129,16 @@ where
                     blob_dst = blob_dst.display()
                 )
             })?;
+        if executable {
+            if let Some(permissions) = executable_permissions() {
+                blob_out.set_permissions(permissions).map_err(|e| {
+                    format!(
+                        "Failed to set executable premissions on {dst}: {e}",
+                        dst = dst.display()
+                    )
+                })?;
+            }
+        }
         std::io::copy(&mut hashed_bytes, &mut blob_out)
             .map(|_| ())
             .map_err(|e| format!("Failed to unpack blob to {dst}: {e}", dst = dst.display()))?;
@@ -126,6 +148,7 @@ where
 
 fn unpack<R: Read + Seek, T, F>(
     file_type: FileType,
+    executable: bool,
     bytes: F,
     expected_hash: &str,
     dst: &Path,
@@ -135,7 +158,7 @@ where
 {
     match file_type {
         FileType::Archive(archive_type) => unpack_archive(archive_type, bytes, expected_hash, dst),
-        FileType::Blob => unpack_blob(bytes, expected_hash, dst),
+        FileType::Blob => unpack_blob(executable, bytes, expected_hash, dst),
         FileType::Directory => unpack_archive(ArchiveType::Zip, bytes, expected_hash, dst),
     }
 }
@@ -154,6 +177,7 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                     let bytes = &payload[location..(location + file.size)];
                     unpack(
                         file.file_type,
+                        file.executable.unwrap_or(false),
                         || Ok((Cursor::new(bytes), ())),
                         file.hash.as_str(),
                         dst,
@@ -188,9 +212,13 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                     })?;
                     Ok((buffer, child))
                 };
-                if let Some(mut child) =
-                    unpack(file.file_type, buffer_source, file.hash.as_str(), dst)?
-                {
+                if let Some(mut child) = unpack(
+                    file.file_type,
+                    file.executable.unwrap_or(false),
+                    buffer_source,
+                    file.hash.as_str(),
+                    dst,
+                )? {
                     let exit_status = child.wait().map_err(|e| {
                         format!(
                             "Failed to await termination of {binding:?} when loading {file:?}: {e}"
@@ -212,6 +240,7 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                 let bytes = &payload[location..(location + tote_file.size)];
                 unpack(
                     tote_file.file_type,
+                    tote_file.executable.unwrap_or(false),
                     || Ok((Cursor::new(bytes), ())),
                     tote_file.hash.as_str(),
                     &scie_tote_path,
@@ -225,30 +254,15 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                                 src = src_path.display()
                             )
                         })?;
-                        let permissions = file
-                            .metadata()
-                            .map_err(|e| {
-                                format!(
-                                    "Failed to read permissions of {src_path}: {e}",
-                                    src_path = src_path.display()
-                                )
-                            })?
-                            .permissions();
-                        Ok((file, permissions))
+                        Ok((file, ()))
                     };
-                    if let Some(permissions) =
-                        unpack(file.file_type, scie_tote_src, file.hash.as_str(), dst)?
-                    {
-                        // We let archives handle their internally stored permission bits.
-                        if file.file_type == FileType::Blob {
-                            std::fs::set_permissions(dst, permissions).map_err(|e| {
-                                format!(
-                                    "Failed to set permissions of {dst}: {e}",
-                                    dst = dst.display()
-                                )
-                            })?;
-                        }
-                    }
+                    unpack(
+                        file.file_type,
+                        file.executable.unwrap_or(false),
+                        scie_tote_src,
+                        file.hash.as_str(),
+                        dst,
+                    )?;
                 }
                 tote_file.size
             }
