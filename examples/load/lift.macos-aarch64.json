@@ -13,7 +13,7 @@
           "size": 1724250,
           "hash": "212ee64546eb8b5074572fed4107d850eb90bc462aa3099c0ac8ea63fdca7811",
           "type": "blob",
-          "source": "curl"
+          "source": "get"
         },
         {
           "name": "openjdk-19.0.1_macos-aarch64_bin.tar.gz",
@@ -21,7 +21,7 @@
           "size": 190630653,
           "hash": "915054b18fc17216410cea7aba2321c55b82bd414e1ef3c7e1bafc7beb6856c8",
           "type": "tar.gz",
-          "source": "curl"
+          "source": "get"
         }
       ],
       "boot": {
@@ -39,7 +39,7 @@
           }
         },
         "bindings": {
-          "curl": {
+          "get": {
             "exe": "{get.sh}",
             "args": [
               "{scie.lift}"
