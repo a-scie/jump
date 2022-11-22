@@ -55,6 +55,7 @@ jobs:
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
         run: cargo run --release -p package dist
       - name: Setup Python
+        if: ${{ matrix.os != 'macos-13-aarch64' }}
         uses: actions/setup-python@v4
         with:
           python-version: 3.11

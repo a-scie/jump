@@ -46,7 +46,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
-      - name: Run Unit Tests
+      - name: Check Tools
         uses: pantsbuild/actions/run-tox@v1
         with:
           tox-env: fmt-check,check
