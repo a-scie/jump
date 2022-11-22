@@ -82,6 +82,13 @@ jobs:
         id: prepare-changelog
         run: |
           CHANGELOG="$(tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})"
+
+          # GITHUB_OUTPUT elements can only be single line. We work around this.
+          # See: https://github.com/orgs/community/discussions/26288#discussioncomment-3251220
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+
           echo "changelog=${CHANGELOG}" >> $GITHUB_OUTPUT
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v1
