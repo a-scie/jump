@@ -6,8 +6,11 @@ target/
 *.iml
 *.ipr
 
-# Integration Test output.
+# Integration test output.
 dist/
 
 # Tox tool environments.
 /.tox/
+
+# Changelog snippets.
+/.changelog-snippet

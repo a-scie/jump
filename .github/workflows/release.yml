@@ -79,17 +79,12 @@ jobs:
           python -mpip install -U pip
           python -mpip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
       - name: Prepare Changelog
-        id: prepare-changelog
         run: |
-          CHANGELOG="$(tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})"
+          cat <<EOF > .changelog-snippet
+          ---
 
-          # GITHUB_OUTPUT elements can only be single line. We work around this.
-          # See: https://github.com/orgs/community/discussions/26288#discussioncomment-3251220
-          CHANGELOG="${CHANGELOG//'%'/'%25'}"
-          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
-          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
-
-          echo "changelog=${CHANGELOG}" >> $GITHUB_OUTPUT
+          $(tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})
+          EOF
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v1
         env:
@@ -97,10 +92,7 @@ jobs:
         with:
           tag_name: ${{ needs.determine-tag.outputs.release-tag }}
           name: scie-jump ${{ needs.determine-tag.outputs.release-version }}
-          body: |
-            ---
-
-            ${{ steps.prepare-changelog.outputs.changelog }}
+          body_path: .changelog-snippet
           draft: false
           prerelease: false
           files: dist/scie-jump*
