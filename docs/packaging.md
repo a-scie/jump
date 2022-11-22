@@ -125,7 +125,14 @@ tar or any of the various forms of compressed tarballs (`tar.gz`, `tar.zst`, etc
 be extracted and unpacked at boot time. Any other file is treated as a blob and is only extracted at
 boot time; no unpacking is performed. In the example above we accept the defaults; so the JDK
 tarball is extracted and unpacked at runtime and the jar, although unpackable since jars are zips,
-is treated as a blob and extracted as a single file at runtime.
+is treated as a blob and extracted as a single file at runtime. You can also set a "source" field to
+have a file be materialized by a binding command (see below for more details on binding commands)
+instead of being stored and materialized from within the scie directly. When a "source" is specified
+it should take the value of a binding command name and the corresponding binding command should
+accept a file "name" as an argument and produce the corresponding file's bytes on stdout. Any file
+with a source field set like this will not be packed by the boot pack; so it should have all fields
+specified including "size", "hash" and "type". It will be materialized just in time when 1st needed
+at runtime by executing the source binding command.
 
 For commands, you can specify additional command line "args" to always pass to the "exe" as well as
 environment variables to set in the ambient runtime environment via the "env" object. An environment
