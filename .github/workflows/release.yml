@@ -79,6 +79,7 @@ jobs:
           python -mpip install -U pip
           python -mpip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
       - name: Prepare Changelog
+        shell: bash
         run: |
           cat <<EOF > .changelog-snippet
           ---
