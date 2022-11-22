@@ -9,6 +9,9 @@ target/
 # Integration test output.
 dist/
 
+# Venvs
+*.venv/
+
 # Tox tool environments.
 /.tox/
 

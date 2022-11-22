@@ -1,14 +1,6 @@
 # Release Notes
 
-## 0.3.5
-
-This release brings support for files with sources other than the scie itself. This allows for
-shipping skinny skis that later materialize certain files from the internet or elsewhere just when
-needed at runtime.
-
-N.B.: This is effectively a re-release of 0.3.4 with fixes to the automated release process.
-
-## 0.3.4
+## 0.3.6
 
 This release brings support for files with sources other than the scie itself. This allows for
 shipping skinny skis that later materialize certain files from the internet or elsewhere just when

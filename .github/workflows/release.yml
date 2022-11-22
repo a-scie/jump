@@ -74,13 +74,13 @@ jobs:
           tox_min_version = cp.get("tox", "minversion")
           with open(os.environ["GITHUB_OUTPUT"], "a") as gh_output_fp:
               print("tox-min-version={}".format(tox_min_version), file=gh_output_fp)
-      - name: Install Tox
-        run: |
-          python -mpip install -U pip
-          python -mpip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
       - name: Prepare Changelog
         shell: bash
         run: |
+          python -mvenv .tox.venv
+          source .tox.venv/bin/activate
+          pip install -U pip
+          pip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
           cat <<EOF > .changelog-snippet
           ---
 
