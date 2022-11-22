@@ -78,13 +78,18 @@ jobs:
         shell: bash
         run: |
           python -mvenv .tox.venv
-          .tox.venv/bin/python -mpip install -U pip
-          .tox.venv/bin/pip install \
-              'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
+          if [[ "$(uname -s)" =~ _NT ]]; then
+            # Git bash reports something like: MINGW64_NT-10.0-22621
+            source .tox.venv/Scripts/activate
+          else
+            source .tox.venv/bin/activate
+          fi
+          python -mpip install -U pip
+          pip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
           cat <<EOF > .changelog-snippet
           ---
 
-          $(.tox.venv/bin/tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})
+          $(tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})
           EOF
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v1
