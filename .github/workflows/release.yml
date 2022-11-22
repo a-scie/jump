@@ -78,13 +78,13 @@ jobs:
         shell: bash
         run: |
           python -mvenv .tox.venv
-          source .tox.venv/bin/activate
-          pip install -U pip
-          pip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
+          .tox.venv/bin/python -mpip install -U pip
+          .tox.venv/bin/pip install \
+              'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
           cat <<EOF > .changelog-snippet
           ---
 
-          $(tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})
+          $(.tox.venv/bin/tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})
           EOF
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v1
