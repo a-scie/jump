@@ -9,3 +9,5 @@ target/
 # Integration Test output.
 dist/
 
+# Tox tool environments.
+/.tox/

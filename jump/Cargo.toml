@@ -1,6 +1,6 @@
 [package]
 name = "jump"
-version = "0.2.1"
+version = "0.3.0"
 description = "The bulk of the scie-jump binary logic."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
