@@ -54,43 +54,13 @@ jobs:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
         run: cargo run --release -p package dist
-      - name: Setup Python
-        if: ${{ matrix.os != 'macos-13-aarch64' }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-      - name: Calculate Tox Version
-        id: calculate-tox-version
-        shell: python
-        run: |
-          from __future__ import print_function
-          import os
-          try:
-              from ConfigParser import ConfigParser
-          except ImportError:
-              from configparser import ConfigParser
-          cp = ConfigParser()
-          cp.read("tox.ini")
-          tox_min_version = cp.get("tox", "minversion")
-          with open(os.environ["GITHUB_OUTPUT"], "a") as gh_output_fp:
-              print("tox-min-version={}".format(tox_min_version), file=gh_output_fp)
       - name: Prepare Changelog
-        shell: bash
-        run: |
-          python -mvenv .tox.venv
-          if [[ "$(uname -s)" =~ _NT ]]; then
-            # Git bash reports something like: MINGW64_NT-10.0-22621
-            source .tox.venv/Scripts/activate
-          else
-            source .tox.venv/bin/activate
-          fi
-          python -mpip install -U pip
-          pip install 'tox==${{ steps.calculate-tox-version.outputs.tox-min-version }}'
-          cat <<EOF > .changelog-snippet
-          ---
-
-          $(tox -echangelog -qq -- ${{ needs.determine-tag.outputs.release-version }})
-          EOF
+        id: prepare-changelog
+        uses: a-scie/actions/changelog@v1.3
+        with:
+          changelog-file: ${{ github.workspace }}/CHANGES.md
+          version: ${{ needs.determine-tag.outputs.release-version }}
+          setup-python: ${{ matrix.os != 'macos-13-aarch64' }}
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v1
         env:
@@ -98,7 +68,7 @@ jobs:
         with:
           tag_name: ${{ needs.determine-tag.outputs.release-tag }}
           name: scie-jump ${{ needs.determine-tag.outputs.release-version }}
-          body_path: .changelog-snippet
+          body_path: ${{ steps.prepare-changelog.outputs.changelog-file }}
           draft: false
           prerelease: false
           files: dist/scie-jump*

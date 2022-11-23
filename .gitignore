@@ -9,11 +9,3 @@ target/
 # Integration test output.
 dist/
 
-# Venvs
-*.venv/
-
-# Tox tool environments.
-/.tox/
-
-# Changelog snippets.
-/.changelog-snippet
