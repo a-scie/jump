@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::env;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
@@ -200,7 +200,7 @@ fn pack(
             .finish()
             .map_err(|e| format!("Failed to finalize the scie-tote zip: {e}"))?;
 
-        tote.zip_file.seek(SeekFrom::Start(0)).map_err(|e| {
+        tote.zip_file.rewind().map_err(|e| {
             format!(
                 "Failed to re-wind the scie-tote file to make a second pass calculation of \
                     its hash: {e}"
@@ -219,7 +219,7 @@ fn pack(
         };
 
         tote.zip_file
-            .seek(SeekFrom::Start(0))
+            .rewind()
             .map_err(|e| format!("{e}"))?;
         std::io::copy(&mut tote.zip_file, &mut binary).map_err(|e| {
             format!(

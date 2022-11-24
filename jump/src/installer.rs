@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fs::{OpenOptions, Permissions};
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
 use logging_timer::time;
@@ -27,7 +27,7 @@ fn check_hash<R: Read + Seek>(
     } else {
         // TODO(John Sirois): Hash in-line with extraction.
         bytes
-            .seek(SeekFrom::Start(0))
+            .rewind()
             .map_err(|e| format!("Failed to re-wind {file_type} after hashing: {e}"))?;
         debug!(
             "The {file_type} destination {dst} of size {size} had expected hash",
@@ -204,7 +204,7 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                     })?;
                     std::io::copy(&mut stdout, &mut buffer)
                         .map_err(|e| format!("Failed to load {file:?} via {binding:?}: {e}"))?;
-                    buffer.seek(SeekFrom::Start(0)).map_err(|e| {
+                    buffer.rewind().map_err(|e| {
                         format!(
                             "Failed to re-wind temp file for reading {file:?} loaded by \
                             {binding:?}: {e}"
