@@ -218,9 +218,7 @@ fn pack(
             source: Source::Scie,
         };
 
-        tote.zip_file
-            .rewind()
-            .map_err(|e| format!("{e}"))?;
+        tote.zip_file.rewind().map_err(|e| format!("{e}"))?;
         std::io::copy(&mut tote.zip_file, &mut binary).map_err(|e| {
             format!(
                 "Failed to append {tote_file:?} to {binary}: {e}",
