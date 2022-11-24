@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Noop
         run: "true"
-  rust-ci:
+  ci:
     name: (${{ matrix.os }}) CI
     needs: org-check
     runs-on: ${{ matrix.os }}
@@ -36,17 +36,3 @@ jobs:
         run: cargo run --release -p package dist
       - name: Integration Tests
         run: examples/run.sh
-  tools-ci:
-    name: Tools Checks
-    needs: org-check
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-      - name: Check Tools
-        uses: pantsbuild/actions/run-tox@v1
-        with:
-          tox-env: fmt-check,check
