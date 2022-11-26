@@ -5,7 +5,7 @@ members = [
 
 [package]
 name = "scie-jump"
-version = "0.3.8"
+version = "0.3.9"
 description = "The self contained interpreted executable launcher."
 authors = [
   "John Sirois <john.sirois@gmail.com>",
