@@ -42,7 +42,7 @@
           "get": {
             "exe": "{get.sh}",
             "args": [
-              "{scie.lift}"
+              "{scie.env.GET_CONFIG={scie.lift}}"
             ]
           }
         }

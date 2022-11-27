@@ -320,8 +320,14 @@ scie. Either way though, since the scie is powered by a `scie-jump` in its tip, 
 
 Further placeholders you can use in command "exe", "args" and "env" values include:
 
-+ `{scie.env.<env var name>}`: This expands to the value of the env var named. If the env var is not
-  in the ambient runtime environment, it expands to the empty string ("").
++ `{scie.env.<env var name>[=<default env var value>]}`: This expands to the value of the env var
+  named. If the env var is not in the ambient runtime environment and no default env var value is
+  specified it expands to the empty string (""). If a default env var value is specified, it is
+  used. The default env var value specified can itself be a placeholder, in which case that is
+  expanded (recursively) to obtain the default value. For example,
+  `{scie.env.FOO={scie.env.BAR=42}}` would evaluate to "bar" if the "FOO" env var was not set but
+  the "BAR" env var was set to "bar" and it would evaluate to "42" if neither the "FOO" nor "BAR"
+  env vars were set.
 + `{scie.lift}`: This expands to the path to the lift manifest, which is extracted to disk when you
   use this placeholder. This can be used to read custom metadata stored in the lift manifest.
 

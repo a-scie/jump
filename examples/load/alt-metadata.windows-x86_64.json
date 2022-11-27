@@ -1,0 +1,6 @@
+{
+  "get": {
+    "openjdk-19.0.1_macos-x64_bin.tar.gz": "https://download.java.net/java/GA/jdk19.0.1/afdd2e245b014143b62ccb916125e3ce/10/GPL/openjdk-19.0.1_macos-x64_bin.tar.gz",
+    "cowsay-1.1.0.jar": "https://repo1.maven.org/maven2/com/github/ricksbrown/cowsay/1.1.0/cowsay-1.1.0.jar"
+  }
+}

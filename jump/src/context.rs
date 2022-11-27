@@ -303,8 +303,18 @@ impl<'a> Context<'a> {
                     reified.push_str(path_to_str(&path)?);
                     self.replacements.insert(file);
                 }
-                Item::Placeholder(Placeholder::Env(name)) => {
-                    let env_var = env::var_os(name).unwrap_or_else(|| "".into());
+                Item::Placeholder(Placeholder::Env(text)) => {
+                    let parsed_env = self.reify_string(text)?;
+                    let (name, default) = match parsed_env.splitn(2, '=').collect::<Vec<_>>()[..] {
+                        [name] => (name, ""),
+                        [name, default] => (name, default),
+                        _ => return Err(
+                            "Expected {{scie.env.<name>}} <name> placeholder to be a non-empty \
+                            string"
+                                .to_string(),
+                        ),
+                    };
+                    let env_var = env::var_os(name).unwrap_or_else(|| default.into());
                     let value = env_var.into_string().map_err(|value| {
                         format!("Failed to decode env var {name} as utf-8 value: {value:?}")
                     })?;
@@ -351,4 +361,113 @@ pub(crate) fn select_command(
 ) -> Result<Option<SelectedCmd>, String> {
     let mut context = Context::new(scie, jump, lift)?;
     context.select_command()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::Context;
+    use crate::config::{Boot, FileType};
+    use crate::{File, Jump, Lift, Source};
+
+    #[test]
+    fn env() {
+        let jump = Jump {
+            size: 42,
+            version: "0.1.0".to_string(),
+        };
+        let tempdir = tempfile::tempdir().unwrap();
+        let lift = Lift {
+            name: "test".to_string(),
+            description: None,
+            base: tempdir.path().to_path_buf(),
+            size: 137,
+            hash: "abc".to_string(),
+            boot: Boot {
+                commands: Default::default(),
+                bindings: Default::default(),
+            },
+            files: vec![File {
+                name: "file".to_string(),
+                key: None,
+                size: 37,
+                hash: "def".to_string(),
+                file_type: FileType::Blob,
+                executable: None,
+                eager_extract: false,
+                source: Source::Scie,
+            }],
+            other: None,
+        };
+        let mut context = Context::new(Path::new("scie_path"), &jump, &lift).unwrap();
+
+        assert!(std::env::var_os("__DNE__").is_none());
+        assert_eq!(
+            "",
+            context.reify_string("{scie.env.__DNE__}").unwrap().as_str()
+        );
+        assert_eq!(
+            "default",
+            context
+                .reify_string("{scie.env.__DNE__=default}")
+                .unwrap()
+                .as_str()
+        );
+
+        std::env::set_var("__DNE__", "foo");
+        assert_eq!(
+            "foo",
+            context
+                .reify_string("{scie.env.__DNE__=default}")
+                .unwrap()
+                .as_str()
+        );
+        std::env::remove_var("__DNE__");
+
+        assert_eq!(
+            "scie_path",
+            context
+                .reify_string("{scie.env.__DNE__={scie}}")
+                .unwrap()
+                .as_str()
+        );
+        assert_eq!(
+            tempdir
+                .path()
+                .join("abc")
+                .join("lift.json")
+                .to_str()
+                .unwrap(),
+            context
+                .reify_string("{scie.env.__DNE__={scie.lift}}")
+                .unwrap()
+                .as_str()
+        );
+        assert_eq!(
+            tempdir.path().join("def").join("file").to_str().unwrap(),
+            context
+                .reify_string("{scie.env.__DNE__={file}}")
+                .unwrap()
+                .as_str()
+        );
+
+        assert!(std::env::var_os("__DNE2__").is_none());
+        assert_eq!(
+            "42",
+            context
+                .reify_string("{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .unwrap()
+                .as_str()
+        );
+        std::env::set_var("__DNE2__", "bar");
+        assert_eq!(
+            "bar",
+            context
+                .reify_string("{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .unwrap()
+                .as_str()
+        );
+        std::env::remove_var("__DNE2__");
+    }
 }

@@ -43,7 +43,7 @@
             "exe": "C:\\Program Files\\Git\\usr\\bin\\bash",
             "args": [
               "{get.sh}",
-              "{scie.lift}"
+              "{scie.env.GET_CONFIG={scie.lift}}"
             ]
           }
         }
