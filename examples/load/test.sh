@@ -27,7 +27,7 @@ GET_LOG_CONFIG="$(mktemp)"
 gc "${GET_LOG_CONFIG}"
 export GET_LOG_CONFIG
 
-export GET_CONFIG="alt-metadata.${OS_ARCH}.json"
+export GET_CONFIG="alt-metadata.json"
 ./cowsay "Alt Curl!"
 
 grep "${GET_CONFIG}" "${GET_LOG_CONFIG}"
