@@ -1,7 +1,10 @@
-# The various archive types fetched via `prepare` for the examples.
+# The various archive types fetched for the examples.
 *.jar
 *.pex
 *.tar.gz
 *.tar.xz
 *.zip
+
+# The ptex binary fetched for some examples.
+ptex-*
 

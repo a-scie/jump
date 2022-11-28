@@ -6,6 +6,7 @@ use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
 use logging_timer::time;
+use tempfile::TempDir;
 
 use crate::atomic::{atomic_path, Target};
 use crate::config::{ArchiveType, Compression, FileType};
@@ -231,22 +232,33 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                 0
             }
             FileEntry::ScieTote((tote_file, entries)) => {
-                let scie_tote_tmpdir = tempfile::TempDir::new().map_err(|e| {
-                    format!(
-                        "Failed to create a temporary directory to extract the scie-tote to: {e}"
-                    )
-                })?;
-                let scie_tote_path = scie_tote_tmpdir.path().join(&tote_file.name);
-                let bytes = &payload[location..(location + tote_file.size)];
-                unpack(
-                    tote_file.file_type,
-                    tote_file.executable.unwrap_or(false),
-                    || Ok((Cursor::new(bytes), ())),
-                    tote_file.hash.as_str(),
-                    &scie_tote_path,
-                )?;
+                let mut scie_tote: Option<TempDir> = None;
+                let mut scie_tote_src = || {
+                    if let Some(tempdir) = scie_tote.as_ref() {
+                        return Ok::<_, String>(tempdir.path().join(&tote_file.name));
+                    }
+                    let scie_tote_tmpdir = TempDir::new().map_err(|e| {
+                        format!(
+                            "Failed to create a temporary directory to extract the scie-tote to: \
+                            {e}"
+                        )
+                    })?;
+                    let path = scie_tote_tmpdir.path().join(&tote_file.name);
+                    let bytes = &payload[location..(location + tote_file.size)];
+                    unpack(
+                        tote_file.file_type,
+                        tote_file.executable.unwrap_or(false),
+                        || Ok((Cursor::new(bytes), ())),
+                        tote_file.hash.as_str(),
+                        &path,
+                    )?;
+                    scie_tote = Some(scie_tote_tmpdir);
+                    Ok(path)
+                };
+
                 for (file, dst) in entries {
-                    let scie_tote_src = || {
+                    let file_src = || {
+                        let scie_tote_path = scie_tote_src()?;
                         let src_path = scie_tote_path.join(&file.name);
                         let file = std::fs::File::open(&src_path).map_err(|e| {
                             format!(
@@ -259,7 +271,7 @@ pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String>
                     unpack(
                         file.file_type,
                         file.executable.unwrap_or(false),
-                        scie_tote_src,
+                        file_src,
                         file.hash.as_str(),
                         dst,
                     )?;

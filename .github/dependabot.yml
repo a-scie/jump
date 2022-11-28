@@ -1,0 +1,17 @@
+# Documentation for all configuration options is here:
+#   https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "cargo"
+    directory: "/jump"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "cargo"
+    directory: "/package"
+    schedule:
+      interval: "weekly"
