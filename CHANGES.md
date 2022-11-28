@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.4.0
+
+This release beings support for `{scie.env.*}` defaults which allows for ptex'ed scies that opt
+in to having file urls over-ridden behind corporate firewalls as the motivating use case.
+
 ## 0.3.9
 
 This release fixes a bug that caused the scie-tote in scies using one to always be extracted and
