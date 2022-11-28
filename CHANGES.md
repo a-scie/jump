@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.3.9
+
+This release fixes a bug that caused the scie-tote in scies using one to always be extracted and
+thus impact startup latency on warm runs.
+
 ## 0.3.8
 
 This release brings support for files with sources other than the scie itself. This allows for
