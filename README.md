@@ -64,8 +64,10 @@ re-executes itself using that command. In general, the command will run an inter
 contained in one of the files it extracts (say a CPython distribution) against another set of
 interpreted files it extracts (say `.py` files). As such, a `scie-jump` is the launcher stub for a
 self-contained interpreted executable. It extracts the needed files into a base directory that is
-traditionally located at `~/.nce`. This is where the self-contained interpreted executable is
-transformed by the `scie-jump` into a non-compact executable.
+traditionally located in the local user cache subdirectory `nce` (`~/.cache/nce` on Linux,
+`~/Library/Caches/nce` on macOS and `~\AppData\Local\nce` on Windows). This is where the
+self-contained interpreted executable is transformed by the `scie-jump` into a non-compact
+executable.
 
 ## Format
 

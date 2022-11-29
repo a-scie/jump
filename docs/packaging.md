@@ -102,10 +102,10 @@ In the "lift" manifest, there are 3 required fields:
    command and have done that so that it runs by default (More on adding more commands and selecting
    them at runtime below). Each command object requires an "exe" that is the path of the executable
    to run. Since your scie will be packaged as a single file executable, it will need to unpack the
-   files you have added to it on first boot. By default, it will do this in the `~/.nce` directory
-   of the user running the scie, but your command should insulate itself from the details of exactly
-   where things are unpacked by using placeholders. Placeholders come in a few varieties, but the
-   most common is a file placeholder. This is just the name of a file in the "files" section
+   files you have added to it on first boot. By default, it will do this in the `nce` cache
+   directory of the user running the scie, but your command should insulate itself from the details
+   of exactly where things are unpacked by using placeholders. Placeholders come in a few varieties,
+   but the most common is a file placeholder. This is just the name of a file in the "files" section
    surrounded by brackets, e.g.: `{amazon-corretto-11.0.17.8.1-linux-x64.tar.gz}`. That placeholder
    will be expanded to the full path of the unpacked tarball on the local system when the command
    runs. If the name is a bit unwieldy, as it is in this case, you can add a "key" field to the file
@@ -146,13 +146,13 @@ user of the scie. Instead, they serve the role of performing 1-time installation
 requested by other commands that rely upon them via a `{scie.bindings.<binding command name>}`
 placeholder. The named binding command will be run (successfully) exactly once as tracked by a lock
 file maintained by the scie jump. The binding command will generally want to use the
-`{scie.bindings}` to request the path of a directory (housed in the `~/.nce` and namespaced by the
-lift manifest hash) set aside for that scie alone. The binding command is guaranteed it will be the
-only command operating against that directory when it is invoked.
+`{scie.bindings}` to request the path of a directory (housed in the `nce` cache and namespaced by
+the lift manifest hash) set aside for that scie alone. The binding command is guaranteed it will be
+the only command operating against that directory when it is invoked.
 
-N.B.: Since the scie-jump only maintains cooperative control over the contents of the `~/.nce`, care
-should be taken when designing boot binding commands. If the scie is run in a Docker container build
-step, you have a wider guaranty of non-interference. If the scie is run in an open environment
+N.B.: Since the scie-jump only maintains cooperative control over the contents of the `nce` cache,
+care should be taken when designing boot binding commands. If the scie is run in a Docker container
+build step, you have a wider guaranty of non-interference. If the scie is run in an open environment
 though, you may need to account for conflicting processes running in parallel to your binding
 command and invalidating its work or assumptions about the state of the wider filesystem.
 
@@ -215,7 +215,7 @@ And you can also inspect the lift manifest with basic tools since the boot-pack 
 `--single-lift-line` by default:
 ```
 $ tail -1 coursier
-{"scie":{"lift":{"name":"coursier","base":"~/.nce","files":[{"name":"amazon-corretto-11.0.17.8.1-linux-x64.tar.gz","key":"jdk","size":194998805,"hash":"9628b1c1ec298a6e0f277afe383b342580086cfd7eee2be567b8d00529ca9449","type":"tar.gz"},{"name":"coursier.jar","size":42284054,"hash":"a1799d6418fbcbad47ac9e388affc751b4fc2d8678f89c332df9592d2dd3a202","type":"blob"}],"boot":{"commands":{"":{"exe":"{jdk}/amazon-corretto-11.0.17.8.1-linux-x64/bin/java","args":["-jar","{coursier.jar}"],"env":{"=JAVA_HOME":"{jdk}/amazon-corretto-11.0.17.8.1-linux-x64","=PATH":"{jdk}/amazon-corretto-11.0.17.8.1-linux-x64/bin:{scie.env.PATH}"}}}}},"jump":{"size":1557952,"version":"0.1.10"}}}
+{"scie":{"lift":{"name":"coursier","files":[{"name":"amazon-corretto-11.0.17.8.1-linux-x64.tar.gz","key":"jdk","size":194998805,"hash":"9628b1c1ec298a6e0f277afe383b342580086cfd7eee2be567b8d00529ca9449","type":"tar.gz"},{"name":"coursier.jar","size":42284054,"hash":"a1799d6418fbcbad47ac9e388affc751b4fc2d8678f89c332df9592d2dd3a202","type":"blob"}],"boot":{"commands":{"":{"exe":"{jdk}/amazon-corretto-11.0.17.8.1-linux-x64/bin/java","args":["-jar","{coursier.jar}"],"env":{"=JAVA_HOME":"{jdk}/amazon-corretto-11.0.17.8.1-linux-x64","=PATH":"{jdk}/amazon-corretto-11.0.17.8.1-linux-x64/bin:{scie.env.PATH}"}}}}},"jump":{"size":1557952,"version":"0.1.10"}}}
 ```
 
 You can also inspect the lift manifest with the built in `inspect` tool by setting the `SCIE`
@@ -225,7 +225,6 @@ environment variable, e.g.: `SCIE=inspect ./coursier`
   "scie": {
     "lift": {
       "name": "coursier",
-      "base": "~/.nce",
       "files": [
         {
           "name": "amazon-corretto-11.0.17.8.1-linux-x64.tar.gz",

@@ -231,10 +231,6 @@ pub struct Boot {
     pub bindings: BTreeMap<String, Cmd>,
 }
 
-fn default_base() -> PathBuf {
-    PathBuf::from("~/.nce")
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Lift {
@@ -242,8 +238,9 @@ pub struct Lift {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    #[serde(default = "default_base")]
-    pub base: PathBuf,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base: Option<PathBuf>,
     pub files: Vec<File>,
     pub boot: Boot,
 }
@@ -373,7 +370,7 @@ mod tests {
                     size: 37,
                 },
                 Lift {
-                    base: "~/.nce".into(),
+                    base: None,
                     files: vec![
                         File {
                             name: "pants-client".to_string(),
