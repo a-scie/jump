@@ -52,7 +52,7 @@ impl From<File> for crate::config::File {
 pub struct Lift {
     pub name: String,
     pub description: Option<String>,
-    pub base: PathBuf,
+    pub base: Option<PathBuf>,
     pub size: usize,
     pub hash: String,
     pub boot: Boot,
@@ -259,17 +259,12 @@ fn load(
         .unwrap_or_else(|| Path::new(""));
     let lift = config.scie.lift;
     let files = assemble(resolve_base, lift.files, reconstitute)?;
-    let base = if let Ok(base) = std::env::var("SCIE_BASE") {
-        PathBuf::from(base)
-    } else {
-        lift.base
-    };
     Ok((
         config.scie.jump,
         Lift {
             name: lift.name,
             description: lift.description,
-            base,
+            base: lift.base,
             boot: lift.boot,
             size: data.len(),
             hash: fingerprint::digest(data),

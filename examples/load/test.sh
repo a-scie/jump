@@ -10,7 +10,7 @@ check_cmd mktemp
 gc "${PWD}/cowsay"
 "${SCIE_JUMP}" "${LIFT}"
 
-# Force downloads to occur to exercise the load functionality even if ~/.nce has the JDK and the
+# Force downloads to occur to exercise the load functionality even if nce cache has the JDK and the
 # cowsay jars already from other examples.
 SCIE_BASE="$(mktemp -d)"
 gc "${SCIE_BASE}"

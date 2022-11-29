@@ -3,7 +3,7 @@
 The core logic of the scie-jump binary.
 
 Most modules are self-explanatory but the relationship between [config](src/config.rs) and [lift](
-src/lift.rs), the overall scie-jump execution flow and the `~/.nce` [CAS](
+src/lift.rs), the overall scie-jump execution flow and the `nce` [CAS](
 https://en.wikipedia.org/wiki/Content-addressable_storage) deserve to be fleshed out a bit since
 they are key aspects of operation.
 
@@ -61,7 +61,6 @@ That is reified to this fully specified lift manifest on ingestion via the scie-
       "version": "0.1.9"
     },
     "lift": {
-      "base": "~/.nce",
       "boot": {
         "commands": {
           "": {
@@ -119,14 +118,16 @@ scie-jump intrinsic command. The checking proceeds in order:
    any files not yet extracted and substituting their paths into placeholders in the command
    definition.
 
-## The `~/.nce` CAS
+## The `nce` CAS
 
 Step 5 in the execution flow described above critically relies on an atomic content addressable
 store for scie file artifacts to ensure the work of extracting scie files is performed exactly once
 on any given machine. The `scie-jump` uses a file-system based [CAS](
-https://en.wikipedia.org/wiki/Content-addressable_storage) rooted in the `~/.nce` directory by
-default, but overridable at scie construction time with the `scie.lift.base` lift manifest field and
-at runtime via the `SCIE_BASE` environment variable. The sha256 hash of each file is used as a
-directory name key under the `~/.nce` and a cooperative file locking scheme implemented in
-[atomic.rs](src/atomic.rs) is used to ensure the CAS directory containing the extracted file is
-created exactly once by a single process in the face of parallel scie execution on a host.
+https://en.wikipedia.org/wiki/Content-addressable_storage) rooted in the `nce` subdirectory of the
+User's cache directory by default (`~/Library/Caches/nce` by default on macOS, `~\AppData\Local\nce`
+by default on Windows and `~/.cache/nce` by default on all other Unix systems), but overridable at
+scie construction time with the `scie.lift.base` lift manifest field and at runtime via the
+`SCIE_BASE` environment variable. The sha256 hash of each file is used as a directory name key under
+the `nce` cache directory and a cooperative file locking scheme implemented in [atomic.rs](
+src/atomic.rs) is used to ensure the CAS directory containing the extracted file is created exactly
+once by a single process in the face of parallel scie execution on a host.

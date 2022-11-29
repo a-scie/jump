@@ -2,7 +2,6 @@
   "scie": {
     "lift": {
       "name": "cowsay",
-      "base": "~/.nce",
       "files": [
         {
           "name": "get.sh"
