@@ -2,7 +2,6 @@
   "scie": {
     "lift": {
       "name": "java",
-      "base": "~/.nce",
       "files": [
         {
           "name": "openjdk-19.0.1_linux-aarch64_bin.tar.gz",

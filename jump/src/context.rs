@@ -118,11 +118,20 @@ impl<'a> Context<'a> {
                 files_by_name.insert(key.as_str(), file);
             }
         }
+        let base = if let Ok(base) = env::var("SCIE_BASE") {
+            PathBuf::from(base)
+        } else if let Some(base) = &lift.base {
+            base.clone()
+        } else if let Some(dir) = dirs::cache_dir() {
+            dir.join("nce")
+        } else {
+            PathBuf::from("~/.nce")
+        };
         Ok(Context {
             scie,
             jump,
             lift,
-            base: expanduser(&lift.base)?,
+            base: expanduser(base.as_path())?,
             files_by_name,
             replacements: HashSet::new(),
             bindings: IndexMap::new(),
