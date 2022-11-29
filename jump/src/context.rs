@@ -390,7 +390,7 @@ mod tests {
         let lift = Lift {
             name: "test".to_string(),
             description: None,
-            base: tempdir.path().to_path_buf(),
+            base: Some(tempdir.path().to_path_buf()),
             size: 137,
             hash: "abc".to_string(),
             boot: Boot {
