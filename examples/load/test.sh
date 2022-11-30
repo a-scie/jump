@@ -18,3 +18,16 @@ export SCIE_BASE
 
 time RUST_LOG=info ./cowsay "Curl!"
 time RUST_LOG=info ./cowsay "Local!"
+
+SCIE_BASE="$(mktemp -d)"
+gc "${SCIE_BASE}"
+export SCIE_BASE
+
+GET_LOG_CONFIG="$(mktemp)"
+gc "${GET_LOG_CONFIG}"
+export GET_LOG_CONFIG
+
+export GET_CONFIG="alt-metadata.json"
+./cowsay "Alt Curl!"
+
+grep "${GET_CONFIG}" "${GET_LOG_CONFIG}"

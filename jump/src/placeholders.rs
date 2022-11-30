@@ -30,7 +30,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
     let mut items = vec![];
 
     let mut previous_char: Option<char> = None;
-    let mut inside_placeholder = false;
+    let mut inside_placeholder = 0;
     let mut start = 0_usize;
 
     if "{" == text {
@@ -41,29 +41,26 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
     }
     for (index, current_char) in text.chars().enumerate() {
         match current_char {
-            '{' if !inside_placeholder => {
+            '{' if inside_placeholder == 0 => {
                 if index - start > 0 {
                     items.push(Item::Text(&text[start..index]))
                 }
                 previous_char = Some('{');
-                inside_placeholder = true;
+                inside_placeholder = 1;
                 start = index + 1;
             }
-            '{' if inside_placeholder && Some('{') == previous_char => {
+            '{' if inside_placeholder > 0 && Some('{') == previous_char => {
                 items.push(Item::LeftBrace);
-                inside_placeholder = false;
+                inside_placeholder = 0;
                 start = index + 1;
             }
-            '{' if inside_placeholder => {
-                return Err(format!(
-                    "Encountered '{{' at character {pos} inside placeholder starting at character \
-                    {placeholder_pos} in {text}'. Placeholders symbols cannot include the '{{' or \
-                    '}}' characters",
-                    pos = index + 1,
-                    placeholder_pos = start,
-                ));
+            '{' if inside_placeholder > 0 => {
+                inside_placeholder += 1;
             }
-            '}' if inside_placeholder => {
+            '}' if inside_placeholder > 1 => {
+                inside_placeholder -= 1;
+            }
+            '}' if inside_placeholder == 1 => {
                 let symbol = &text[start..index];
                 if symbol.is_empty() {
                     return Err(format!(
@@ -86,7 +83,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                     _ => items.push(Item::Placeholder(Placeholder::FileName(symbol))),
                 }
                 previous_char = Some('}');
-                inside_placeholder = false;
+                inside_placeholder = 0;
                 start = index + 1;
             }
             c => previous_char = Some(c),
@@ -114,7 +111,6 @@ mod tests {
     fn invalid_placeholder() {
         assert!(parse("{").is_err());
         assert!(parse("{}").is_err());
-        assert!(parse("{placeholder.cannot.include.'{'}").is_err());
         assert_eq!(vec![Item::Text("}")], parse("}").unwrap().items);
     }
 
@@ -187,6 +183,18 @@ mod tests {
         assert_eq!(
             vec![Item::Placeholder(Placeholder::Env("dotted.env.var.name"))],
             parse("{scie.env.dotted.env.var.name}").unwrap().items
+        );
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::Env("embedded={brackets}"))],
+            parse("{scie.env.embedded={brackets}}").unwrap().items
+        );
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::Env(
+                "embedded={scie.env.doubly_embedded={brackets}}"
+            ))],
+            parse("{scie.env.embedded={scie.env.doubly_embedded={brackets}}}")
+                .unwrap()
+                .items
         );
     }
 
