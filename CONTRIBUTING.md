@@ -20,8 +20,8 @@ You might want to open a [discussion](https://github.com/a-scie/jump/discussions
 https://github.com/a-scie/jump/issues) to vet your idea first. It can often save overall
 effort and lead to a better end result.
 
-The code is run through the standard `cargo` gamut. Before sending off changes you should have:
-+ Formatted the code: `cargo fmt --all`
+The code is run through the ~standard `cargo` gamut. Before sending off changes you should have:
++ Formatted the code (requires Rust nightly): `cargo +nightly fmt --all`
 + Linted the code: `cargo clippy --all`
 + Tested the code: `cargo test --all`
 
@@ -29,8 +29,9 @@ Additionally, you can run any existing integration tests using [`examples/run.sh
 Learn more about those in the [README](examples/README.md).
 
 The scie-jump binary can be built via `cargo build` but that does not produce a fully featured
-scie-jump. For that you should instead use `cargo run -p package .`. The `.` can be any directory
-where you want the final scie-jump binary deposited to. Two files will be produced:
+`scie-jump`. For that you should instead use `cargo run -p package`. That will build the scie-jump
+binary for the current machine to the `dist/` directory by default (run
+`cargo run -p package -- --help` to find out more options). Two files will be produced there:
 1. The scie jump binary: `scie-jump-<os>-<arch>(.<ext>)`
 2. The scie jump fingerprint file: `scie-jump-<os>-<arch>(.<ext>).sha256`
 

@@ -32,7 +32,8 @@ jobs:
           nightly-toolchain: true
       - rust/install
       - rust/clippy
-      - rust/test
+      - rust/test:
+          package: --all
   package:
     machine:
       image: ubuntu-2004:current
@@ -47,7 +48,7 @@ jobs:
               -v $PWD:/code \
               -w /code \
               rust:1.65.0-alpine3.15 \
-                sh -c 'apk add cmake make musl-dev perl && cargo run -p package -- dist'
+                cargo run -p package -- dist
       - persist_to_workspace:
           root: dist
           paths:
