@@ -136,7 +136,7 @@ of your application.
 To build an executable `scie-jump` you'll need the [Rust suite of tools](https://rustup.rs/)
 installed. With that done, simply:
 ```
-cargo run --release -p package
+cargo run -p package
 ```
 
 That will deposit a `scie-jump` binary in the `dist/` directory after building it and packaging it.
