@@ -12,7 +12,7 @@ make this a bit easier. In either case you'll first need the following:
 
 There is probably a pre-built `scie-jump` binary for the platform you're targeting in our
 [releases](https://github.com/a-scie/jump/releases) that you can download. If not, you can clone
-this project on a machine of your target platform and run `cargo run --release -p package dist` and
+this project on a machine of your target platform and run `cargo run -p package` and
 a `scie-jump` binary for that platform will be deposited in the `dist/` directory. See the
 [contributing guide](../CONTRIBUTING.md) for more on the development environment setup if you're not
 already setup for Rust development.

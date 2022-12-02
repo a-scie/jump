@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.5.0
+
+This release brings fully static binaries for Linux with zero runtime
+linkage by switching the Linux targets to use musl. As part of this
+switch, the Rust toolchain used is stabilized to stable / 1.65.0.
+
 ## 0.4.0
 
 This release beings support for `{scie.env.*}` defaults which allows for ptex'ed scies that opt

@@ -72,9 +72,9 @@ impl Binding {
         atomic_path(&self.target.clone(), Target::File, |lock| {
             trace!("Installing boot binding {binding:#?}", binding = &self);
             match self.process.execute() {
-                Err(err) => return Err(format!("Failed to launch boot binding: {err}")),
+                Err(err) => Err(format!("Failed to launch boot binding: {err}")),
                 Ok(exit_status) if !exit_status.success() => {
-                    return Err(format!("Boot binding command failed: {exit_status}"));
+                    Err(format!("Boot binding command failed: {exit_status}"))
                 }
                 _ => std::fs::write(lock, b"").map_err(|e| {
                     format!(

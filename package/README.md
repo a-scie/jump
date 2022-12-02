@@ -6,7 +6,7 @@ binary.
 ## Usage
 
 ```
-cargo run [--release] -p package <output directory>
+cargo run -p package [--target TARGET (current)] [output directory (dist/)]
 ```
 
 ## Role

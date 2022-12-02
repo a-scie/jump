@@ -20,7 +20,7 @@ orbs:
   rust: circleci/rust@1.6.0
 
 jobs:
-  package:
+  test:
     machine:
       image: ubuntu-2004:current
     resource_class: arm.medium
@@ -28,13 +28,31 @@ jobs:
       - checkout
       - rust/install:
           version: nightly
-      - rust/cargo-run:
-          package: --release -p package dist
+      - rust/format:
+          nightly-toolchain: true
+      - rust/install
+      - rust/clippy
+      - rust/test
+  package:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: arm.medium
+    steps:
+      - checkout
+      - run:
+          name: Package scie-jump
+          command: |
+            mkdir dist
+            docker run --rm \
+              -v $PWD:/code \
+              -w /code \
+              rust:1.65.0-alpine3.15 \
+                sh -c 'apk add cmake make musl-dev perl && cargo run -p package -- dist'
       - persist_to_workspace:
           root: dist
           paths:
             - scie-jump*
-  test:
+  integration-test:
     machine:
       image: ubuntu-2004:current
     resource_class: arm.medium
@@ -60,8 +78,9 @@ jobs:
 workflows:
   ci:
     jobs:
+      - test
       - package
-      - test:
+      - integration-test:
           requires:
             - package
   release:

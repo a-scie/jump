@@ -1,6 +1,6 @@
 [package]
 name = "package"
-version = "0.1.1"
+version = "0.2.0"
 description = "Packages the scie-jump binary into its final form."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
@@ -8,10 +8,9 @@ authors = [
 edition = "2021"
 publish = false
 
-[build-dependencies]
-byteorder = "1.4"
-jump = { path="../jump" }
-scie-jump = { path="..", artifact="bin" }
-
 [dependencies]
+byteorder = "1.4"
+clap = { version = "4.0", features = ["derive"] }
+jump = { path = "../jump" }
 proc-exit = "2.0"
+sha2 = "0.10"

@@ -29,5 +29,5 @@ tempfile = { workspace = true }
 tuple = "0.5"
 xz2 = "0.1"
 zip = { workspace = true }
-zstd = "0.11"
+zstd = "0.12"
 walkdir = "2.3"

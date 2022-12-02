@@ -1,10 +1,12 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - dependabot/**
+  pull_request:
 defaults:
   run:
     shell: bash
-env:
-  CARGO_TERM_COLOR: always
 concurrency:
   group: CI-${{ github.ref }}
   # Queue on all branches and tags, but only cancel overlapping PR burns.
@@ -27,12 +29,24 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
-        run: cargo fmt --check --all
+        run: |
+          rustup toolchain add nightly -c rustfmt
+          cargo +nightly fmt --check --all
       - name: Lint
         run: cargo clippy --all
       - name: Unit Tests
         run: cargo test --all
       - name: Build & Package
-        run: cargo run --release -p package dist
+        if: ${{ matrix.os != 'ubuntu-20.04' }}
+        run: cargo run -p package
+      - name: Build & Package
+        if: ${{ matrix.os == 'ubuntu-20.04' }}
+        run: |
+          mkdir dist
+          docker run --rm \
+            -v $PWD:/code \
+            -w /code \
+            rust:1.65.0-alpine3.15 \
+              sh -c 'apk add cmake make musl-dev perl && cargo run -p package'
       - name: Integration Tests
-        run: examples/run.sh
+        run: examples/run.sh --no-package
