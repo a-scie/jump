@@ -135,7 +135,7 @@ if [[ "${OS}" == "windows" ]]; then
 fi
 
 if [[ -n "${_PACKAGE}" ]]; then
-  cargo run --release -p package "${DIST_DIR}"
+  cargo run -p package -- "${DIST_DIR}"
 fi
 SCIE_JUMP_NAME="scie-jump-${OS_ARCH}${EXE_EXT}"
 SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"

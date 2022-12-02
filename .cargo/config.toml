@@ -9,6 +9,3 @@ rustflags = [
     # For Windows static msvcrt linking with no need for dll re-distribution.
     "-C", "target-feature=+crt-static"
 ]
-
-[unstable]
-bindeps = true

@@ -21,10 +21,10 @@ fn check_hash<R: Read + Seek>(
 ) -> Result<R, String> {
     let (size, actual_hash) = fingerprint::digest_reader(&mut bytes)?;
     if expected_hash != actual_hash.as_str() {
-        return Err(format!(
+        Err(format!(
             "The {file_type} destination {dst} of size {size} had unexpected hash: {actual_hash}",
             dst = dst.display(),
-        ));
+        ))
     } else {
         // TODO(John Sirois): Hash in-line with extraction.
         bytes

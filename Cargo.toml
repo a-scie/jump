@@ -5,7 +5,7 @@ members = [
 
 [package]
 name = "scie-jump"
-version = "0.4.0"
+version = "0.5.0"
 description = "The self contained interpreted executable launcher."
 authors = [
   "John Sirois <john.sirois@gmail.com>",
@@ -17,19 +17,6 @@ publish = false
 opt-level = "s"
 strip = "symbols"
 lto = "fat"
-codegen-units = 1
-
-# N.B.: The `package` psuedo-crate serves as a cross-platform build-step
-# to post-process this root crate's binary by adding a 64 bit magic
-# trailer to the binary that allows it to know its own size and know if
-# it's being run as a stub or an application. This ensures when its
-# binary dependency (this root crate) is built, it is size-optimized and
-# has symbols stripped. The lto can't be applied to a build script, but
-# that is properly plumbed to the root crate during a `-p package`
-# build.
-[profile.release.build-override]
-opt-level = "s"
-strip = "symbols"
 codegen-units = 1
 
 [workspace.dependencies]
@@ -49,11 +36,11 @@ features = ["deflate"]
 
 [dependencies]
 bstr = { workspace = true }
-env_logger = { version = "0.9", default-features = false }
+env_logger = { version = "0.10", default-features = false }
 jump = { path = "jump" }
 log = { workspace = true }
 logging_timer = { workspace = true }
-nix = "0.25"
+nix = "0.26"
 proc-exit = "2.0"
 tempfile = { workspace = true }
 zip = { workspace = true }
