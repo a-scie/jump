@@ -6,7 +6,7 @@ source "${COMMON}"
 trap gc EXIT
 
 "${SCIE_JUMP}" "${LIFT}"
-gc "${PWD}/node.js"
+gc "${PWD}/node.js${EXE_EXT}"
 
 # Get help on scie boot commands.
 SCIE="help" ./node.js
@@ -22,9 +22,17 @@ sha256 node.js* ../node.js*
 cd .. && rm -rf split
 
 # Use the built-in BusyBox functionality via binary base name.
-ln node.js "npm${EXE_EXT}"
+applets=()
+for applet in $(SCIE="list" ./node.js); do
+  applets+=("${applet}")
+done
+SCIE="install" ./node.js -s .
+for applet in ${applets[*]}; do
+  gc "${PWD}/${applet}"
+done
+
 ./npm install cowsay
-gc "${PWD}/npm" "${PWD}/node_modules" "${PWD}/package.json" "${PWD}/package-lock.json"
+gc "${PWD}/node_modules" "${PWD}/package.json" "${PWD}/package-lock.json"
 
 # Build a scie from another scie's tip-embedded scie-jump.
 SCIE="boot-pack" ./node.js "cowsay-lift.${OS_ARCH}.json"

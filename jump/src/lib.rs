@@ -51,6 +51,13 @@ help: Display this help message.
 
 inspect: Pretty-print this scie's lift manifest to stdout.
 
+install (-s|--symlink) [dest dir]*
+
+    Install all the commands in this scie to each dest dir given. If no
+    dest dirs are given, installs them in the current directory.
+
+list: List the names of the commands contained in this scie.
+
 split [directory]?
 
     Split this scie into its component files in the given directory or
@@ -61,6 +68,8 @@ pub enum BootAction {
     Execute((Process, bool)),
     Help((String, i32)),
     Inspect((Jump, Lift)),
+    Install((PathBuf, Vec<ScieBoot>)),
+    List(Vec<ScieBoot>),
     Pack((Jump, PathBuf)),
     Select(SelectBoot),
     Split((Jump, Lift, PathBuf)),
@@ -101,6 +110,10 @@ pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
             return Ok(BootAction::Help((format!("{HELP}\n"), 0)));
         } else if "inspect" == value {
             return Ok(BootAction::Inspect((jump, lift)));
+        } else if "install" == value {
+            return Ok(BootAction::Install((current_exe, lift.boots())));
+        } else if "list" == value {
+            return Ok(BootAction::List(lift.boots()));
         } else if "split" == value {
             return Ok(BootAction::Split((jump, lift, current_exe)));
         } else if !PathBuf::from(&value).exists() {

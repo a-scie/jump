@@ -1,8 +1,11 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::env;
+use std::path::{Path, PathBuf};
+
 use jump::config::Fmt;
-use jump::{Jump, Lift, SelectBoot};
+use jump::{Jump, Lift, ScieBoot, SelectBoot};
 use proc_exit::{Code, ExitResult};
 
 mod pack;
@@ -58,4 +61,106 @@ pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
             .map(|err| format!("\nERROR: {err}"))
             .unwrap_or_default()
     )))
+}
+
+#[cfg(target_family = "windows")]
+fn symlink_file(src: &Path, dst: &Path) -> ExitResult {
+    std::os::windows::fs::symlink_file;
+    symlink_file(&src, &dst).map_err(|e| {
+        Code::FAILURE.with_message(format!(
+            "Failed to symlink {src} -> {dst}",
+            src = src.display(),
+            dst = dst.display()
+        ))
+    })
+}
+
+#[cfg(target_family = "unix")]
+fn symlink_file(src: &Path, dst: &Path) -> ExitResult {
+    use std::os::unix::fs::symlink;
+    let resolved_src = src.canonicalize().map_err(|e| {
+        Code::FAILURE.with_message(format!(
+            "Failed to resolve symlink source {src}: {e}",
+            src = src.display()
+        ))
+    })?;
+    symlink(resolved_src, dst).map_err(|e| {
+        Code::FAILURE.with_message(format!(
+            "Failed to symlink {src} -> {dst}: {e}",
+            src = src.display(),
+            dst = dst.display()
+        ))
+    })
+}
+
+pub(crate) fn install(scie: PathBuf, commands: Vec<ScieBoot>) -> ExitResult {
+    let mut symlink = false;
+    let mut dest_dirs = vec![];
+    for arg in env::args().skip(1) {
+        match arg.as_str() {
+            "-s" | "--symlink" => symlink = true,
+            path => dest_dirs.push(PathBuf::from(path)),
+        }
+    }
+    if dest_dirs.is_empty() {
+        dest_dirs.push(env::current_dir().map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to determine the current directory for installing scie commands to: {e}"
+            ))
+        })?);
+    }
+    for dest_dir in dest_dirs {
+        std::fs::create_dir_all(&dest_dir).map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to create destination directory {dest_dir}: {e}",
+                dest_dir = dest_dir.display()
+            ))
+        })?;
+        for command in &commands {
+            let command_name = if command.name.is_empty() {
+                scie.file_name()
+                    .ok_or_else(|| {
+                        Code::FAILURE.with_message(format!(
+                            "Failed to get basename of {scie}.",
+                            scie = scie.display()
+                        ))
+                    })?
+                    .to_str()
+                    .ok_or_else(|| {
+                        Code::FAILURE.with_message(format!(
+                            "Failed to convert the basename of {scie} to a UTF-8 string.",
+                            scie = scie.display()
+                        ))
+                    })?
+            } else {
+                command.name.as_str()
+            };
+            let dest = dest_dir
+                .join(command_name)
+                .with_extension(env::consts::EXE_EXTENSION);
+            if dest != scie {
+                if symlink {
+                    symlink_file(&scie, &dest)?;
+                } else {
+                    std::fs::hard_link(&scie, &dest).map_err(|e| {
+                        Code::FAILURE.with_message(format!(
+                            "Failed to hard link {src} -> {dst}: {e}",
+                            src = scie.display(),
+                            dst = dest.display()
+                        ))
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn list(commands: Vec<ScieBoot>) -> ExitResult {
+    for command in commands {
+        if !command.name.is_empty() {
+            println!("{}", command.name);
+        }
+    }
+    Ok(())
 }
