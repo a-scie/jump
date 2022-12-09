@@ -7,7 +7,7 @@ use std::path::Path;
 use logging_timer::time;
 use sha2::{Digest, Sha256};
 
-#[time("debug")]
+#[time("debug", "fingerprint::{}")]
 pub fn digest(data: &[u8]) -> String {
     format!("{digest:x}", digest = Sha256::digest(data))
 }
@@ -22,7 +22,7 @@ pub fn digest_file(path: &Path) -> Result<(usize, String), String> {
     digest_reader(file)
 }
 
-#[time("debug")]
+#[time("debug", "fingerprint::{}")]
 pub fn digest_reader<R: Read>(mut reader: R) -> Result<(usize, String), String> {
     let mut hasher = Sha256::new();
     let copied_size = std::io::copy(&mut reader, &mut hasher)

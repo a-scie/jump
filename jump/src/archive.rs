@@ -90,7 +90,7 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
     Ok(zip_path)
 }
 
-#[time("debug")]
+#[time("debug", "archive::{}")]
 pub(crate) fn create(dir: &Path, name: &str) -> Result<PathBuf, String> {
     let path = dir.join(name);
     let directory = path.canonicalize().map_err(|e| {
