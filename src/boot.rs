@@ -65,10 +65,10 @@ pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
 
 #[cfg(target_family = "windows")]
 fn symlink_file(src: &Path, dst: &Path) -> ExitResult {
-    std::os::windows::fs::symlink_file;
-    symlink_file(&src, &dst).map_err(|e| {
+    use std::os::windows::fs::symlink_file;
+    symlink_file(src, dst).map_err(|e| {
         Code::FAILURE.with_message(format!(
-            "Failed to symlink {src} -> {dst}",
+            "Failed to symlink {src} -> {dst}: {e}",
             src = src.display(),
             dst = dst.display()
         ))
