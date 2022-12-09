@@ -38,14 +38,14 @@ fn check_hash<R: Read + Seek>(
     }
 }
 
-#[time("debug")]
+#[time("debug", "installer::{}")]
 fn unpack_tar<R: Read>(archive_type: ArchiveType, tar_stream: R, dst: &Path) -> Result<(), String> {
     let mut tar = tar::Archive::new(tar_stream);
     tar.unpack(dst)
         .map_err(|e| format!("Failed to unpack {archive_type:?}: {e}"))
 }
 
-#[time(debug)]
+#[time("debug", "installer::{}")]
 fn unpack_archive<R: Read + Seek, T, F>(
     archive: ArchiveType,
     bytes_source: F,
@@ -107,7 +107,7 @@ fn executable_permissions() -> Option<Permissions> {
     Some(Permissions::from_mode(0o755))
 }
 
-#[time("debug")]
+#[time("debug", "installer::{}")]
 fn unpack_blob<R: Read + Seek, T, F>(
     executable: bool,
     bytes_source: F,
@@ -164,123 +164,136 @@ where
     }
 }
 
-#[time("debug")]
-pub(crate) fn install(files: &[FileEntry], payload: &[u8]) -> Result<(), String> {
-    let mut scie_tote = vec![];
-    let mut location = 0;
-    for file_entry in files {
-        let advance = match file_entry {
-            FileEntry::Skip(size) => *size,
-            FileEntry::Install((file, dst)) => {
-                if file.size == 0 {
-                    scie_tote.push((file, file.file_type, dst.clone()));
-                } else {
-                    let bytes = &payload[location..(location + file.size)];
-                    unpack(
-                        file.file_type,
-                        file.executable.unwrap_or(false),
-                        || Ok((Cursor::new(bytes), ())),
-                        file.hash.as_str(),
-                        dst,
-                    )?;
-                }
-                file.size
-            }
-            FileEntry::LoadAndInstall((binding, file, dst)) => {
-                let buffer_source = || {
-                    info!(
-                        "Loading {file} via {exe:?}...",
-                        file = file.name,
-                        exe = binding.exe
-                    );
-                    let mut buffer = tempfile::tempfile().map_err(|e| {
-                        format!(
-                            "Failed to establish a temporary file buffer for loading {file:?} via \
-                            {binding:?}: {e}"
-                        )
-                    })?;
-                    let mut child = binding.spawn_stdout(vec![file.name.as_str()].as_slice())?;
-                    let mut stdout = child.stdout.take().ok_or_else(|| {
-                        format!("Failed to grab stdout attempting to load {file:?} via binding.")
-                    })?;
-                    std::io::copy(&mut stdout, &mut buffer)
-                        .map_err(|e| format!("Failed to load {file:?} via {binding:?}: {e}"))?;
-                    buffer.rewind().map_err(|e| {
-                        format!(
-                            "Failed to re-wind temp file for reading {file:?} loaded by \
-                            {binding:?}: {e}"
-                        )
-                    })?;
-                    Ok((buffer, child))
-                };
-                if let Some(mut child) = unpack(
-                    file.file_type,
-                    file.executable.unwrap_or(false),
-                    buffer_source,
-                    file.hash.as_str(),
-                    dst,
-                )? {
-                    let exit_status = child.wait().map_err(|e| {
-                        format!(
-                            "Failed to await termination of {binding:?} when loading {file:?}: {e}"
-                        )
-                    })?;
-                    if !exit_status.success() {
-                        return Err(format!("Failed to load file {file:?}: {exit_status:?}"));
-                    }
-                }
-                0
-            }
-            FileEntry::ScieTote((tote_file, entries)) => {
-                let mut scie_tote: Option<TempDir> = None;
-                let mut scie_tote_src = || {
-                    if let Some(tempdir) = scie_tote.as_ref() {
-                        return Ok::<_, String>(tempdir.path().join(&tote_file.name));
-                    }
-                    let scie_tote_tmpdir = TempDir::new().map_err(|e| {
-                        format!(
-                            "Failed to create a temporary directory to extract the scie-tote to: \
-                            {e}"
-                        )
-                    })?;
-                    let path = scie_tote_tmpdir.path().join(&tote_file.name);
-                    let bytes = &payload[location..(location + tote_file.size)];
-                    unpack(
-                        tote_file.file_type,
-                        tote_file.executable.unwrap_or(false),
-                        || Ok((Cursor::new(bytes), ())),
-                        tote_file.hash.as_str(),
-                        &path,
-                    )?;
-                    scie_tote = Some(scie_tote_tmpdir);
-                    Ok(path)
-                };
+pub(crate) struct Installer<'a> {
+    payload: &'a [u8],
+}
 
-                for (file, dst) in entries {
-                    let file_src = || {
-                        let scie_tote_path = scie_tote_src()?;
-                        let src_path = scie_tote_path.join(&file.name);
-                        let file = std::fs::File::open(&src_path).map_err(|e| {
-                            format!(
-                                "Failed to open {file:?} at {src} from the unpacked scie-tote: {e}",
-                                src = src_path.display()
-                            )
-                        })?;
-                        Ok((file, ()))
-                    };
-                    unpack(
-                        file.file_type,
-                        file.executable.unwrap_or(false),
-                        file_src,
-                        file.hash.as_str(),
-                        dst,
-                    )?;
-                }
-                tote_file.size
-            }
-        };
-        location += advance;
+impl<'a> Installer<'a> {
+    pub(crate) fn new(payload: &'a [u8]) -> Self {
+        Self { payload }
     }
 
-    Ok(())
+    #[time("debug", "Installer::{}")]
+    pub(crate) fn install(&self, files: &[FileEntry]) -> Result<(), String> {
+        let mut scie_tote = vec![];
+        let mut location = 0;
+        for file_entry in files {
+            let advance = match file_entry {
+                FileEntry::Skip(size) => *size,
+                FileEntry::Install((file, dst)) => {
+                    if file.size == 0 {
+                        scie_tote.push((file, file.file_type, dst.clone()));
+                    } else {
+                        let bytes = &self.payload[location..(location + file.size)];
+                        unpack(
+                            file.file_type,
+                            file.executable.unwrap_or(false),
+                            || Ok((Cursor::new(bytes), ())),
+                            file.hash.as_str(),
+                            dst,
+                        )?;
+                    }
+                    file.size
+                }
+                FileEntry::LoadAndInstall((binding, file, dst)) => {
+                    let buffer_source = || {
+                        info!(
+                            "Loading {file} via {exe:?}...",
+                            file = file.name,
+                            exe = binding.exe()
+                        );
+                        let mut buffer = tempfile::tempfile().map_err(|e| {
+                            format!(
+                                "Failed to establish a temporary file buffer for loading {file:?} via \
+                                {binding:?}: {e}"
+                            )
+                        })?;
+                        let mut child =
+                            binding.spawn_stdout(vec![file.name.as_str()].as_slice())?;
+                        let mut stdout = child.stdout.take().ok_or_else(|| {
+                            format!(
+                                "Failed to grab stdout attempting to load {file:?} via binding."
+                            )
+                        })?;
+                        std::io::copy(&mut stdout, &mut buffer)
+                            .map_err(|e| format!("Failed to load {file:?} via {binding:?}: {e}"))?;
+                        buffer.rewind().map_err(|e| {
+                            format!(
+                                "Failed to re-wind temp file for reading {file:?} loaded by \
+                                {binding:?}: {e}"
+                            )
+                        })?;
+                        Ok((buffer, child))
+                    };
+                    if let Some(mut child) = unpack(
+                        file.file_type,
+                        file.executable.unwrap_or(false),
+                        buffer_source,
+                        file.hash.as_str(),
+                        dst,
+                    )? {
+                        let exit_status = child.wait().map_err(|e| {
+                            format!(
+                                "Failed to await termination of {binding:?} when loading {file:?}: {e}"
+                            )
+                        })?;
+                        if !exit_status.success() {
+                            return Err(format!("Failed to load file {file:?}: {exit_status:?}"));
+                        }
+                    }
+                    0
+                }
+                FileEntry::ScieTote((tote_file, entries)) => {
+                    let mut scie_tote: Option<TempDir> = None;
+                    let mut scie_tote_src = || {
+                        if let Some(tempdir) = scie_tote.as_ref() {
+                            return Ok::<_, String>(tempdir.path().join(&tote_file.name));
+                        }
+                        let scie_tote_tmpdir = TempDir::new().map_err(|e| {
+                            format!(
+                                "Failed to create a temporary directory to extract the scie-tote \
+                                to: {e}"
+                            )
+                        })?;
+                        let path = scie_tote_tmpdir.path().join(&tote_file.name);
+                        let bytes = &self.payload[location..(location + tote_file.size)];
+                        unpack(
+                            tote_file.file_type,
+                            tote_file.executable.unwrap_or(false),
+                            || Ok((Cursor::new(bytes), ())),
+                            tote_file.hash.as_str(),
+                            &path,
+                        )?;
+                        scie_tote = Some(scie_tote_tmpdir);
+                        Ok(path)
+                    };
+
+                    for (file, dst) in entries {
+                        let file_src = || {
+                            let scie_tote_path = scie_tote_src()?;
+                            let src_path = scie_tote_path.join(&file.name);
+                            let file = std::fs::File::open(&src_path).map_err(|e| {
+                                format!(
+                                    "Failed to open {file:?} at {src} from the unpacked scie-tote: {e}",
+                                    src = src_path.display()
+                                )
+                            })?;
+                            Ok((file, ()))
+                        };
+                        unpack(
+                            file.file_type,
+                            file.executable.unwrap_or(false),
+                            file_src,
+                            file.hash.as_str(),
+                            dst,
+                        )?;
+                    }
+                    tote_file.size
+                }
+            };
+            location += advance;
+        }
+
+        Ok(())
+    }
 }

@@ -158,7 +158,7 @@ fn is_executable(path: &Path) -> Result<bool, String> {
     Ok(metadata.permissions().mode() & 0o111 != 0)
 }
 
-#[time("debug")]
+#[time("debug", "lift::{}")]
 fn assemble(
     resolve_base: &Path,
     config_files: Vec<crate::config::File>,
@@ -224,7 +224,7 @@ fn assemble(
     Ok(files)
 }
 
-#[time("debug")]
+#[time("debug", "lift::{}")]
 pub(crate) fn load_scie(scie_path: &Path, scie_data: &[u8]) -> Result<(Jump, Lift), String> {
     let end_of_zip = crate::zip::end_of_zip(scie_data, Config::MAXIMUM_CONFIG_SIZE)?;
     let result = load(scie_path, &scie_data[end_of_zip..], false).map_err(|e| {
@@ -242,7 +242,7 @@ pub(crate) fn load_scie(scie_path: &Path, scie_data: &[u8]) -> Result<(Jump, Lif
     }
 }
 
-#[time("debug")]
+#[time("debug", "lift::{}")]
 pub fn load_lift(manifest_path: &Path) -> Result<(Option<Jump>, Lift), String> {
     let data = std::fs::read(manifest_path).map_err(|e| {
         format!(

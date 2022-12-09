@@ -4,9 +4,12 @@
 use std::ffi::OsString;
 use std::process::{Child, Command, ExitStatus, Stdio};
 
+use logging_timer::time;
+use sha2::{Digest, Sha256};
+
 use crate::config::EnvVar as ConfigEnvVar;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EnvVar {
     Default(OsString),
     Replace(OsString),
@@ -21,7 +24,7 @@ impl From<&ConfigEnvVar> for EnvVar {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct EnvVars {
     pub vars: Vec<(EnvVar, OsString)>,
 }
@@ -67,16 +70,42 @@ where
         .map_err(|e| format!("Spawned {exe:?} {args:?} but failed to gather its exit status: {e}"))
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Process {
     pub env: EnvVars,
     pub exe: OsString,
     pub args: Vec<OsString>,
 }
 
+fn as_bytes(os_string: &OsString) -> Result<Vec<u8>, String> {
+    let string = os_string
+        .clone()
+        .into_string()
+        .map_err(|e| format!("Failed to encode as UTF-8 string: {e:?}"))?;
+    Ok(string.into_bytes())
+}
+
 impl Process {
-    pub fn execute(self) -> Result<ExitStatus, String> {
-        execute_with_env(self.exe, self.args, usize::MAX, self.env.into_env_vars())
+    #[time("debug", "Process::{}")]
+    pub(crate) fn fingerprint(&self) -> Result<String, String> {
+        let mut hasher = Sha256::new_with_prefix(as_bytes(&self.exe)?);
+        for arg in &self.args {
+            hasher.update(as_bytes(arg)?);
+        }
+        for (key, value) in self.env.clone().into_env_vars() {
+            hasher.update(as_bytes(&key)?);
+            hasher.update(as_bytes(&value)?);
+        }
+        Ok(format!("{digest:x}", digest = hasher.finalize()))
+    }
+
+    pub fn execute(&self, extra_env: Vec<(OsString, OsString)>) -> Result<ExitStatus, String> {
+        execute_with_env(
+            self.exe.clone(),
+            self.args.clone(),
+            usize::MAX,
+            self.env.clone().into_env_vars().chain(extra_env),
+        )
     }
 
     pub fn spawn_stdout(&self, args: &[&str]) -> Result<Child, String> {

@@ -11,7 +11,7 @@ use logging_timer::time;
 use proc_exit::{Code, ExitResult};
 use zip::{CompressionMethod, ZipWriter};
 
-#[time("debug")]
+#[time("debug", "pack::{}")]
 fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
     let manifest_path = if path.is_dir() {
         path.join("lift.json")
@@ -96,7 +96,7 @@ impl ScieTote {
     }
 }
 
-#[time("debug")]
+#[time("debug", "pack::{}")]
 fn pack(
     mut lift: Lift,
     manifest_path: &Path,

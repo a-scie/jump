@@ -27,6 +27,7 @@ use logging_timer::time;
 pub use crate::archive::create_options;
 use crate::config::Config;
 pub use crate::config::Jump;
+use crate::installer::Installer;
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
 pub use crate::lift::{load_lift, File, Lift, ScieBoot, Source};
@@ -80,7 +81,7 @@ pub fn config(jump: Jump, mut lift: Lift) -> Config {
     Config::new(jump, lift, other)
 }
 
-#[time("debug")]
+#[time("debug", "jump::{}")]
 pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
     let file = std::fs::File::open(&current_exe).map_err(|e| {
         format!(
@@ -128,16 +129,13 @@ pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
         }
     }
 
-    let manifest_size = lift.size;
-    let result = context::select_command(&current_exe, &jump, &lift);
+    let payload = &data[jump.size..data.len() - lift.size];
+    let installer = Installer::new(payload);
+    let result = context::select_command(&current_exe, &jump, &lift, &installer);
     if let Ok(Some(selected_command)) = result {
-        let payload = &data[jump.size..data.len() - manifest_size];
-        installer::install(&selected_command.files, payload)?;
+        installer.install(&selected_command.files)?;
         let process = selected_command.process;
         trace!("Prepared {process:#?}");
-        for binding in selected_command.bindings {
-            binding.execute()?;
-        }
         env::set_var("SCIE", current_exe.as_os_str());
         Ok(BootAction::Execute((
             process,
