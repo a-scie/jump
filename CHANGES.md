@@ -1,5 +1,29 @@
 # Release Notes
 
+## 0.6.0
+
+This release brings various improvements and features whose need was fleshed out by the
+[scie-pants](https://github.com/pantsbuild/scie-pants) project.
+
+Support is added for:
+
++ New placeholders:
+
+  - `{scie.base}`: The current `SCIE_BASE`.
+  - `{scie.files.<name>}`: Another way to say `{<name>}`.
+  - `{scie.files.<name>:hash}`: The sha256 hash of the named file.
+  - `{scie.bindings.<name>:<key>}`: The output named `<key>` of the named binding.
+
+  For the last, bindings have access to a `SCIE_BINDING_ENV` environment variable pointing to a
+  file they can write `<key>=<value>` lines to propagate binding information via the
+  `{scie.bindings.<name>:<key>}` placeholder.
+
++ Environment sensitive bindings:
+
+  Binding commands are now locked based on the content hash of their `env`, `exe` and `args`. This
+  allows for binding commands that are still guaranteed to run only once, but once for each unique
+  context.
+
 ## 0.5.0
 
 This release brings fully static binaries for Linux with zero runtime
