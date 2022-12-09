@@ -63,6 +63,7 @@ pub struct Lift {
 pub struct ScieBoot {
     pub name: String,
     pub description: Option<String>,
+    pub default: bool,
 }
 
 impl Lift {
@@ -70,9 +71,19 @@ impl Lift {
         self.boot
             .commands
             .iter()
-            .map(|(name, cmd)| ScieBoot {
-                name: name.to_string(),
-                description: cmd.description.clone(),
+            .map(|(name, cmd)| {
+                let default = name.is_empty();
+                let name = if default {
+                    self.name.clone()
+                } else {
+                    name.to_string()
+                };
+                let description = cmd.description.clone();
+                ScieBoot {
+                    name,
+                    description,
+                    default,
+                }
             })
             .collect::<Vec<_>>()
     }
