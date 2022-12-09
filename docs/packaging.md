@@ -148,7 +148,12 @@ placeholder. The named binding command will be run (successfully) exactly once a
 file maintained by the scie jump. The binding command will generally want to use the
 `{scie.bindings}` to request the path of a directory (housed in the `nce` cache and namespaced by
 the lift manifest hash) set aside for that scie alone. The binding command is guaranteed it will be
-the only command operating against that directory when it is invoked.
+the only command operating against that directory when it is invoked. The binding command will be
+run with access to a `SCIE_BINDING_ENV` environment variable pointing to a file that the binding
+command can write `<key>=<value>` pairs to on individual lines. These bindings can be read by other
+commands using `{scie.bindings.<binding command name>:<key>}`. This facility is similar to the
+GitHub action [`$GITHUB_OUTPUT` facility](
+https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter).
 
 N.B.: Since the scie-jump only maintains cooperative control over the contents of the `nce` cache,
 care should be taken when designing boot binding commands. If the scie is run in a Docker container
@@ -319,6 +324,7 @@ scie. Either way though, since the scie is powered by a `scie-jump` in its tip, 
 
 Further placeholders you can use in command "exe", "args" and "env" values include:
 
++ `{scie.base}`: The value of the active `SCIE_BASE`.
 + `{scie.env.<env var name>[=<default env var value>]}`: This expands to the value of the env var
   named. If the env var is not in the ambient runtime environment and no default env var value is
   specified it expands to the empty string (""). If a default env var value is specified, it is
@@ -327,8 +333,16 @@ Further placeholders you can use in command "exe", "args" and "env" values inclu
   `{scie.env.FOO={scie.env.BAR=42}}` would evaluate to "bar" if the "FOO" env var was not set but
   the "BAR" env var was set to "bar" and it would evaluate to "42" if neither the "FOO" nor "BAR"
   env vars were set.
++ `{scie.file.<name>}`: Another way to specify a file in a command. Useful for dynamic file names.
+  Using `{{env.var.FILE_NAME}}` doesn't work since `{{` is treated as an escape that produces a
+  literal `{{`; so you can use `{scie.file.{env.var.FILE_NAME}}` instead for these cases.
++ `{scie.file:hash.<name>}`: The sha256 hash of the given file name.
 + `{scie.lift}`: This expands to the path to the lift manifest, which is extracted to disk when you
   use this placeholder. This can be used to read custom metadata stored in the lift manifest.
++ `{scie.platform}`: The `<OS>-<ARCH>` value for the current platform where `<OS>` is one of
+  `linux`, `macos` or `windows` and `<ARCH>` is either `aarch64` or `x86_64`.
++ `{scie.platform.arch}`: The current chip architecture as described by `<ARCH>` above.
++ `{scie.platform.os}`: The current operating system as described by `<OS>` above.
 
 [^1]: The binaries that Coursier releases are single-file true native binaries that do not require a
 JVM at all. As such they are ~1/3 the size of the scie we build here, which contains a full JDK

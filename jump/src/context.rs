@@ -1,19 +1,21 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
+use std::fmt::{Debug, Formatter};
 use std::path::{Component, Path, PathBuf};
+use std::process::Child;
 
 use bstr::ByteSlice;
-use indexmap::IndexMap;
 use logging_timer::time;
 
 use crate::atomic::{atomic_path, Target};
 use crate::config::{Cmd, Fmt};
+use crate::installer::Installer;
 use crate::lift::{File, Lift};
-use crate::placeholders::{self, Item, Placeholder};
+use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
 use crate::process::{EnvVar, Process};
 use crate::{config, EnvVars, Jump, Source};
 
@@ -53,55 +55,158 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
         .map_err(|e| format!("{e}"))
 }
 
+#[derive(Clone, Debug)]
+struct LiftManifest {
+    path: PathBuf,
+    jump: Jump,
+    lift: Lift,
+}
+
+impl LiftManifest {
+    fn install(&self) -> Result<(), String> {
+        atomic_path(&self.path, Target::File, |path| {
+            config(self.jump.clone(), self.lift.clone()).serialize(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(path)
+                    .map_err(|e| {
+                        format!(
+                            "Failed top open lift manifest at {path} for writing: {e}",
+                            path = self.path.display()
+                        )
+                    })?,
+                Fmt::new().trailing_newline(true).pretty(true),
+            )
+        })?;
+        Ok(())
+    }
+}
+
+pub(crate) struct LoadProcess {
+    lift_manifest: Option<LiftManifest>,
+    process: Process,
+}
+
+impl LoadProcess {
+    pub(crate) fn spawn_stdout(&self, args: &[&str]) -> Result<Child, String> {
+        if let Some(ref lift_manifest) = self.lift_manifest {
+            lift_manifest.install()?;
+        }
+        self.process.spawn_stdout(args)
+    }
+
+    pub(crate) fn exe(&self) -> &OsStr {
+        self.process.exe.as_os_str()
+    }
+}
+
+impl Debug for LoadProcess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoadProcess")
+            .field("process", &self.process)
+            .finish()
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum FileEntry {
     Skip(usize),
     Install((File, PathBuf)),
-    LoadAndInstall((Process, File, PathBuf)),
+    LoadAndInstall((LoadProcess, File, PathBuf)),
     ScieTote((File, Vec<(File, PathBuf)>)),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Binding {
+struct Binding {
     target: PathBuf,
     process: Process,
 }
 
 impl Binding {
-    pub(crate) fn execute(self) -> Result<Option<()>, String> {
-        atomic_path(&self.target.clone(), Target::File, |lock| {
+    fn execute<F>(&self, install_required_files: F) -> Result<HashMap<String, String>, String>
+    where
+        F: FnOnce() -> Result<(), String>,
+    {
+        if let Some(env) = atomic_path(self.target.as_path(), Target::File, |lock| {
             trace!("Installing boot binding {binding:#?}", binding = &self);
-            match self.process.execute() {
+            install_required_files()?;
+
+            let result = self
+                .process
+                .execute(vec![("SCIE_BINDING_ENV".into(), lock.into())]);
+
+            match result {
                 Err(err) => Err(format!("Failed to launch boot binding: {err}")),
                 Ok(exit_status) if !exit_status.success() => {
                     Err(format!("Boot binding command failed: {exit_status}"))
                 }
-                _ => std::fs::write(lock, b"").map_err(|e| {
-                    format!(
-                        "Failed to touch lock file {path}: {e}",
-                        path = lock.display()
-                    )
-                }),
+                _ => std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(lock)
+                    .map_err(|e| {
+                        format!(
+                            "Failed to touch lock file {path}: {e}",
+                            path = lock.display()
+                        )
+                    }),
+            }?;
+            // We eagerly load the env file before we exit the lock such that malformed env files
+            // are detected and the lock is not poisoned.
+            Self::load_env_file(lock)
+        })? {
+            Ok(env)
+        } else {
+            self.load_env()
+        }
+    }
+
+    fn load_env(&self) -> Result<HashMap<String, String>, String> {
+        Self::load_env_file(self.target.as_path())
+    }
+
+    fn load_env_file(env_file: &Path) -> Result<HashMap<String, String>, String> {
+        let contents = std::fs::read_to_string(env_file).map_err(|e| {
+            format!(
+                "Failed to read binding env from {env_file}: {e}",
+                env_file = env_file.display()
+            )
+        })?;
+        let mut env = HashMap::new();
+        for line in contents.lines() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                let mut components = trimmed.splitn(2, '=');
+                let key = components.next().ok_or_else(|| {
+                    format!("The non-empty line {line} must contain at least an env var name.")
+                })?;
+                let value = components.next().unwrap_or("");
+                env.insert(key.to_string(), value.to_string());
             }
-        })
+        }
+        Ok(env)
     }
 }
 
 pub(crate) struct SelectedCmd {
     pub(crate) process: Process,
-    pub(crate) bindings: Vec<Binding>,
     pub(crate) files: Vec<FileEntry>,
     pub(crate) argv1_consumed: bool,
 }
 
 pub(crate) struct Context<'a> {
     scie: &'a Path,
-    jump: &'a Jump,
     lift: &'a Lift,
     base: PathBuf,
+    installer: &'a Installer<'a>,
     files_by_name: BTreeMap<&'a str, &'a File>,
     replacements: HashSet<&'a File>,
-    bindings: IndexMap<&'a str, Binding>,
+    lift_manifest: LiftManifest,
+    lift_manifest_dependants: HashSet<Process>,
+    lift_manifest_installed: bool,
+    bound: HashMap<&'a str, Binding>,
+    installed: HashSet<File>,
 }
 
 fn try_as_str(os_str: &OsStr) -> Option<&str> {
@@ -109,8 +214,13 @@ fn try_as_str(os_str: &OsStr) -> Option<&str> {
 }
 
 impl<'a> Context<'a> {
-    #[time("debug")]
-    fn new(scie: &'a Path, jump: &'a Jump, lift: &'a Lift) -> Result<Self, String> {
+    #[time("debug", "Context::{}")]
+    fn new(
+        scie: &'a Path,
+        jump: &'a Jump,
+        lift: &'a Lift,
+        installer: &'a Installer,
+    ) -> Result<Self, String> {
         let mut files_by_name = BTreeMap::new();
         for file in &lift.files {
             files_by_name.insert(file.name.as_str(), file);
@@ -127,65 +237,94 @@ impl<'a> Context<'a> {
         } else {
             PathBuf::from("~/.nce")
         };
+        let base = expanduser(base.as_path())?;
+        let lift_manifest = base.join(&lift.hash).join("lift.json");
         Ok(Context {
             scie,
-            jump,
             lift,
-            base: expanduser(base.as_path())?,
+            base,
+            installer,
             files_by_name,
             replacements: HashSet::new(),
-            bindings: IndexMap::new(),
+            lift_manifest: LiftManifest {
+                path: lift_manifest,
+                jump: jump.clone(),
+                lift: lift.clone(),
+            },
+            lift_manifest_dependants: HashSet::new(),
+            lift_manifest_installed: false,
+            bound: HashMap::new(),
+            installed: HashSet::new(),
         })
     }
 
     fn prepare_process(&mut self, cmd: &'a Cmd) -> Result<Process, String> {
-        let vars = cmd
-            .env
-            .iter()
-            .map(|(key, value)| {
-                self.reify_string(value)
-                    .map(|v| (EnvVar::from(key), OsString::from(v)))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let exe = self.reify_string(&cmd.exe)?.into();
-        let args = cmd
-            .args
-            .iter()
-            .map(|string| self.reify_string(string).map(OsString::from))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut needs_lift_manifest = false;
+        let (exe, needs_manifest) = self.reify_string(&cmd.exe)?;
+        needs_lift_manifest |= needs_manifest;
 
-        Ok(Process {
+        let mut args = vec![];
+        for arg in &cmd.args {
+            let (reified_arg, needs_manifest) = self.reify_string(arg)?;
+            needs_lift_manifest |= needs_manifest;
+            args.push(reified_arg.into());
+        }
+        let mut vars = vec![];
+        for (key, value) in cmd.env.iter() {
+            let (reified_value, needs_manifest) = self.reify_string(value)?;
+            needs_lift_manifest |= needs_manifest;
+            vars.push((EnvVar::from(key), reified_value.into()));
+        }
+
+        let process = Process {
             env: EnvVars { vars },
-            exe,
+            exe: exe.into(),
             args,
-        })
+        };
+        if needs_lift_manifest {
+            self.lift_manifest_dependants.insert(process.clone());
+        }
+        Ok(process)
     }
 
-    fn prepare(&mut self, cmd: &'a Cmd) -> Result<(Process, Vec<Binding>, Vec<FileEntry>), String> {
+    fn prepare(&mut self, cmd: &'a Cmd) -> Result<(Process, Vec<FileEntry>), String> {
         let process = self.prepare_process(cmd)?;
 
         let mut load_entries = vec![];
         for file in &self.lift.files {
-            if let Source::LoadBinding(binding_name) = &file.source {
-                let path = self.get_path(file);
-                load_entries.push(FileEntry::LoadAndInstall((
-                    self.prepare_process(
+            if self.replacements.contains(&file) && !self.installed.contains(file) {
+                if let Source::LoadBinding(binding_name) = &file.source {
+                    let path = self.get_path(file);
+                    let file_source_process = self.prepare_process(
                         self.lift
                             .boot
                             .bindings
                             .get(binding_name)
                             .ok_or_else(|| format!("No boot binding named {binding_name}."))?,
-                    )?,
-                    file.clone(),
-                    path,
-                )))
+                    )?;
+                    let lift_manifest = if !self.lift_manifest_installed
+                        && self.lift_manifest_dependants.contains(&file_source_process)
+                    {
+                        Some(self.lift_manifest.clone())
+                    } else {
+                        None
+                    };
+                    load_entries.push(FileEntry::LoadAndInstall((
+                        LoadProcess {
+                            lift_manifest,
+                            process: file_source_process,
+                        },
+                        file.clone(),
+                        path,
+                    )))
+                }
             }
         }
 
         let mut scie_tote = vec![];
         let mut file_entries = vec![];
         for (index, file) in self.lift.files.iter().enumerate() {
-            if self.replacements.contains(&file) {
+            if self.replacements.contains(&file) && !self.installed.contains(file) {
                 let path = self.get_path(file);
                 if file.size == 0 {
                     scie_tote.push((file.clone(), path));
@@ -193,7 +332,11 @@ impl<'a> Context<'a> {
                     file_entries.push(FileEntry::Install((file.clone(), path)));
                 }
             } else if index < self.lift.files.len() - 1 || scie_tote.is_empty() {
-                file_entries.push(FileEntry::Skip(file.size))
+                file_entries.push(FileEntry::Skip(if file.source == Source::Scie {
+                    file.size
+                } else {
+                    0
+                }))
             }
         }
         if !scie_tote.is_empty() {
@@ -216,14 +359,7 @@ impl<'a> Context<'a> {
         // extracted for use in the load process.
         file_entries.append(&mut load_entries);
 
-        Ok((
-            process,
-            self.bindings
-                .values()
-                .map(Binding::clone)
-                .collect::<Vec<_>>(),
-            file_entries,
-        ))
+        Ok((process, file_entries))
     }
 
     fn select_cmd(
@@ -232,10 +368,10 @@ impl<'a> Context<'a> {
         argv1_consumed: bool,
     ) -> Result<Option<SelectedCmd>, String> {
         if let Some(cmd) = self.lift.boot.commands.get(name) {
-            let (process, bindings, files) = self.prepare(cmd)?;
+            let (process, files) = self.prepare(cmd)?;
+            self.maybe_install_lift_manifest(&process)?;
             return Ok(Some(SelectedCmd {
                 process,
-                bindings,
                 files,
                 argv1_consumed,
             }));
@@ -275,91 +411,161 @@ impl<'a> Context<'a> {
         self.base.join(&file.hash).join(&file.name)
     }
 
-    fn record_lift_manifest(&self) -> Result<PathBuf, String> {
-        let manifest = self.base.join(&self.lift.hash).join("lift.json");
-        atomic_path(&manifest, Target::File, |path| {
-            config(self.jump.clone(), self.lift.clone()).serialize(
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(path)
-                    .map_err(|e| {
-                        format!(
-                            "Failed top open lift manifest at {path} for writing: {e}",
-                            path = manifest.display()
-                        )
-                    })?,
-                Fmt::new().trailing_newline(true).pretty(true),
-            )
-        })?;
-        Ok(manifest)
+    fn get_bindings_dir(&self) -> PathBuf {
+        self.base.join(&self.lift.hash).join("bindings")
     }
 
-    fn reify_string(&mut self, value: &'a str) -> Result<String, String> {
+    fn maybe_install_lift_manifest(&mut self, process: &Process) -> Result<(), String> {
+        if !self.lift_manifest_installed && self.lift_manifest_dependants.contains(process) {
+            self.lift_manifest.install()?;
+            self.lift_manifest_installed = true;
+        }
+        Ok(())
+    }
+
+    fn parse_env(&mut self, env: &'a str) -> Result<(String, String, bool), String> {
+        let (parsed_env, needs_lift_manifest) = self.reify_string(env)?;
+        let (name, default) = match parsed_env.splitn(2, '=').collect::<Vec<_>>()[..] {
+            [name] => (name, ""),
+            [name, default] => (name, default),
+            _ => {
+                return Err(
+                    "Expected {{scie.env.<name>}} <name> placeholder to be a non-empty \
+                            string"
+                        .to_string(),
+                )
+            }
+        };
+        Ok((name.to_string(), default.to_string(), needs_lift_manifest))
+    }
+
+    fn bind(&mut self, name: &'a str) -> Result<HashMap<String, String>, String> {
+        if let Some(binding) = self.bound.get(name) {
+            binding.load_env()
+        } else {
+            let (process, files) = self.prepare(
+                self.lift
+                    .boot
+                    .bindings
+                    .get(name)
+                    .ok_or_else(|| format!("No boot binding named {name}."))?,
+            )?;
+            let process_hash = process.fingerprint()?;
+            let boot_binding = Binding {
+                target: self
+                    .base
+                    .join(&self.lift.hash)
+                    .join("locks")
+                    .join(format!("{name}-{process_hash}")),
+                process,
+            };
+            let binding_env = boot_binding.execute(|| {
+                self.maybe_install_lift_manifest(&boot_binding.process)?;
+                self.installer.install(files.as_slice())
+            })?;
+            self.bound.insert(name, boot_binding);
+            for file_entry in files {
+                match file_entry {
+                    FileEntry::Skip(_) => {}
+                    FileEntry::Install((file, _)) => {
+                        self.installed.insert(file);
+                    }
+                    FileEntry::LoadAndInstall((_, file, _)) => {
+                        self.installed.insert(file);
+                    }
+                    FileEntry::ScieTote((_, tote_entries)) => {
+                        for (file, _) in tote_entries {
+                            self.installed.insert(file);
+                        }
+                    }
+                }
+            }
+            Ok(binding_env)
+        }
+    }
+
+    fn reify_string(&mut self, value: &'a str) -> Result<(String, bool), String> {
         let mut reified = String::with_capacity(value.len());
+        let mut lift_manifest_required = false;
 
         let parsed = placeholders::parse(value)?;
         for item in &parsed.items {
             match item {
                 Item::LeftBrace => reified.push('{'),
                 Item::Text(text) => reified.push_str(text),
-                Item::Placeholder(Placeholder::FileName(name)) => {
+                Item::Placeholder(Placeholder::FileHash(name)) => {
+                    let (parsed_name, needs_manifest) = self.reify_string(name)?;
+                    lift_manifest_required |= needs_manifest;
                     let file = self
                         .files_by_name
-                        .get(name)
-                        .ok_or_else(|| format!("No file named {name} is stored in this scie."))?;
+                        .get(parsed_name.as_str())
+                        .ok_or_else(|| {
+                            format!("No file named {parsed_name} is stored in this scie.")
+                        })?;
+                    reified.push_str(&file.hash);
+                }
+                Item::Placeholder(Placeholder::FileName(name)) => {
+                    let (parsed_name, needs_manifest) = self.reify_string(name)?;
+                    lift_manifest_required |= needs_manifest;
+                    let file = self
+                        .files_by_name
+                        .get(parsed_name.as_str())
+                        .ok_or_else(|| {
+                            format!("No file named {parsed_name} is stored in this scie.")
+                        })?;
                     let path = self.get_path(file);
                     reified.push_str(path_to_str(&path)?);
                     self.replacements.insert(file);
                 }
-                Item::Placeholder(Placeholder::Env(text)) => {
-                    let parsed_env = self.reify_string(text)?;
-                    let (name, default) = match parsed_env.splitn(2, '=').collect::<Vec<_>>()[..] {
-                        [name] => (name, ""),
-                        [name, default] => (name, default),
-                        _ => return Err(
-                            "Expected {{scie.env.<name>}} <name> placeholder to be a non-empty \
-                            string"
-                                .to_string(),
-                        ),
-                    };
-                    let env_var = env::var_os(name).unwrap_or_else(|| default.into());
+                Item::Placeholder(Placeholder::Env(env)) => {
+                    let (name, default, needs_manifest) = self.parse_env(env)?;
+                    lift_manifest_required |= needs_manifest;
+                    let env_var = env::var_os(&name).unwrap_or_else(|| default.into());
                     let value = env_var.into_string().map_err(|value| {
                         format!("Failed to decode env var {name} as utf-8 value: {value:?}")
                     })?;
                     reified.push_str(&value)
                 }
                 Item::Placeholder(Placeholder::Scie) => reified.push_str(path_to_str(self.scie)?),
+                Item::Placeholder(Placeholder::ScieBase) => {
+                    reified.push_str(path_to_str(&self.base)?)
+                }
                 Item::Placeholder(Placeholder::ScieBindings) => {
-                    reified.push_str(path_to_str(
-                        &self.base.join(&self.lift.hash).join("bindings"),
-                    )?);
+                    reified.push_str(path_to_str(self.get_bindings_dir().as_path())?);
                 }
                 Item::Placeholder(Placeholder::ScieBindingCmd(name)) => {
-                    if !self.bindings.contains_key(name) {
-                        let boot_binding = Binding {
-                            target: self.base.join(&self.lift.hash).join("locks").join(name),
-                            process: self.prepare_process(
-                                self.lift
-                                    .boot
-                                    .bindings
-                                    .get(*name)
-                                    .ok_or_else(|| format!("No boot binding named {name}."))?,
-                            )?,
-                        };
-                        self.bindings.insert(name, boot_binding);
-                    }
-                    reified.push_str(path_to_str(
-                        &self.base.join(&self.lift.hash).join("bindings"),
-                    )?);
+                    self.bind(name)?;
+                    reified.push_str(path_to_str(self.get_bindings_dir().as_path())?);
+                }
+                Item::Placeholder(Placeholder::ScieBindingEnv(ScieBindingEnv { binding, env })) => {
+                    let binding_env = self.bind(binding)?;
+                    let (name, default, needs_manifest) = self.parse_env(env)?;
+                    lift_manifest_required |= needs_manifest;
+                    let value = binding_env
+                        .get(name.as_str())
+                        .map(String::to_owned)
+                        .unwrap_or(default);
+                    reified.push_str(&value)
                 }
                 Item::Placeholder(Placeholder::ScieLift) => {
-                    let manifest = self.record_lift_manifest()?;
-                    reified.push_str(path_to_str(&manifest)?);
+                    lift_manifest_required = true;
+                    reified.push_str(path_to_str(&self.lift_manifest.path)?);
                 }
+                Item::Placeholder(Placeholder::SciePlatform) => reified.push_str(
+                    format!(
+                        "{os}-{arch}",
+                        os = env::consts::OS,
+                        arch = env::consts::ARCH
+                    )
+                    .as_str(),
+                ),
+                Item::Placeholder(Placeholder::SciePlatformArch) => {
+                    reified.push_str(env::consts::ARCH)
+                }
+                Item::Placeholder(Placeholder::SciePlatformOs) => reified.push_str(env::consts::OS),
             }
         }
-        Ok(reified)
+        Ok((reified, lift_manifest_required))
     }
 }
 
@@ -367,8 +573,9 @@ pub(crate) fn select_command(
     scie: &Path,
     jump: &Jump,
     lift: &Lift,
+    installer: &Installer,
 ) -> Result<Option<SelectedCmd>, String> {
-    let mut context = Context::new(scie, jump, lift)?;
+    let mut context = Context::new(scie, jump, lift, installer)?;
     context.select_command()
 }
 
@@ -378,6 +585,7 @@ mod tests {
 
     use super::Context;
     use crate::config::{Boot, FileType};
+    use crate::installer::Installer;
     use crate::{File, Jump, Lift, Source};
 
     #[test]
@@ -409,73 +617,72 @@ mod tests {
             }],
             other: None,
         };
-        let mut context = Context::new(Path::new("scie_path"), &jump, &lift).unwrap();
+        let installer = Installer::new(&[]);
+        let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
 
         assert!(std::env::var_os("__DNE__").is_none());
         assert_eq!(
-            "",
-            context.reify_string("{scie.env.__DNE__}").unwrap().as_str()
+            ("".to_string(), false),
+            context.reify_string("{scie.env.__DNE__}").unwrap()
         );
         assert_eq!(
-            "default",
-            context
-                .reify_string("{scie.env.__DNE__=default}")
-                .unwrap()
-                .as_str()
+            ("default".to_string(), false),
+            context.reify_string("{scie.env.__DNE__=default}").unwrap()
         );
 
         std::env::set_var("__DNE__", "foo");
         assert_eq!(
-            "foo",
-            context
-                .reify_string("{scie.env.__DNE__=default}")
-                .unwrap()
-                .as_str()
+            ("foo".to_string(), false),
+            context.reify_string("{scie.env.__DNE__=default}").unwrap()
         );
         std::env::remove_var("__DNE__");
 
         assert_eq!(
-            "scie_path",
-            context
-                .reify_string("{scie.env.__DNE__={scie}}")
-                .unwrap()
-                .as_str()
+            ("scie_path".to_string(), false),
+            context.reify_string("{scie.env.__DNE__={scie}}").unwrap()
         );
         assert_eq!(
-            tempdir
-                .path()
-                .join("abc")
-                .join("lift.json")
-                .to_str()
-                .unwrap(),
+            (
+                tempdir
+                    .path()
+                    .join("abc")
+                    .join("lift.json")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                true
+            ),
             context
                 .reify_string("{scie.env.__DNE__={scie.lift}}")
                 .unwrap()
-                .as_str()
         );
         assert_eq!(
-            tempdir.path().join("def").join("file").to_str().unwrap(),
-            context
-                .reify_string("{scie.env.__DNE__={file}}")
-                .unwrap()
-                .as_str()
+            (
+                tempdir
+                    .path()
+                    .join("def")
+                    .join("file")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                false
+            ),
+            context.reify_string("{scie.env.__DNE__={file}}").unwrap()
         );
 
         assert!(std::env::var_os("__DNE2__").is_none());
         assert_eq!(
-            "42",
+            ("42".to_string(), false),
             context
                 .reify_string("{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
-                .as_str()
         );
         std::env::set_var("__DNE2__", "bar");
         assert_eq!(
-            "bar",
+            ("bar".to_string(), false),
             context
                 .reify_string("{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
-                .as_str()
         );
         std::env::remove_var("__DNE2__");
     }

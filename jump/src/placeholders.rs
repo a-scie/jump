@@ -3,13 +3,26 @@
 
 #[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Debug)]
+pub(crate) struct ScieBindingEnv<'a> {
+    pub(crate) binding: &'a str,
+    pub(crate) env: &'a str,
+}
+
+#[cfg_attr(test, derive(Eq, PartialEq))]
+#[derive(Debug)]
 pub(crate) enum Placeholder<'a> {
+    Env(&'a str),
+    FileHash(&'a str),
     FileName(&'a str),
     Scie,
+    ScieBase,
     ScieBindings,
     ScieBindingCmd(&'a str),
+    ScieBindingEnv(ScieBindingEnv<'a>),
     ScieLift,
-    Env(&'a str),
+    SciePlatform,
+    SciePlatformArch,
+    SciePlatformOs,
 }
 
 #[cfg_attr(test, derive(Eq, PartialEq))]
@@ -72,14 +85,37 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                 }
                 match symbol.splitn(3, '.').collect::<Vec<_>>()[..] {
                     ["scie"] => items.push(Item::Placeholder(Placeholder::Scie)),
+                    ["scie", "base"] => items.push(Item::Placeholder(Placeholder::ScieBase)),
                     ["scie", "bindings"] => {
                         items.push(Item::Placeholder(Placeholder::ScieBindings))
                     }
-                    ["scie", "bindings", cmd] => {
-                        items.push(Item::Placeholder(Placeholder::ScieBindingCmd(cmd)))
+                    ["scie", "bindings", binding] => {
+                        match binding.splitn(2, ':').collect::<Vec<_>>()[..] {
+                            [name, env] => items.push(Item::Placeholder(
+                                Placeholder::ScieBindingEnv(ScieBindingEnv { binding: name, env }),
+                            )),
+                            _ => {
+                                items.push(Item::Placeholder(Placeholder::ScieBindingCmd(binding)))
+                            }
+                        }
                     }
-                    ["scie", "env", name] => items.push(Item::Placeholder(Placeholder::Env(name))),
+                    ["scie", "env", env] => items.push(Item::Placeholder(Placeholder::Env(env))),
+                    ["scie", "files", name] => {
+                        items.push(Item::Placeholder(Placeholder::FileName(name)))
+                    }
+                    ["scie", "files:hash", name] => {
+                        items.push(Item::Placeholder(Placeholder::FileHash(name)))
+                    }
                     ["scie", "lift"] => items.push(Item::Placeholder(Placeholder::ScieLift)),
+                    ["scie", "platform"] => {
+                        items.push(Item::Placeholder(Placeholder::SciePlatform))
+                    }
+                    ["scie", "platform", "arch"] => {
+                        items.push(Item::Placeholder(Placeholder::SciePlatformArch))
+                    }
+                    ["scie", "platform", "os"] => {
+                        items.push(Item::Placeholder(Placeholder::SciePlatformOs))
+                    }
                     _ => items.push(Item::Placeholder(Placeholder::FileName(symbol))),
                 }
                 previous_char = Some('}');
@@ -99,6 +135,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
 #[cfg(test)]
 mod tests {
     use super::{parse, Item, Placeholder};
+    use crate::placeholders::ScieBindingEnv;
 
     #[test]
     fn no_placeholders() {
@@ -131,6 +168,21 @@ mod tests {
                 Item::Text("boot")
             ],
             parse("a{scie}boot").unwrap().items
+        );
+    }
+
+    #[test]
+    fn scie_base() {
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::ScieBase)],
+            parse("{scie.base}").unwrap().items
+        );
+        assert_eq!(
+            vec![
+                Item::Placeholder(Placeholder::ScieBase),
+                Item::Text("/here")
+            ],
+            parse("{scie.base}/here").unwrap().items
         );
     }
 
@@ -175,6 +227,31 @@ mod tests {
     }
 
     #[test]
+    fn scie_bindings_env() {
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::ScieBindingEnv(
+                ScieBindingEnv {
+                    binding: "do",
+                    env: "FOO"
+                }
+            ))],
+            parse("{scie.bindings.do:FOO}").unwrap().items
+        );
+        assert_eq!(
+            vec![
+                Item::Placeholder(Placeholder::ScieBindingEnv(ScieBindingEnv {
+                    binding: "dotted.cmd.name",
+                    env: "BAR"
+                })),
+                Item::Text("/venv/pex"),
+            ],
+            parse("{scie.bindings.dotted.cmd.name:BAR}/venv/pex")
+                .unwrap()
+                .items
+        );
+    }
+
+    #[test]
     fn scie_env() {
         assert_eq!(
             vec![Item::Placeholder(Placeholder::Env("PATH"))],
@@ -199,6 +276,14 @@ mod tests {
     }
 
     #[test]
+    fn file_hash() {
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::FileHash("python"))],
+            parse("{scie.files:hash.python}").unwrap().items
+        );
+    }
+
+    #[test]
     fn file_name() {
         assert_eq!(
             vec![
@@ -208,8 +293,40 @@ mod tests {
             parse("{python}/bin/python").unwrap().items
         );
         assert_eq!(
+            vec![
+                Item::Placeholder(Placeholder::FileName("python")),
+                Item::Text("/bin/python")
+            ],
+            parse("{scie.files.python}/bin/python").unwrap().items
+        );
+        assert_eq!(
+            vec![
+                Item::Placeholder(Placeholder::FileName("{scie.env.PYTHON}")),
+                Item::Text("/bin/python")
+            ],
+            parse("{scie.files.{scie.env.PYTHON}}/bin/python")
+                .unwrap()
+                .items
+        );
+        assert_eq!(
             vec![Item::Placeholder(Placeholder::FileName("dotted.file.name"))],
             parse("{dotted.file.name}").unwrap().items
+        );
+    }
+
+    #[test]
+    fn platform() {
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::SciePlatform)],
+            parse("{scie.platform}").unwrap().items,
+        );
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::SciePlatformArch)],
+            parse("{scie.platform.arch}").unwrap().items,
+        );
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::SciePlatformOs)],
+            parse("{scie.platform.os}").unwrap().items,
         );
     }
 
