@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.7.0
+
+This release brings support for removing env vars to command definitions. Now, in addition to
+defaulting a variable with a `"NAME": "VALUE` entry in the `"env"` object and unconditionally
+writing a variable with `"=NAME": "VALUE"`, ambient environment variables can be removed by adding
+an `"env"` entry object with a `null` value. See the [packaging guide](docs/packaging.md) for more
+details.
+
 ## 0.6.0
 
 This release brings various improvements and features whose need was fleshed out by the

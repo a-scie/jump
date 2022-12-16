@@ -208,7 +208,7 @@ pub struct Cmd {
     pub args: Vec<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub env: BTreeMap<EnvVar, String>,
+    pub env: BTreeMap<EnvVar, Option<String>>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -414,12 +414,14 @@ mod tests {
                                 env: [
                                     (
                                         EnvVar::Default("DEFAULT".to_string()),
-                                        "default".to_string()
+                                        Some("default".to_string())
                                     ),
                                     (
                                         EnvVar::Replace("REPLACE".to_string()),
-                                        "replace".to_string()
-                                    )
+                                        Some("replace".to_string())
+                                    ),
+                                    (EnvVar::Default("PEX_.*".to_string()), None,),
+                                    (EnvVar::Replace("PEX".to_string()), None,)
                                 ]
                                 .into_iter()
                                 .collect(),
@@ -465,7 +467,9 @@ mod tests {
                                     "": {
                                         "env": {
                                             "PEX_VERBOSE": "1",
-                                            "=PATH": ".:${scie.env.PATH}"
+                                            "=PATH": ".:${scie.env.PATH}",
+                                            "PEX_.*": null,
+                                            "=PEX": null
                                         },
                                         "exe":"{python}/bin/python",
                                         "args": [

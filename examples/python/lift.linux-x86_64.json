@@ -8,7 +8,8 @@
           "": {
             "description": "The Pants build tool.",
             "env": {
-              "=PATH": "{cpython}/python/bin:{scie.env.PATH}"
+              "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
+              "PEX_.*": null
             },
             "exe": "{scie.bindings.venv}/venv/bin/python3.9",
             "args": [
@@ -19,7 +20,7 @@
             "description": "A Python repl with Pants (minus plugins) available for inspection.",
             "env": {
               "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
-              "PEX_TOOLS": "1"
+              "=PYTHONPATH": null
             },
             "exe": "{scie.bindings.venv}/venv/bin/python3.9"
           }
@@ -30,7 +31,8 @@
             "env": {
               "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
               "PEX_TOOLS": "1",
-              "PEX_ROOT": "{scie.bindings}/pex_root"
+              "PEX_ROOT": "{scie.bindings}/pex_root",
+              "PEX_.*": null
             },
             "exe": "{cpython}/python/bin/python3.9",
             "args": [

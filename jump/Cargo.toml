@@ -1,6 +1,6 @@
 [package]
 name = "jump"
-version = "0.6.0"
+version = "0.7.0"
 description = "The bulk of the scie-jump binary logic."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
@@ -19,6 +19,7 @@ itertools = "0.10"
 log = { workspace = true }
 logging_timer = { workspace = true }
 memmap = "0.7"
+regex = { version = "1.7", default_features = false, features = ["std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"

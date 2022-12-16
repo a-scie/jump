@@ -138,7 +138,15 @@ For commands, you can specify additional command line "args" to always pass to t
 environment variables to set in the ambient runtime environment via the "env" object. An environment
 variable name that begins with "=" will have the "=" stripped and will overwrite any ambient
 environment variable of the same name. Without the leading "=" the environment variable will be set
-only if not already present in the ambient runtime environment.
+only if not already present in the ambient runtime environment. If the env entry has a `null` value,
+the corresponding environment variable will be removed. For removals, names with a leading "=" will
+have the "=" stripped and the environment variable with the corresponding name will be removed. With
+no leading "=", the name is interpreted as a regular expression and all matching environment
+variable names will be removed. For example, `"BASH_.*": null` would remove all environment
+variables whose name start with `BASH_` and `"=BASH_SOURCE": null` would just remove the
+`BASH_SOURCE` environment variable. When processing env entries, removals are done first, then
+defaults are set and finally overwrites are processed. This is regardless of the order of the env
+var entries in the lift manifest JSON document.
 
 You can also supply a list of commands under "scie.lift.boot.bindings". These commands are objects
 with the same format as the "scie.lift.boot.commands" but they are not directly runnable by the end

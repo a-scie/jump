@@ -271,9 +271,15 @@ impl<'a> Context<'a> {
         }
         let mut vars = vec![];
         for (key, value) in cmd.env.iter() {
-            let (reified_value, needs_manifest) = self.reify_string(value)?;
-            needs_lift_manifest |= needs_manifest;
-            vars.push((EnvVar::from(key), reified_value.into()));
+            let final_value = match value {
+                Some(val) => {
+                    let (reified_value, needs_manifest) = self.reify_string(val)?;
+                    needs_lift_manifest |= needs_manifest;
+                    Some(reified_value)
+                }
+                None => None,
+            };
+            vars.push(EnvVar::try_from((key, final_value))?);
         }
 
         let process = Process {

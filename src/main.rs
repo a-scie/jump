@@ -12,7 +12,7 @@ mod boot;
 
 use jump::BootAction;
 
-#[cfg(target_family = "windows")]
+#[cfg(windows)]
 fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
     let result = jump::execute(exe, args, argv_skip);
     match result {
@@ -21,7 +21,7 @@ fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
     }
 }
 
-#[cfg(not(target_family = "windows"))]
+#[cfg(unix)]
 fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStringExt;
