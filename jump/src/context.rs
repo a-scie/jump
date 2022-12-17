@@ -387,6 +387,9 @@ impl<'a> Context<'a> {
 
     fn select_command(&mut self) -> Result<Option<SelectedCmd>, String> {
         if let Some(cmd) = env::var_os("SCIE_BOOT") {
+            // Avoid subprocesses that re-execute this SCIE unintentionally getting in an infinite
+            // loop.
+            env::remove_var("SCIE_BOOT");
             let name = cmd.into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_BOOT: {value:?}")
             })?;

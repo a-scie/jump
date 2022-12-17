@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.7.1
+
+This release fixes `SCIE_BOOT` re-directions to clear the `SCIE_BOOT` environment variable before
+executing the `SCIE_BOOT` selected command. This avoids the need for these commands to clear the
+`SCIE_BOOT` environment variable when re-executing the `SCIE` to avoid infinite loops.
+
 ## 0.7.0
 
 This release brings support for removing env vars to command definitions. Now, in addition to
