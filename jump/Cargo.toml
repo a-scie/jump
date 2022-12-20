@@ -13,6 +13,7 @@ bstr = { workspace = true }
 byteorder = "1.4"
 bzip2 = "0.4"
 dirs = "4.0"
+dotenv = "0.15"
 fd-lock = "3.0"
 flate2 = "1.0"  # For gz support.
 itertools = "0.10"

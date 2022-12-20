@@ -53,6 +53,7 @@ pub struct Lift {
     pub name: String,
     pub description: Option<String>,
     pub base: Option<PathBuf>,
+    pub(crate) load_dotenv: bool,
     pub size: usize,
     pub hash: String,
     pub boot: Boot,
@@ -95,6 +96,7 @@ impl From<Lift> for crate::config::Lift {
             name: value.name,
             description: value.description,
             base: value.base,
+            load_dotenv: if value.load_dotenv { Some(true) } else { None },
             boot: value.boot,
             files: value
                 .files
@@ -276,6 +278,7 @@ fn load(
             name: lift.name,
             description: lift.description,
             base: lift.base,
+            load_dotenv: lift.load_dotenv.unwrap_or(false),
             boot: lift.boot,
             size: data.len(),
             hash: fingerprint::digest(data),

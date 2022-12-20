@@ -2,6 +2,7 @@
   "scie": {
     "lift": {
       "name": "cowsay",
+      "load_dotenv": true,
       "files": [
         {
           "name": "get.sh"

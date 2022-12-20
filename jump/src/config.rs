@@ -243,6 +243,9 @@ pub struct Lift {
     pub base: Option<PathBuf>,
     pub files: Vec<File>,
     pub boot: Boot,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_dotenv: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -433,7 +436,8 @@ mod tests {
                         bindings: Default::default()
                     },
                     name: "test".to_string(),
-                    description: None
+                    description: None,
+                    load_dotenv: Some(false)
                 },
                 None,
             ))
