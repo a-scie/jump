@@ -21,6 +21,7 @@ mod process;
 mod zip;
 
 use std::env;
+use std::env::current_exe;
 use std::path::PathBuf;
 
 use logging_timer::time;
@@ -82,42 +83,59 @@ pub fn config(jump: Jump, mut lift: Lift) -> Config {
     Config::new(jump, lift, other)
 }
 
+struct CurrentExe {
+    exe: PathBuf,
+    invoked_as: PathBuf,
+}
+
+fn find_current_exe() -> Result<CurrentExe, String> {
+    let exe =
+        current_exe().map_err(|e| format!("Failed to find path of the current executable: {e}"))?;
+    let invoked_as = if let Some(arg) = env::args_os().next() {
+        PathBuf::from(arg)
+    } else {
+        exe.clone()
+    };
+    Ok(CurrentExe { exe, invoked_as })
+}
+
 #[time("debug", "jump::{}")]
-pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
-    let file = std::fs::File::open(&current_exe).map_err(|e| {
+pub fn prepare_boot() -> Result<BootAction, String> {
+    let current_exe = find_current_exe()?;
+    let file = std::fs::File::open(&current_exe.exe).map_err(|e| {
         format!(
             "Failed to open current exe at {exe} for reading: {e}",
-            exe = current_exe.display(),
+            exe = current_exe.exe.display(),
         )
     })?;
     let data = unsafe {
         memmap::Mmap::map(&file)
-            .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.display()))?
+            .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.exe.display()))?
     };
 
-    if let Some(jump) = jump::load(&data, &current_exe)? {
-        return Ok(BootAction::Pack((jump, current_exe)));
+    if let Some(jump) = jump::load(&data, &current_exe.exe)? {
+        return Ok(BootAction::Pack((jump, current_exe.exe)));
     }
 
-    let (jump, lift) = lift::load_scie(&current_exe, &data)?;
+    let (jump, lift) = lift::load_scie(&current_exe.exe, &data)?;
     trace!(
         "Loaded lift manifest from {current_exe}:\n{lift:#?}",
-        current_exe = current_exe.display()
+        current_exe = current_exe.exe.display()
     );
 
     if let Some(value) = env::var_os("SCIE") {
         if "boot-pack" == value {
-            return Ok(BootAction::Pack((jump, current_exe)));
+            return Ok(BootAction::Pack((jump, current_exe.exe)));
         } else if "help" == value {
             return Ok(BootAction::Help((format!("{HELP}\n"), 0)));
         } else if "inspect" == value {
             return Ok(BootAction::Inspect((jump, lift)));
         } else if "install" == value {
-            return Ok(BootAction::Install((current_exe, lift.boots())));
+            return Ok(BootAction::Install((current_exe.exe, lift.boots())));
         } else if "list" == value {
             return Ok(BootAction::List(lift.boots()));
         } else if "split" == value {
-            return Ok(BootAction::Split((jump, lift, current_exe)));
+            return Ok(BootAction::Split((jump, lift, current_exe.exe)));
         } else if !PathBuf::from(&value).exists() {
             let help_message = format!(
                 "The SCIE environment variable is set to {value:?} which is not a scie path\n\
@@ -137,7 +155,7 @@ pub fn prepare_boot(current_exe: PathBuf) -> Result<BootAction, String> {
         installer.install(&selected_command.files)?;
         let process = selected_command.process;
         trace!("Prepared {process:#?}");
-        env::set_var("SCIE", current_exe.as_os_str());
+        env::set_var("SCIE", current_exe.exe.as_os_str());
         Ok(BootAction::Execute((
             process,
             selected_command.argv1_consumed,
