@@ -27,7 +27,10 @@ GET_LOG_CONFIG="$(mktemp)"
 gc "${GET_LOG_CONFIG}"
 export GET_LOG_CONFIG
 
-export GET_CONFIG="alt-metadata.json"
+# Specify an alternate URL database via load_dotenv capability.
+gc "${PWD}/.env"
+echo GET_CONFIG=alt-metadata.json > .env
 ./cowsay "Alt Curl!"
 
+source .env
 grep "${GET_CONFIG}" "${GET_LOG_CONFIG}"

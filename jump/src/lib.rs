@@ -24,7 +24,8 @@ use std::env;
 use std::env::current_exe;
 use std::path::PathBuf;
 
-use logging_timer::time;
+use log::Level;
+use logging_timer::{time, timer};
 
 pub use crate::archive::create_options;
 use crate::config::Config;
@@ -148,6 +149,12 @@ pub fn prepare_boot() -> Result<BootAction, String> {
         }
     }
 
+    if lift.load_dotenv {
+        let _timer = timer!(Level::Debug; "jump::load_dotenv");
+        if let Ok(dotenv_file) = dotenv::dotenv() {
+            debug!("Loaded env file from {path}", path = dotenv_file.display());
+        }
+    }
     let payload = &data[jump.size..data.len() - lift.size];
     let installer = Installer::new(payload);
     let result = context::select_command(&current_exe, &jump, &lift, &installer);

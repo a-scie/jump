@@ -608,6 +608,7 @@ mod tests {
             name: "test".to_string(),
             description: None,
             base: Some(tempdir.path().to_path_buf()),
+            load_dotenv: true,
             size: 137,
             hash: "abc".to_string(),
             boot: Boot {
