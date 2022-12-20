@@ -17,7 +17,7 @@ use crate::installer::Installer;
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
 use crate::process::{EnvVar, Process};
-use crate::{config, EnvVars, Jump, Source};
+use crate::{config, CurrentExe, EnvVars, Jump, Source};
 
 fn expanduser(path: &Path) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(path)
@@ -385,7 +385,7 @@ impl<'a> Context<'a> {
         Ok(None)
     }
 
-    fn select_command(&mut self) -> Result<Option<SelectedCmd>, String> {
+    fn select_command(&mut self, invoked_as: &Path) -> Result<Option<SelectedCmd>, String> {
         if let Some(cmd) = env::var_os("SCIE_BOOT") {
             // Avoid subprocesses that re-execute this SCIE unintentionally getting in an infinite
             // loop.
@@ -399,11 +399,11 @@ impl<'a> Context<'a> {
             return Ok(Some(selected_cmd));
         }
 
-        #[cfg(target_family = "windows")]
-        let basename = self.scie.file_stem().and_then(try_as_str);
+        #[cfg(windows)]
+        let basename = invoked_as.file_stem().and_then(try_as_str);
 
-        #[cfg(not(target_family = "windows"))]
-        let basename = self.scie.file_name().and_then(try_as_str);
+        #[cfg(unix)]
+        let basename = invoked_as.file_name().and_then(try_as_str);
 
         if let Some(basename) = basename {
             if let Some(selected_command) = self.select_cmd(basename, false)? {
@@ -579,13 +579,13 @@ impl<'a> Context<'a> {
 }
 
 pub(crate) fn select_command(
-    scie: &Path,
+    current_exe: &CurrentExe,
     jump: &Jump,
     lift: &Lift,
     installer: &Installer,
 ) -> Result<Option<SelectedCmd>, String> {
-    let mut context = Context::new(scie, jump, lift, installer)?;
-    context.select_command()
+    let mut context = Context::new(&current_exe.exe, jump, lift, installer)?;
+    context.select_command(&current_exe.invoked_as)
 }
 
 #[cfg(test)]

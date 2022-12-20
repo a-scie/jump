@@ -1,12 +1,9 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::env;
-use std::env::current_exe;
 use std::ffi::OsString;
-use std::path::PathBuf;
 
-use proc_exit::{Code, Exit, ExitResult};
+use proc_exit::{Code, ExitResult};
 
 mod boot;
 
@@ -54,29 +51,10 @@ fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
         .map(|_| ())
 }
 
-fn find_current_exe() -> Result<PathBuf, Exit> {
-    if let Some(arg) = env::args().next() {
-        let argv0 = PathBuf::from(arg);
-        if argv0.is_file() {
-            return Ok(argv0);
-        }
-    }
-    current_exe().map_err(|e| {
-        Code::FAILURE.with_message(format!(
-            "Failed to find path of the current executable: {e}"
-        ))
-    })
-}
-
 fn main() -> ExitResult {
     env_logger::init();
 
-    if let Some(arg) = env::args().next() {
-        let argv0 = PathBuf::from(arg);
-        if argv0.is_file() {}
-    }
-    let current_exe = find_current_exe()?;
-    let action = jump::prepare_boot(current_exe).map_err(|e| {
+    let action = jump::prepare_boot().map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
 
