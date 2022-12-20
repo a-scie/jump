@@ -10,6 +10,16 @@ check_cmd mktemp
 gc "${PWD}/cowsay"
 "${SCIE_JUMP}" "${LIFT}"
 
+# Verify byte-wise identical pack -> split -> pack round tripping.
+gc "${PWD}/split"
+SCIE="split" ./cowsay split
+
+sha256 cowsay* > split/cowsay.sha256
+cd split && ./scie-jump
+sha256 --check cowsay.sha256
+sha256 cowsay* ../cowsay*
+cd .. && rm -rf split
+
 # Force downloads to occur to exercise the load functionality even if nce cache has the JDK and the
 # cowsay jars already from other examples.
 SCIE_BASE="$(mktemp -d)"
