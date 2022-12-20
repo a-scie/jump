@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.7.2
+
+This release fixes a bug in argv0 / current exe determination handling that led to a scie-jump
+being fooled by a file in `CWD` with the same name as the active scie invoked from elsewhere via
+the `PATH`.
+
 ## 0.7.1
 
 This release fixes `SCIE_BOOT` re-directions to clear the `SCIE_BOOT` environment variable before
