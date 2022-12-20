@@ -7,7 +7,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use jump::config::{FileType, Fmt};
-use jump::{File, Jump, Lift};
+use jump::{File, Jump, Lift, Source};
 use log::debug;
 use proc_exit::{Code, Exit, ExitResult};
 use zip::ZipArchive;
@@ -88,7 +88,9 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
     let mut scie_tote = vec![];
     let scie_tote_index = lift.files.len() - 1;
     for (index, file) in lift.files.iter().enumerate() {
-        if file.size == 0 {
+        if file.source != Source::Scie {
+            continue;
+        } else if file.size == 0 {
             scie_tote.push(file);
         } else if file.file_type == FileType::Directory
             || (index == scie_tote_index && !scie_tote.is_empty())
@@ -154,13 +156,15 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
     if !scie_tote.is_empty() {
         lift.files.remove(lift.files.len() - 1);
         for mut file in lift.files.iter_mut() {
-            let metadata = base.join(&file.name).metadata().map_err(|e| {
-                Code::FAILURE.with_message(format!(
-                    "Failed to determine size of {file}: {e}",
-                    file = file.name
-                ))
-            })?;
-            file.size = metadata.len() as usize;
+            if file.source == Source::Scie {
+                let metadata = base.join(&file.name).metadata().map_err(|e| {
+                    Code::FAILURE.with_message(format!(
+                        "Failed to determine size of {file}: {e}",
+                        file = file.name
+                    ))
+                })?;
+                file.size = metadata.len() as usize;
+            }
         }
     }
 
