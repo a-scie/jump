@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.8.0
+
+Support is added for `.env` file loading for scies that opt-in via the new `scie.lift.load_dotenv`
+boolean lift manifest field. This release also fixes `SCIE=split` to work with scies that include
+sourced files (ptex'ed scies).
+
 ## 0.7.2
 
 This release fixes a bug in argv0 / current exe determination handling that led to a scie-jump

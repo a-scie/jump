@@ -114,7 +114,9 @@ In the "lift" manifest, there are 3 required fields:
 
 ### Optional fields
 
-Files and commands can have additional configuration metadata described.
+A scie "lift" can opt in to loading `.env` files via the "load_dotenv" boolean field. The [dotenv](
+https://crates.io/crates/dotenv) crate handles this loading. A lift's files and commands can also
+have additional configuration metadata described.
 
 For files, you can supply a "size" and sha256 "hash". Without these the boot-pack will calculate
 them, but you may want to set them in advance as a security precaution. The `scie-jump` will refuse
