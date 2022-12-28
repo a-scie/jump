@@ -22,7 +22,10 @@ gc "${PWD}/${JAVA}.sha256"
 gc "${PWD}/split"
 SCIE="split" ./"${JAVA}" split
 if [[ "Hello Trailer!" != "$(tail -1 split/scie-jump*)" ]]; then
-  die "Expected customised scie-jump-alt with test trailer to be embedded in the ${JAVA} scie tip."
+  die "
+Expected customised scie-jump-alt with test trailer to be embedded in the ${JAVA} scie tip.
+Found: $(tail -1 split/scie-jump*)
+"
 else
   tail -1 split/scie-jump*
 fi
