@@ -244,13 +244,31 @@ fn pack(
     finalize_executable(&binary_path)
 }
 
-pub(crate) fn set(jump: Jump, scie_jump_path: PathBuf) -> ExitResult {
+pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
     let mut lifts = vec![];
     let mut single_line = true;
-    for arg in env::args().skip(1) {
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
         match arg.as_str() {
             "-1" | "--single-lift-line" => single_line = true,
             "--no-single-lift-line" => single_line = false,
+            "-sj" | "--jump" | "--scie-jump" => {
+                scie_jump_path = PathBuf::from(args.next().ok_or_else(|| {
+                    Code::FAILURE.with_message(format!(
+                        "The {arg} flag requires an argument pointing to an alternate \
+                        scie-jump binary to pack in the scie tip."
+                    ))
+                })?);
+                jump.size = scie_jump_path
+                    .metadata()
+                    .map_err(|e| {
+                        Code::FAILURE.with_message(format!(
+                            "Failed to determine size of alternate scie-jump {path}: {e}",
+                            path = scie_jump_path.display()
+                        ))
+                    })?
+                    .len() as usize;
+            }
             _ => {
                 let (lift, path) = load_manifest(Path::new(arg.as_str()), &jump)
                     .map_err(|e| Code::FAILURE.with_message(e))?;
