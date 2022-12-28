@@ -21,13 +21,17 @@ gc "${PWD}/${JAVA}.sha256"
 ./"${JAVA}" "scie-jump boot-pack"
 gc "${PWD}/split"
 SCIE="split" ./"${JAVA}" split
-if [[ "Hello Trailer!" != "$(tail -1 split/scie-jump*)" ]]; then
+
+# N.B.: For unknown reasons, macOS tail -1 split/scie-jump* includes garbage; i.e.: more than just
+# the last line. This, though, works.
+trailer="$(cat split/scie-jump* | tail -1)"
+if [[ "Hello Trailer!" != "${trailer}" ]]; then
   die "
 Expected customised scie-jump-alt with test trailer to be embedded in the ${JAVA} scie tip.
-Found: $(tail -1 split/scie-jump*)
+Found: ${trailer}
 "
 else
-  tail -1 split/scie-jump*
+  echo "Found expected trailer: ${trailer}"
 fi
 
 SCIE_JUMP_SIZE="$(SCIE="inspect" ./"${JAVA}" | jq -r '.scie.jump.size')"
