@@ -46,10 +46,18 @@ pub struct SelectBoot {
 const HELP: &str = "\
 For SCIE=<boot_command> you can select from the following:
 
-boot-pack [lift manifest]*
+boot-pack
+    (-sj|--jump|--scie-jump [PATH])
+    (-1|--single-lift-line|--no-single-lift-line)
+    [lift manifest]*
 
     Pack the given lift manifests into scie executables. If no manifests
-    are given, looks for `lift.json` in the current directory.
+    are given, looks for `lift.json` in the current directory. By
+    default the current scie-jump is used as the scie tip, but an
+    alternate scie-jump binary can be specified using --path. By default
+    the lift manifest is appended to the tail of the scie as a single
+    line JSON document, but can be made a multi-line pretty-printed JSON
+    document by passing --no-single-lift-line.
 
 help: Display this help message.
 

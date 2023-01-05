@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.9.0
+
+Support is added for specifying an alternate `scie-jump` binary to embed in the scie tip when
+executing a `scie-jump` boot-pack. This allows "cross-building" a scie for another platform.
+
 ## 0.8.0
 
 Support is added for `.env` file loading for scies that opt-in via the new `scie.lift.load_dotenv`
