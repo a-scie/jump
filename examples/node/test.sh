@@ -31,6 +31,15 @@ for applet in ${applets[*]}; do
   gc "${PWD}/${applet}"
 done
 
+cat <<EOF | ./node --input-type=module -
+import { strict as assert } from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+
+assert.equal(path.basename(fs.realpathSync(process.env.SCIE)), 'node.js${EXE_EXT}');
+assert.equal(path.basename(process.env.SCIE_ARGV0), 'node${EXE_EXT}');
+EOF
+
 ./npm install cowsay
 gc "${PWD}/node_modules" "${PWD}/package.json" "${PWD}/package-lock.json"
 

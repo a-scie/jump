@@ -1,5 +1,14 @@
 # Release Notes
 
+## 0.10.0
+
+In addition to the `SCIE` environment variable being exposed to scies, `SCIE_ARGV0` is now exposed
+as well. On Unix systems this value can differ from `SCIE` and can be used to detect the name of the
+scie executable launched by the user. Although the `scie-jump` uses this internally to allow for
+BusyBox style dispatch based on symlinks, exposing `SCIE_ARGV0` allows non BusyBox scies to do the
+same.  See the [packaging guide](docs/packaging.md) for more details on environment variables
+supported by `scie-jump`.
+
 ## 0.9.0
 
 Support is added for specifying an alternate `scie-jump` binary to embed in the scie tip when

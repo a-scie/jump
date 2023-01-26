@@ -37,10 +37,23 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
     Ok((lift, manifest_path))
 }
 
-#[cfg(target_family = "windows")]
+#[cfg(windows)]
 fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
-    if path.extension().is_none() {
-        let exe = path.with_extension(env::consts::EXE_EXTENSION);
+    use std::ffi::OsStr;
+    if let Some(env::consts::EXE_EXTENSION) = path.extension().and_then(OsStr::to_str) {
+        Ok(path.to_path_buf())
+    } else {
+        let exe = path.with_file_name(format!(
+            "{file_name}.{ext}",
+            file_name = path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .ok_or_else(|| format!(
+                    "Failed to determine the file name of {path}",
+                    path = path.display()
+                ))?,
+            ext = env::consts::EXE_EXTENSION
+        ));
         std::fs::rename(path, &exe).map_err(|e| {
             format!(
                 "Failed to rename executable from {path} to {exe}: {e}",
@@ -48,12 +61,11 @@ fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
                 exe = exe.display()
             )
         })?;
-        return Ok(exe);
+        Ok(exe)
     }
-    Ok(path.to_path_buf())
 }
 
-#[cfg(not(target_family = "windows"))]
+#[cfg(unix)]
 fn finalize_executable(path: &Path) -> Result<PathBuf, String> {
     use std::os::unix::fs::PermissionsExt;
     let mut perms = std::fs::metadata(path)

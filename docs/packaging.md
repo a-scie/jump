@@ -330,6 +330,27 @@ gains the ability to blindly issue `tail -1 coursier | jq .` to inspect the lift
 scie. Either way though, since the scie is powered by a `scie-jump` in its tip, you can also issue
 `SCIE=inspect coursier` as in the boot-pack example.
 
+## Environment variables
+
+Environment variables can be used both to control a scie from the outside and by code embedded in a
+scie.
+
+Runtime external control variables:
+
++ `SCIE=<command>`: This can be used to execute built-in `scie-jump` utilities like `inspect` and
+  `boot-pack`. Use `SCIE=help <scie path>` to see the built-in `sice-jump` utilities supported.
++ `SCIE_BOOT=<command>`: This can be used to select a non-default command for execution in a scie
+  that defines named commands. One way to discover these is via invoking `SCIE=list <scie path>`.
++ `SCIE_BASE`: This can be used to override the default scie base of `~/.cache/nce` on Linux,
+   `~/Library/Caches/nce` on Mac and `~\AppData\Local\nce` on Windows.
+
+Runtime read-only variables:
+
++ `SCIE`: The absolute path of the scie executable. This can be used to re-execute the scie.
++ `SCIE_ARGV0`: The value of the 1st command line argument. If the scie was launched via a symlink
+  The symlink name will be preserved here whereas it would be resolved in `SCIE` on Unix systems.
+  This can be used to implement BusyBox-style re-direction.
+
 ## Advanced placeholders
 
 Further placeholders you can use in command "exe", "args" and "env" values include:

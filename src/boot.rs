@@ -19,7 +19,7 @@ pub(crate) fn help(message: String, exit_code: i32) -> ExitResult {
     if code.is_err() {
         Err(code.with_message(message))
     } else {
-        print!("{}", message);
+        print!("{message}");
         code.ok()
     }
 }

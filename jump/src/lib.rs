@@ -171,6 +171,7 @@ pub fn prepare_boot() -> Result<BootAction, String> {
         let process = selected_command.process;
         trace!("Prepared {process:#?}");
         env::set_var("SCIE", current_exe.exe.as_os_str());
+        env::set_var("SCIE_ARGV0", current_exe.invoked_as.as_os_str());
         Ok(BootAction::Execute((
             process,
             selected_command.argv1_consumed,
