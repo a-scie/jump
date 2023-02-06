@@ -20,7 +20,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.dependencies]
-bstr = "1.1"
+bstr = "1.2"
 log = "0.4"
 logging_timer = "1.1"
 tempfile = "3.3"
