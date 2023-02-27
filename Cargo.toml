@@ -23,7 +23,7 @@ codegen-units = 1
 bstr = "1.2"
 log = "0.4"
 logging_timer = "1.1"
-tempfile = "3.3"
+tempfile = "3.4"
 
 [workspace.dependencies.zip]
 version = "0.6"
