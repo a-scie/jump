@@ -1,3 +1,6 @@
+[registries.crates-io]
+protocol = "sparse"
+
 [target.aarch64-pc-windows-msvc]
 rustflags = [
       # For Windows static msvcrt linking with no need for dll re-distribution.
