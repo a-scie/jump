@@ -55,7 +55,7 @@
           "key": "cpython39"
         },
         {
-          "name": "pants.2.14.0.pex",
+          "name": "pants.2.14.0.pex"
         }
       ]
     }
