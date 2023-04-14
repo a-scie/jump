@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.11.0
+
+Support is added for `{scie.env.*}` placeholders referring to environment variables defined in the
+lift command environment in addition to the existing support for referring to environment variables
+defined in the ambient environment.
+
 ## 0.10.0
 
 In addition to the `SCIE` environment variable being exposed to scies, `SCIE_ARGV0` is now exposed

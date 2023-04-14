@@ -8,33 +8,30 @@
           "": {
             "description": "The Pants build tool.",
             "env": {
-              "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
               "PEX_.*": null
             },
-            "exe": "{scie.bindings.venv}/venv/bin/python3.9",
-            "args": [
-              "{scie.bindings.venv}/venv/pex"
-            ]
+            "exe": "{scie.bindings.venv}/venv-3.{scie.env.PYTHON_MINOR=9}/pex"
           },
           "repl": {
             "description": "A Python repl with Pants (minus plugins) available for inspection.",
             "env": {
-              "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
               "=PYTHONPATH": null
             },
-            "exe": "{scie.bindings.venv}/venv/bin/python3.9"
+            "exe": "{scie.bindings.venv}/venv-3.{scie.env.PYTHON_MINOR=9}/bin/python"
           }
         },
         "bindings": {
           "venv": {
             "description": "Installs Pants in a venv and pre-compiles .pyc.",
             "env": {
-              "=PATH": "{cpython}/python/bin:{scie.env.PATH}",
               "PEX_TOOLS": "1",
               "PEX_ROOT": "{scie.bindings}/pex_root",
-              "PEX_.*": null
+              "PEX_.*": null,
+              "=__PYTHON_3_8": "{cpython38}/python/bin/python3.8",
+              "=__PYTHON_3_9": "{cpython39}/python/bin/python3.9",
+              "=__PYTHON": "{scie.env.__PYTHON_3_{scie.env.PYTHON_MINOR=9}}"
             },
-            "exe": "{cpython}/python/bin/python3.9",
+            "exe": "{scie.env.__PYTHON}",
             "args": [
               "{pants.2.14.0.pex}",
               "venv",
@@ -43,26 +40,28 @@
               "--compile",
               "--rm",
               "all",
-              "{scie.bindings}/venv"
+              "{scie.bindings}/venv-3.{scie.env.PYTHON_MINOR=9}"
             ]
           }
         }
       },
       "files": [
         {
+          "name": "cpython-3.8.14+20221002-x86_64-apple-darwin-install_only.tar.gz",
+          "key": "cpython38"
+        },
+        {
           "name": "cpython-3.9.14+20221002-x86_64-apple-darwin-install_only.tar.gz",
-          "key": "cpython",
-          "hash": "b7d3a1f4b57e9350571ccee49c82f503133de0d113a2dbaebc8ccf108fb3fe1b",
-          "size": 17138819
+          "key": "cpython39"
         },
         {
           "name": "pants.2.14.0.pex",
-          "type": "zip"
         }
       ]
     }
   },
   "fetch": [
+    "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.8.14+20221002-x86_64-apple-darwin-install_only.tar.gz",
     "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.9.14+20221002-x86_64-apple-darwin-install_only.tar.gz"
   ]
 }

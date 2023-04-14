@@ -40,3 +40,8 @@ setpath(["extra"]; 42)
 gc "${PWD}/lift.json" "${PWD}/pants-extra"
 "${SCIE_JUMP}"
 time RUST_LOG=debug ./pants-extra -V
+
+# Verify dynamic env var selection.
+SCIE_BOOT=repl ./pants -c 'import sys; assert (3, 9) == sys.version_info[:2]'
+PYTHON_MINOR=8 SCIE_BOOT=repl ./pants -c 'import sys; assert (3, 8) == sys.version_info[:2]'
+PYTHON_MINOR=9 SCIE_BOOT=repl ./pants -c 'import sys; assert (3, 9) == sys.version_info[:2]'

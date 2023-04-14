@@ -9,6 +9,7 @@ extern crate structure;
 
 mod archive;
 mod atomic;
+mod cmd_env;
 mod comparable_regex;
 pub mod config;
 mod context;

@@ -1,7 +1,7 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::{Debug, Formatter};
@@ -9,9 +9,11 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Child;
 
 use bstr::ByteSlice;
+use indexmap::IndexMap;
 use logging_timer::time;
 
 use crate::atomic::{atomic_path, Target};
+use crate::cmd_env::{parse_scie_env_placeholder, prepare_env, ParsedEnv};
 use crate::config::{Cmd, Fmt};
 use crate::installer::Installer;
 use crate::lift::{File, Lift};
@@ -200,12 +202,12 @@ pub(crate) struct Context<'a> {
     lift: &'a Lift,
     base: PathBuf,
     installer: &'a Installer<'a>,
-    files_by_name: BTreeMap<&'a str, &'a File>,
+    files_by_name: HashMap<&'a str, &'a File>,
     replacements: HashSet<&'a File>,
     lift_manifest: LiftManifest,
     lift_manifest_dependants: HashSet<Process>,
     lift_manifest_installed: bool,
-    bound: HashMap<&'a str, Binding>,
+    bound: HashMap<String, Binding>,
     installed: HashSet<File>,
 }
 
@@ -221,7 +223,7 @@ impl<'a> Context<'a> {
         lift: &'a Lift,
         installer: &'a Installer,
     ) -> Result<Self, String> {
-        let mut files_by_name = BTreeMap::new();
+        let mut files_by_name = HashMap::new();
         for file in &lift.files {
             files_by_name.insert(file.name.as_str(), file);
             if let Some(key) = file.key.as_ref() {
@@ -259,13 +261,14 @@ impl<'a> Context<'a> {
     }
 
     fn prepare_process(&mut self, cmd: &'a Cmd) -> Result<Process, String> {
+        let mut env = prepare_env(cmd)?;
         let mut needs_lift_manifest = false;
-        let (exe, needs_manifest) = self.reify_string(&cmd.exe)?;
+        let (exe, needs_manifest) = self.reify_string(&env, &cmd.exe)?;
         needs_lift_manifest |= needs_manifest;
 
         let mut args = vec![];
         for arg in &cmd.args {
-            let (reified_arg, needs_manifest) = self.reify_string(arg)?;
+            let (reified_arg, needs_manifest) = self.reify_string(&env, arg)?;
             needs_lift_manifest |= needs_manifest;
             args.push(reified_arg.into());
         }
@@ -273,8 +276,18 @@ impl<'a> Context<'a> {
         for (key, value) in cmd.env.iter() {
             let final_value = match value {
                 Some(val) => {
-                    let (reified_value, needs_manifest) = self.reify_string(val)?;
+                    let (reified_value, needs_manifest) = self.reify_string(&env, val)?;
                     needs_lift_manifest |= needs_manifest;
+                    match key {
+                        config::EnvVar::Default(name) => {
+                            if !env.contains_key(name) {
+                                env.insert(name.to_owned(), reified_value.clone());
+                            }
+                        }
+                        config::EnvVar::Replace(name) => {
+                            env.insert(name.to_owned(), reified_value.clone());
+                        }
+                    }
                     Some(reified_value)
                 }
                 None => None,
@@ -432,23 +445,19 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn parse_env(&mut self, env: &'a str) -> Result<(String, String, bool), String> {
-        let (parsed_env, needs_lift_manifest) = self.reify_string(env)?;
-        let (name, default) = match parsed_env.splitn(2, '=').collect::<Vec<_>>()[..] {
-            [name] => (name, ""),
-            [name, default] => (name, default),
-            _ => {
-                return Err(
-                    "Expected {{scie.env.<name>}} <name> placeholder to be a non-empty \
-                            string"
-                        .to_string(),
-                )
-            }
-        };
-        Ok((name.to_string(), default.to_string(), needs_lift_manifest))
+    fn parse_env(
+        &mut self,
+        env: &IndexMap<String, String>,
+        env_var: &str,
+    ) -> Result<(ParsedEnv, bool), String> {
+        let (parsed_env, needs_lift_manifest) = self.reify_string(env, env_var)?;
+        Ok((
+            parse_scie_env_placeholder(&parsed_env)?,
+            needs_lift_manifest,
+        ))
     }
 
-    fn bind(&mut self, name: &'a str) -> Result<HashMap<String, String>, String> {
+    fn bind(&mut self, name: &str) -> Result<HashMap<String, String>, String> {
         if let Some(binding) = self.bound.get(name) {
             binding.load_env()
         } else {
@@ -472,7 +481,7 @@ impl<'a> Context<'a> {
                 self.maybe_install_lift_manifest(&boot_binding.process)?;
                 self.installer.install(files.as_slice())
             })?;
-            self.bound.insert(name, boot_binding);
+            self.bound.insert(name.to_string(), boot_binding);
             for file_entry in files {
                 match file_entry {
                     FileEntry::Skip(_) => {}
@@ -493,7 +502,11 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn reify_string(&mut self, value: &'a str) -> Result<(String, bool), String> {
+    fn reify_string(
+        &mut self,
+        env: &IndexMap<String, String>,
+        value: &str,
+    ) -> Result<(String, bool), String> {
         let mut reified = String::with_capacity(value.len());
         let mut lift_manifest_required = false;
 
@@ -503,7 +516,7 @@ impl<'a> Context<'a> {
                 Item::LeftBrace => reified.push('{'),
                 Item::Text(text) => reified.push_str(text),
                 Item::Placeholder(Placeholder::FileHash(name)) => {
-                    let (parsed_name, needs_manifest) = self.reify_string(name)?;
+                    let (parsed_name, needs_manifest) = self.reify_string(env, name)?;
                     lift_manifest_required |= needs_manifest;
                     let file = self
                         .files_by_name
@@ -514,7 +527,7 @@ impl<'a> Context<'a> {
                     reified.push_str(&file.hash);
                 }
                 Item::Placeholder(Placeholder::FileName(name)) => {
-                    let (parsed_name, needs_manifest) = self.reify_string(name)?;
+                    let (parsed_name, needs_manifest) = self.reify_string(env, name)?;
                     lift_manifest_required |= needs_manifest;
                     let file = self
                         .files_by_name
@@ -526,13 +539,20 @@ impl<'a> Context<'a> {
                     reified.push_str(path_to_str(&path)?);
                     self.replacements.insert(file);
                 }
-                Item::Placeholder(Placeholder::Env(env)) => {
-                    let (name, default, needs_manifest) = self.parse_env(env)?;
+                Item::Placeholder(Placeholder::Env(env_var)) => {
+                    let (parsed_env, needs_manifest) = self.parse_env(env, env_var)?;
                     lift_manifest_required |= needs_manifest;
-                    let env_var = env::var_os(&name).unwrap_or_else(|| default.into());
-                    let value = env_var.into_string().map_err(|value| {
-                        format!("Failed to decode env var {name} as utf-8 value: {value:?}")
-                    })?;
+                    let value = if let Some(val) = env
+                        .get(&parsed_env.name)
+                        .map(String::to_owned)
+                        .or_else(|| env::var(&parsed_env.name).ok())
+                    {
+                        let (parsed_value, needs_manifest) = self.reify_string(env, &val)?;
+                        lift_manifest_required |= needs_manifest;
+                        parsed_value
+                    } else {
+                        parsed_env.default.unwrap_or_default()
+                    };
                     reified.push_str(&value)
                 }
                 Item::Placeholder(Placeholder::Scie) => reified.push_str(path_to_str(self.scie)?),
@@ -546,14 +566,18 @@ impl<'a> Context<'a> {
                     self.bind(name)?;
                     reified.push_str(path_to_str(self.get_bindings_dir().as_path())?);
                 }
-                Item::Placeholder(Placeholder::ScieBindingEnv(ScieBindingEnv { binding, env })) => {
+                Item::Placeholder(Placeholder::ScieBindingEnv(ScieBindingEnv {
+                    binding,
+                    env: env_var,
+                })) => {
                     let binding_env = self.bind(binding)?;
-                    let (name, default, needs_manifest) = self.parse_env(env)?;
+                    let (parsed_env, needs_manifest) = self.parse_env(env, env_var)?;
                     lift_manifest_required |= needs_manifest;
                     let value = binding_env
-                        .get(name.as_str())
+                        .get(&parsed_env.name)
                         .map(String::to_owned)
-                        .unwrap_or(default);
+                        .or(parsed_env.default)
+                        .unwrap_or_default();
                     reified.push_str(&value)
                 }
                 Item::Placeholder(Placeholder::ScieLift) => {
@@ -590,12 +614,15 @@ pub(crate) fn select_command(
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::path::Path;
 
+    use indexmap::IndexMap;
+
     use super::Context;
-    use crate::config::{Boot, FileType};
+    use crate::config::{ArchiveType, Boot, Cmd, Compression, FileType};
     use crate::installer::Installer;
-    use crate::{File, Jump, Lift, Source};
+    use crate::{config, process, File, Jump, Lift, Process, Source};
 
     #[test]
     fn env() {
@@ -630,27 +657,42 @@ mod tests {
         let installer = Installer::new(&[]);
         let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
 
-        assert!(std::env::var_os("__DNE__").is_none());
+        assert!(env::var_os("__DNE__").is_none());
+
+        let mut env = IndexMap::new();
         assert_eq!(
             ("".to_string(), false),
-            context.reify_string("{scie.env.__DNE__}").unwrap()
+            context
+                .reify_string(&mut env, "{scie.env.__DNE__}")
+                .unwrap()
         );
+
+        env.clear();
         assert_eq!(
             ("default".to_string(), false),
-            context.reify_string("{scie.env.__DNE__=default}").unwrap()
+            context
+                .reify_string(&mut env, "{scie.env.__DNE__=default}")
+                .unwrap()
         );
 
-        std::env::set_var("__DNE__", "foo");
+        env.clear();
+        env.insert("__DNE__".to_owned(), "foo".to_owned());
         assert_eq!(
             ("foo".to_string(), false),
-            context.reify_string("{scie.env.__DNE__=default}").unwrap()
+            context
+                .reify_string(&mut env, "{scie.env.__DNE__=default}")
+                .unwrap()
         );
-        std::env::remove_var("__DNE__");
 
+        env.clear();
         assert_eq!(
             ("scie_path".to_string(), false),
-            context.reify_string("{scie.env.__DNE__={scie}}").unwrap()
+            context
+                .reify_string(&mut env, "{scie.env.__DNE__={scie}}")
+                .unwrap()
         );
+
+        env.clear();
         assert_eq!(
             (
                 tempdir
@@ -663,9 +705,11 @@ mod tests {
                 true
             ),
             context
-                .reify_string("{scie.env.__DNE__={scie.lift}}")
+                .reify_string(&mut env, "{scie.env.__DNE__={scie.lift}}")
                 .unwrap()
         );
+
+        env.clear();
         assert_eq!(
             (
                 tempdir
@@ -677,23 +721,237 @@ mod tests {
                     .to_string(),
                 false
             ),
-            context.reify_string("{scie.env.__DNE__={file}}").unwrap()
+            context
+                .reify_string(&mut env, "{scie.env.__DNE__={file}}")
+                .unwrap()
         );
 
-        assert!(std::env::var_os("__DNE2__").is_none());
+        env.clear();
         assert_eq!(
             ("42".to_string(), false),
             context
-                .reify_string("{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .reify_string(&mut env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
         );
-        std::env::set_var("__DNE2__", "bar");
+
+        env.clear();
+        env.insert("__DNE2__".to_owned(), "bar".to_owned());
         assert_eq!(
             ("bar".to_string(), false),
             context
-                .reify_string("{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .reify_string(&mut env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
         );
-        std::env::remove_var("__DNE2__");
+    }
+
+    #[test]
+    fn prepare_process_use_cmd_env() {
+        let jump = Jump {
+            size: 42,
+            version: "0.1.0".to_string(),
+        };
+        let tempdir = tempfile::tempdir().unwrap();
+        let lift = Lift {
+            name: "test".to_string(),
+            description: None,
+            base: Some(tempdir.path().to_path_buf()),
+            load_dotenv: true,
+            size: 137,
+            hash: "abc".to_string(),
+            boot: Boot {
+                commands: vec![(
+                    "".to_owned(),
+                    Cmd {
+                        env: vec![
+                            (
+                                config::EnvVar::Replace("SUB_SELECT-v1".to_owned()),
+                                Some("v1/exe".to_owned()),
+                            ),
+                            (
+                                config::EnvVar::Replace("SUB_SELECT-v2".to_owned()),
+                                Some("v2/binary".to_owned()),
+                            ),
+                        ]
+                        .into_iter()
+                        .collect::<IndexMap<_, _>>(),
+                        exe: "{scie.files.dist-{scie.env.SELECT=v1}}/\
+                            {scie.env.SUB_SELECT-{scie.env.SELECT=v2}}"
+                            .to_string(),
+                        args: vec![],
+                        description: None,
+                    },
+                )]
+                .into_iter()
+                .collect::<IndexMap<_, _>>(),
+                bindings: Default::default(),
+            },
+            files: vec![
+                File {
+                    name: "dist-v1".to_string(),
+                    key: None,
+                    size: 37,
+                    hash: "def".to_string(),
+                    file_type: FileType::Archive(ArchiveType::CompressedTar(Compression::Zstd)),
+                    executable: None,
+                    eager_extract: false,
+                    source: Source::Scie,
+                },
+                File {
+                    name: "dist-v2".to_string(),
+                    key: None,
+                    size: 42,
+                    hash: "ghi".to_string(),
+                    file_type: FileType::Archive(ArchiveType::Zip),
+                    executable: None,
+                    eager_extract: false,
+                    source: Source::Scie,
+                },
+            ],
+            other: None,
+        };
+        let installer = Installer::new(&[]);
+        let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
+
+        let cmd = lift.boot.commands.get("").unwrap();
+        let expected_env = process::EnvVars {
+            vars: vec![
+                process::EnvVar::Replace(("SUB_SELECT-v1".into(), "v1/exe".into())),
+                process::EnvVar::Replace(("SUB_SELECT-v2".into(), "v2/binary".into())),
+            ],
+        };
+
+        let process = context.prepare_process(&cmd).unwrap();
+        assert_eq!(
+            Process {
+                env: expected_env.clone(),
+                exe: tempdir.path().join("def").join("dist-v1/v2/binary").into(),
+                args: vec![],
+            },
+            process
+        );
+
+        env::set_var("SELECT", "v1");
+        let process = context.prepare_process(&cmd).unwrap();
+        assert_eq!(
+            Process {
+                env: expected_env.clone(),
+                exe: tempdir.path().join("def").join("dist-v1/v1/exe").into(),
+                args: vec![],
+            },
+            process
+        );
+        env::remove_var("SELECT");
+
+        env::set_var("SELECT", "v2");
+        let process = context.prepare_process(&cmd).unwrap();
+        assert_eq!(
+            Process {
+                env: expected_env,
+                exe: tempdir.path().join("ghi").join("dist-v2/v2/binary").into(),
+                args: vec![],
+            },
+            process
+        );
+        env::remove_var("SELECT")
+    }
+
+    #[test]
+    fn prepare_process_use_cmd_env_recursive() {
+        let jump = Jump {
+            size: 42,
+            version: "0.1.0".to_string(),
+        };
+        let tempdir = tempfile::tempdir().unwrap();
+        let lift = Lift {
+            name: "test".to_string(),
+            description: None,
+            base: Some(tempdir.path().to_path_buf()),
+            load_dotenv: true,
+            size: 137,
+            hash: "abc".to_string(),
+            boot: Boot {
+                commands: vec![(
+                    "".to_owned(),
+                    Cmd {
+                        env: vec![
+                            (
+                                config::EnvVar::Replace("A".to_owned()),
+                                Some("{scie.env.B}".to_owned()),
+                            ),
+                            (
+                                config::EnvVar::Replace("B".to_owned()),
+                                Some("{scie.env.C}".to_owned()),
+                            ),
+                            (
+                                config::EnvVar::Replace("C".to_owned()),
+                                Some("{scie.env.D=c}".to_owned()),
+                            ),
+                            (
+                                config::EnvVar::Replace("PATH".to_owned()),
+                                Some("{scie.env.A}:{scie.env.E=e}:{scie.env.F}".to_owned()),
+                            ),
+                            (
+                                config::EnvVar::Replace("F".to_owned()),
+                                Some("{scie.env.PATH}".to_owned()),
+                            ),
+                        ]
+                        .into_iter()
+                        .collect::<IndexMap<_, _>>(),
+                        exe: "{scie.env.A}".to_string(),
+                        args: vec![],
+                        description: None,
+                    },
+                )]
+                .into_iter()
+                .collect::<IndexMap<_, _>>(),
+                bindings: Default::default(),
+            },
+            files: vec![],
+            other: None,
+        };
+        let installer = Installer::new(&[]);
+        let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
+
+        let cmd = lift.boot.commands.get("").unwrap();
+
+        let process = context.prepare_process(&cmd).unwrap();
+        let reified_path = format!("c:e:{}", env::var("PATH").unwrap());
+        assert_eq!(
+            Process {
+                env: process::EnvVars {
+                    vars: vec![
+                        process::EnvVar::Replace(("A".into(), "c".into())),
+                        process::EnvVar::Replace(("B".into(), "c".into())),
+                        process::EnvVar::Replace(("C".into(), "c".into())),
+                        process::EnvVar::Replace(("PATH".into(), reified_path.clone().into())),
+                        process::EnvVar::Replace(("F".into(), reified_path.into())),
+                    ]
+                },
+                exe: "c".into(),
+                args: vec![],
+            },
+            process
+        );
+
+        env::set_var("D", "d");
+        let process = context.prepare_process(&cmd).unwrap();
+        let reified_path = format!("d:e:{}", env::var("PATH").unwrap());
+        assert_eq!(
+            Process {
+                env: process::EnvVars {
+                    vars: vec![
+                        process::EnvVar::Replace(("A".into(), "d".into())),
+                        process::EnvVar::Replace(("B".into(), "d".into())),
+                        process::EnvVar::Replace(("C".into(), "d".into())),
+                        process::EnvVar::Replace(("PATH".into(), reified_path.clone().into())),
+                        process::EnvVar::Replace(("F".into(), reified_path.into())),
+                    ]
+                },
+                exe: "d".into(),
+                args: vec![],
+            },
+            process
+        );
+        env::remove_var("D");
     }
 }

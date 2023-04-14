@@ -1,11 +1,11 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::BTreeMap;
 use std::fmt::Formatter;
 use std::io::Write;
 use std::path::PathBuf;
 
+use indexmap::IndexMap;
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -207,8 +207,8 @@ pub struct Cmd {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     #[serde(default)]
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub env: BTreeMap<EnvVar, Option<String>>,
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    pub env: IndexMap<EnvVar, Option<String>>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -225,10 +225,10 @@ pub struct Jump {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Boot {
-    pub commands: BTreeMap<String, Cmd>,
+    pub commands: IndexMap<String, Cmd>,
     #[serde(default)]
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub bindings: BTreeMap<String, Cmd>,
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    pub bindings: IndexMap<String, Cmd>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -296,7 +296,7 @@ impl Default for Fmt {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Other {
     #[serde(flatten)]
-    other: BTreeMap<String, Value>,
+    other: IndexMap<String, Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -358,7 +358,7 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use indexmap::IndexMap;
 
     use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift};
     use crate::config::FileType;
@@ -432,7 +432,7 @@ mod tests {
                             }
                         )]
                         .into_iter()
-                        .collect::<BTreeMap<_, _>>(),
+                        .collect::<IndexMap<_, _>>(),
                         bindings: Default::default()
                     },
                     name: "test".to_string(),
