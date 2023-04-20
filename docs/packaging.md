@@ -357,10 +357,12 @@ Further placeholders you can use in command "exe", "args" and "env" values inclu
 
 + `{scie.base}`: The value of the active `SCIE_BASE`.
 + `{scie.env.<env var name>[=<default env var value>]}`: This expands to the value of the env var
-  named. If the env var is not in the ambient runtime environment and no default env var value is
-  specified it expands to the empty string (""). If a default env var value is specified, it is
-  used. The default env var value specified can itself be a placeholder, in which case that is
-  expanded (recursively) to obtain the default value. For example,
+  named. If the env var is not in the ambient runtime environment or the defined command environment
+  and no default env var value is specified it expands to the empty string (""). If a default env 
+  var value is specified, it is used. The env var name can itself be composed of environment
+  placeholders, in which case they are expanded (recursively) before evaluating the env var value.
+  Likewise, the default env var value specified can also be composed of environment placeholders, in
+  which case they too are expanded (recursively) to obtain the default value. For example,
   `{scie.env.FOO={scie.env.BAR=42}}` would evaluate to "bar" if the "FOO" env var was not set but
   the "BAR" env var was set to "bar" and it would evaluate to "42" if neither the "FOO" nor "BAR"
   env vars were set.
