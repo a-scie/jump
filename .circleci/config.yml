@@ -47,7 +47,7 @@ jobs:
             docker run --rm \
               -v $PWD:/code \
               -w /code \
-              rust:1.68.2-alpine3.17 \
+              rust:1.69.0-alpine3.17 \
                 sh -c 'apk add musl-dev && cargo run -p package -- dist'
       - persist_to_workspace:
           root: dist
