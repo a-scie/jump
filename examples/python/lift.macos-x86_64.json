@@ -15,7 +15,7 @@
           "repl": {
             "description": "A Python repl with Pants (minus plugins) available for inspection.",
             "env": {
-              "=PYTHONPATH": null
+              "PYTHON.*": null
             },
             "exe": "{scie.bindings.venv}/venv-3.{scie.env.PYTHON_MINOR=9}/bin/python"
           }
