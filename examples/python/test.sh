@@ -5,6 +5,8 @@
 source "${COMMON}"
 trap gc EXIT
 
+check_cmd env
+
 "${SCIE_JUMP}" "${LIFT}"
 gc "${PWD}/pants" "${PWD}/.pants.d" "${PWD}/.pids"
 
@@ -45,3 +47,20 @@ time RUST_LOG=debug ./pants-extra -V
 SCIE_BOOT=repl ./pants -c 'import sys; assert (3, 9) == sys.version_info[:2]'
 PYTHON_MINOR=8 SCIE_BOOT=repl ./pants -c 'import sys; assert (3, 8) == sys.version_info[:2]'
 PYTHON_MINOR=9 SCIE_BOOT=repl ./pants -c 'import sys; assert (3, 9) == sys.version_info[:2]'
+
+# Check non-utf8 env vars are handled: https://github.com/a-scie/jump/issues/105
+# The PEX_.* zap directive in the lift manifest needs to traverse all env vars and we insert some
+# non-utf8 env vars to ensure it skips past them.
+env \
+$'B\xa5R=FOO' \
+$'FOO=B\xa5R' \
+$'\xca\xfe\xba\xbe=B\xa5R' \
+RUST_LOG=warn \
+PEX_MODULE="foo.bar:baz" \
+PYTHONVERBOSE=x \
+SCIE_BOOT=repl \
+  ./pants -c '
+import os
+assert "PEX_MODULE" in os.environ, "PEX_.* are only scrubbed in the venv binding command."
+assert "PYTHONVERBOSE" not in os.environ, "Expected PYTHON.* to be scrubbed for the repl command."
+'
