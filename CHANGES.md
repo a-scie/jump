@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.11.1
+
+This release fixes a bug handling environment variable removal via regex when the environment
+contains non-utf8 entries.
+
 ## 0.11.0
 
 Support is added for `{scie.env.*}` placeholders referring to environment variables defined in the

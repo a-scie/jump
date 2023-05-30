@@ -63,9 +63,20 @@ impl EnvVars {
                     removals.insert(name.to_owned());
                 }
                 EnvVar::RemoveMatching(regex) => {
-                    for (name, _) in env::vars() {
-                        if regex.is_match(name.as_str()) {
-                            removals.insert(name.into());
+                    for (name, _) in env::vars_os() {
+                        match name.into_string() {
+                            Ok(name_utf8) => {
+                                if regex.is_match(&name_utf8) {
+                                    removals.insert(name_utf8.into());
+                                }
+                            }
+                            Err(name_os) => {
+                                warn!(
+                                    "Cannot process env removal matching regex '{regex}' for \
+                                    non-utf8 env var name {name_os:?}",
+                                    regex = regex.as_str()
+                                )
+                            }
                         }
                     }
                 }
@@ -194,5 +205,135 @@ impl Process {
                     args = self.args
                 )
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+    use std::sync::Arc;
+
+    use once_cell::sync::Lazy;
+    use parking_lot::ReentrantMutex;
+
+    use crate::comparable_regex::ComparableRegex;
+    use crate::{EnvVar, EnvVars};
+
+    static ENV_LOCK: Lazy<Arc<ReentrantMutex<()>>> =
+        Lazy::new(|| Arc::new(ReentrantMutex::new(())));
+
+    #[ctor::ctor]
+    fn init() {
+        env_logger::init();
+    }
+
+    fn with_env<T>(func: T)
+    where
+        T: FnOnce() -> (),
+    {
+        let _env_lock = ENV_LOCK.lock();
+        func();
+    }
+
+    fn with_extra_env<T>(extra_env: &[(OsString, OsString)], func: T)
+    where
+        T: FnOnce() -> (),
+    {
+        with_env(|| {
+            let mut original_env = vec![];
+            for (name, value) in extra_env {
+                original_env.push((name, std::env::var_os(name)));
+                std::env::set_var(name, value);
+            }
+            func();
+            for (name, value) in original_env {
+                if let Some(val) = value {
+                    std::env::set_var(name, val);
+                } else {
+                    std::env::remove_var(name);
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn to_env_vars_empty() {
+        with_env(|| {
+            assert_eq!(
+                Vec::<(OsString, Option<OsString>)>::new(),
+                EnvVars { vars: vec![] }.to_env_vars()
+            )
+        })
+    }
+
+    fn assert_to_env_vars() {
+        with_env(|| {
+            assert_eq!(
+                vec![("foo".into(), Some("bar".into()))],
+                EnvVars {
+                    vars: vec![
+                        EnvVar::Replace(("foo".into(), "bar".into())),
+                        EnvVar::RemoveMatching(ComparableRegex::try_from("__DNE__.*").unwrap())
+                    ]
+                }
+                .to_env_vars()
+            )
+        })
+    }
+
+    #[test]
+    fn to_env_vars() {
+        assert_to_env_vars()
+    }
+
+    #[cfg(windows)]
+    fn create_non_utf8_string() -> OsString {
+        use std::os::windows::ffi::OsStringExt;
+
+        // This value is the 1st high surrogate code point See Chapter 3 (Conformance) section 3.9,
+        // "UTF-8": https://www.unicode.org/versions/Unicode15.0.0/ch03.pdf
+        //
+        // > * Because surrogate code points are not Unicode scalar values, any UTF-8 byte
+        // >   sequence that would otherwise map to code points U+D800..U+DFFF is ill-
+        // >   formed.
+        //
+        // As such it is valid utf16 but we expect it to fail to convert to utf8.
+        OsString::from_wide(&[0xD800])
+    }
+
+    #[cfg(unix)]
+    fn create_non_utf8_string() -> OsString {
+        use std::os::unix::ffi::OsStringExt;
+
+        // This value is taken directly from the original repro example in
+        // https://github.com/pantsbuild/scie-pants/issues/198 that led here.
+        OsString::from_vec(vec![b'b', 0xA5, b'r'])
+    }
+
+    #[test]
+    fn to_env_vars_non_utf8() {
+        let non_utf8 = create_non_utf8_string();
+        assert!(non_utf8.clone().into_string().is_err());
+
+        with_extra_env(&[(non_utf8.clone(), "baz".into())], assert_to_env_vars);
+        with_extra_env(&[("baz".into(), non_utf8.clone())], assert_to_env_vars);
+        with_extra_env(&[(non_utf8.clone(), non_utf8.clone())], assert_to_env_vars);
+
+        with_extra_env(&[("baz".into(), non_utf8.clone())], || {
+            assert_eq!(
+                // N.B.: Our docs guaranty removals are done first, then defaults are set and
+                // finally overwrites are processed. This is regardless of the order of the env var
+                // entries in the lift manifest JSON document.
+                vec![("baz".into(), None), ("foo".into(), Some("bar".into()))],
+                EnvVars {
+                    vars: vec![
+                        EnvVar::Replace(("foo".into(), "bar".into())),
+                        EnvVar::RemoveMatching(ComparableRegex::try_from("^baz$").unwrap())
+                    ]
+                }
+                .to_env_vars(),
+                "Expected removal of an env var with a non-utf8 value to succeed."
+            )
+        })
     }
 }

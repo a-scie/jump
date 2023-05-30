@@ -1,6 +1,6 @@
 [package]
 name = "jump"
-version = "0.11.0"
+version = "0.11.1"
 description = "The bulk of the scie-jump binary logic."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
@@ -33,3 +33,9 @@ xz2 = "0.1"
 zip = { workspace = true }
 zstd = "0.12"
 walkdir = "2.3"
+
+[dev-dependencies]
+ctor = "0.2"
+env_logger = { workspace = true }
+once_cell = "1.17"
+parking_lot = "0.12"
