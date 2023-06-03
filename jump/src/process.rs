@@ -211,16 +211,14 @@ impl Process {
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
-    use std::sync::Arc;
+    use std::sync::{Arc, OnceLock};
 
-    use once_cell::sync::Lazy;
     use parking_lot::ReentrantMutex;
 
     use crate::comparable_regex::ComparableRegex;
     use crate::{EnvVar, EnvVars};
 
-    static ENV_LOCK: Lazy<Arc<ReentrantMutex<()>>> =
-        Lazy::new(|| Arc::new(ReentrantMutex::new(())));
+    static ENV_LOCK: OnceLock<Arc<ReentrantMutex<()>>> = OnceLock::new();
 
     #[ctor::ctor]
     fn init() {
@@ -231,7 +229,9 @@ mod tests {
     where
         T: FnOnce() -> (),
     {
-        let _env_lock = ENV_LOCK.lock();
+        let _env_lock = ENV_LOCK
+            .get_or_init(|| Arc::new(ReentrantMutex::new(())))
+            .lock();
         func();
     }
 

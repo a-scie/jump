@@ -37,5 +37,4 @@ walkdir = "2.3"
 [dev-dependencies]
 ctor = "0.2"
 env_logger = { workspace = true }
-once_cell = "1.17"
 parking_lot = "0.12"
