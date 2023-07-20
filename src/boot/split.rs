@@ -155,7 +155,7 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
 
     if !scie_tote.is_empty() {
         lift.files.remove(lift.files.len() - 1);
-        for mut file in lift.files.iter_mut() {
+        for file in lift.files.iter_mut() {
             if file.source == Source::Scie {
                 let metadata = base.join(&file.name).metadata().map_err(|e| {
                     Code::FAILURE.with_message(format!(
