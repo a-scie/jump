@@ -24,7 +24,7 @@ bstr = "1.6"
 env_logger = { version = "0.10", default-features = false }
 log = "0.4"
 logging_timer = "1.1"
-tempfile = "3.6"
+tempfile = "3.7"
 
 [workspace.dependencies.zip]
 version = "0.6"
