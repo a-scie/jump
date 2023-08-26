@@ -159,7 +159,7 @@ fn main() -> ExitResult {
             // N.B.: This just suppresses a warning about adding this bin dir to your PATH.
             .env(
                 "PATH",
-                vec![output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
+                [output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
             ),
     )?;
 
