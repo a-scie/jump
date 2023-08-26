@@ -46,7 +46,7 @@ jobs:
           docker run --rm \
             -v $PWD:/code \
             -w /code \
-            rust:1.71.1-alpine3.18 \
+            rust:1.72.0-alpine3.18 \
               sh -c 'apk add musl-dev && cargo run -p package'
       - name: Integration Tests
         run: examples/run.sh --no-package
