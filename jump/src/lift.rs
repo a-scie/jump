@@ -1,7 +1,7 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use bstr::ByteSlice;
 use logging_timer::time;
@@ -52,7 +52,7 @@ impl From<File> for crate::config::File {
 pub struct Lift {
     pub name: String,
     pub description: Option<String>,
-    pub base: Option<PathBuf>,
+    pub base: Option<String>,
     pub(crate) load_dotenv: bool,
     pub size: usize,
     pub hash: String,
