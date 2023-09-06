@@ -3,7 +3,6 @@
 
 use std::fmt::Formatter;
 use std::io::Write;
-use std::path::PathBuf;
 
 use indexmap::IndexMap;
 use serde::de::{Error, Unexpected, Visitor};
@@ -240,7 +239,7 @@ pub struct Lift {
     pub description: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub base: Option<PathBuf>,
+    pub base: Option<String>,
     pub files: Vec<File>,
     pub boot: Boot,
     #[serde(default)]

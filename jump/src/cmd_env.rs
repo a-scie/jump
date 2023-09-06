@@ -78,6 +78,9 @@ impl EnvParser {
                 Item::Placeholder(Placeholder::FileName(name)) => {
                     reified.push_str(&format!("{{scie.files.{name}}}"))
                 }
+                Item::Placeholder(Placeholder::UserCacheDir(fallback)) => {
+                    reified.push_str(&format!("{{scie.user.cache_dir={fallback}}}"))
+                }
                 Item::Placeholder(Placeholder::Scie) => reified.push_str("{scie}"),
                 Item::Placeholder(Placeholder::ScieBase) => reified.push_str("{scie.base}"),
                 Item::Placeholder(Placeholder::ScieBindings) => reified.push_str("{scie.bindings}"),
@@ -391,6 +394,27 @@ mod tests {
                 "{{scie.files.foo}}:{path}:{{scie}}:{{scie.base}}:{{scie.files.bar}}:baz{{}}",
                 path = env::var("PATH").unwrap()
             ),
+        )]
+        .into_iter()
+        .collect::<IndexMap<_, _>>();
+
+        assert_eq!(expected, env_parser.parse_env().unwrap());
+    }
+
+    #[test]
+    fn test_user_cache_dir_placeholder() {
+        let env_parser = EnvParser::new(
+            &[(
+                EnvVar::Replace("SCIE_BASE".to_string()),
+                Some("{scie.user.cache_dir=foo}".to_string()),
+            )]
+            .into_iter()
+            .collect::<IndexMap<_, _>>(),
+        );
+
+        let expected = [(
+            "SCIE_BASE".to_string(),
+            "{scie.user.cache_dir=foo}".to_string(),
         )]
         .into_iter()
         .collect::<IndexMap<_, _>>();

@@ -1,5 +1,15 @@
 # Release Notes
 
+## 0.12.0
+
+This release adds support for using placeholders in the `scie.lift.base` lift manifest value as well
+as the corresponding `SCIE_BASE` runtime control env var. A new placeholder is exposed in support of
+establishing custom scie base `nce` cache directories that respect the target OS user cache dir
+structure in the form of `{scie.user.cache_dir=<fallback>}`. Typically, this placeholder will expand
+to `~/Library/Caches` on macOS, `~\AppData\Local` on Windows and `~/.cache` on all other Unix
+systems unless over-ridden via OS-specific means or else unavailable for some reason, in which case
+the supplied `<fallback>` is used.
+
 ## 0.11.1
 
 This release fixes a bug handling environment variable removal via regex when the environment

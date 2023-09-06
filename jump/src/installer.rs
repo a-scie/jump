@@ -164,6 +164,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Installer<'a> {
     payload: &'a [u8],
 }

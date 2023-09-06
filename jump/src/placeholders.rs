@@ -14,6 +14,7 @@ pub(crate) enum Placeholder<'a> {
     Env(&'a str),
     FileHash(&'a str),
     FileName(&'a str),
+    UserCacheDir(&'a str),
     Scie,
     ScieBase,
     ScieBindings,
@@ -105,6 +106,26 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                     }
                     ["scie", "files:hash", name] => {
                         items.push(Item::Placeholder(Placeholder::FileHash(name)))
+                    }
+                    ["scie", "user", cache_dir] => {
+                        match cache_dir.splitn(2, '=').collect::<Vec<_>>()[..] {
+                            ["cache_dir", fallback] => {
+                                items.push(Item::Placeholder(Placeholder::UserCacheDir(fallback)))
+                            }
+                            ["cache_dir"] => {
+                                return Err(
+                                    "The {{scie.user.cache_dir}} requires a fallback value; e.g.: \
+                                    {{scie.user.cache_dir=~/.cache}}"
+                                        .to_string(),
+                                )
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "Unrecognized placeholder in the {{scie.user.*}} \
+                                    namespace: {{scie.user.{cache_dir}}}"
+                                ))
+                            }
+                        }
                     }
                     ["scie", "lift"] => items.push(Item::Placeholder(Placeholder::ScieLift)),
                     ["scie", "platform"] => {
@@ -311,6 +332,24 @@ mod tests {
         assert_eq!(
             vec![Item::Placeholder(Placeholder::FileName("dotted.file.name"))],
             parse("{dotted.file.name}").unwrap().items
+        );
+    }
+
+    #[test]
+    fn user_cache_dir() {
+        assert!(parse("{scie.user.config_dir}").is_err());
+        assert!(parse("{scie.user.cache_dir}").is_err());
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::UserCacheDir("~/fall/back"))],
+            parse("{scie.user.cache_dir=~/fall/back}").unwrap().items
+        );
+        assert_eq!(
+            vec![Item::Placeholder(Placeholder::UserCacheDir(
+                "{scie.env.CACHE_DIR=~/fall/back}"
+            ))],
+            parse("{scie.user.cache_dir={scie.env.CACHE_DIR=~/fall/back}}")
+                .unwrap()
+                .items
         );
     }
 

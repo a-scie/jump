@@ -118,6 +118,10 @@ A scie "lift" can opt in to loading `.env` files via the "load_dotenv" boolean f
 https://crates.io/crates/dotenv) crate handles this loading. A lift's files and commands can also
 have additional configuration metadata described.
 
+A scie "lift" can also establish a custom `nce` cache directory via the "base" string field. Any
+placeholders  present in the custom value will be expanded save for the `{scie.lift}` placeholder
+which will lead to a scie jump boot error.
+
 For files, you can supply a "size" and sha256 "hash". Without these the boot-pack will calculate
 them, but you may want to set them in advance as a security precaution. The `scie-jump` will refuse
 to operate on any file whose size or hash do not match those specified. You can also manually
@@ -342,7 +346,9 @@ Runtime external control variables:
 + `SCIE_BOOT=<command>`: This can be used to select a non-default command for execution in a scie
   that defines named commands. One way to discover these is via invoking `SCIE=list <scie path>`.
 + `SCIE_BASE`: This can be used to override the default scie base of `~/.cache/nce` on Linux,
-   `~/Library/Caches/nce` on Mac and `~\AppData\Local\nce` on Windows.
+   `~/Library/Caches/nce` on Mac and `~\AppData\Local\nce` on Windows. Any placeholders save for
+   `{scie.lift}` will be expanded. If the `{scie.lift}` placeholder is encountered expanding the
+   `SCIE_BASE` value, a runtime error will abort the scie jump boot.
 
 Runtime read-only variables:
 
@@ -376,6 +382,7 @@ Further placeholders you can use in command "exe", "args" and "env" values inclu
   `linux`, `macos` or `windows` and `<ARCH>` is either `aarch64` or `x86_64`.
 + `{scie.platform.arch}`: The current chip architecture as described by `<ARCH>` above.
 + `{scie.platform.os}`: The current operating system as described by `<OS>` above.
++ `{scie.user.cache_dir=<fallback>}`: The default user cache dir or `<fallback>` if there is none.
 
 [^1]: The binaries that Coursier releases are single-file true native binaries that do not require a
 JVM at all. As such they are ~1/3 the size of the scie we build here, which contains a full JDK

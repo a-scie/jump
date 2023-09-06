@@ -197,6 +197,7 @@ pub(crate) struct SelectedCmd {
     pub(crate) argv1_consumed: bool,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct Context<'a> {
     scie: &'a Path,
     lift: &'a Lift,
@@ -233,15 +234,14 @@ impl<'a> Context<'a> {
         let base = if let Ok(base) = env::var("SCIE_BASE") {
             PathBuf::from(base)
         } else if let Some(base) = &lift.base {
-            base.clone()
+            PathBuf::from(base)
         } else if let Some(dir) = dirs::cache_dir() {
             dir.join("nce")
         } else {
             PathBuf::from("~/.nce")
         };
         let base = expanduser(base.as_path())?;
-        let lift_manifest = base.join(&lift.hash).join("lift.json");
-        Ok(Context {
+        let mut context = Context {
             scie,
             lift,
             base,
@@ -249,7 +249,7 @@ impl<'a> Context<'a> {
             files_by_name,
             replacements: HashSet::new(),
             lift_manifest: LiftManifest {
-                path: lift_manifest,
+                path: PathBuf::new(), // N.B.: We replace this empty value below.
                 jump: jump.clone(),
                 lift: lift.clone(),
             },
@@ -257,7 +257,41 @@ impl<'a> Context<'a> {
             lift_manifest_installed: false,
             bound: HashMap::new(),
             installed: HashSet::new(),
-        })
+        };
+
+        // Now patch up the base and the lift path (which is derived from it) with any placeholder
+        // resolving that may be required.
+        let mut env = IndexMap::new();
+        for (key, value) in env::vars_os() {
+            // TODO(John Sirois): Move from IndexMap to a trait with the method
+            //  `get(&str) -> Option<&str>`. That will allow detecting key accesses with non-UTF-8
+            //  values to warn or error.
+            if let (Some(key), Some(value)) = (key.into_string().ok(), value.into_string().ok()) {
+                env.insert(key, value);
+            }
+        }
+        let (parsed_base, needs_lift_manifest) = context.reify_string(
+            &env,
+            &context
+                .base
+                .clone()
+                .into_os_string()
+                .into_string()
+                .map_err(|e| {
+                    format!("Failed to interpret the scie.lift.base as a utf-8 string: {e:?}")
+                })?,
+        )?;
+        if needs_lift_manifest {
+            return Err(format!(
+                "The scie.lift.base cannot use the placeholder {{scie.lift}} since that \
+                placeholder is calculated from the resolved location of the scie.lift.base, \
+                given: {base}",
+                base = context.base.display()
+            ));
+        }
+        context.base = PathBuf::from(parsed_base.clone());
+        context.lift_manifest.path = context.base.join(&lift.hash).join("lift.json");
+        Ok(context)
     }
 
     fn prepare_process(&mut self, cmd: &'a Cmd) -> Result<Process, String> {
@@ -555,6 +589,17 @@ impl<'a> Context<'a> {
                     };
                     reified.push_str(&value)
                 }
+                Item::Placeholder(Placeholder::UserCacheDir(fallback)) => {
+                    let (parsed_fallback, needs_manifest) = self.reify_string(env, fallback)?;
+                    lift_manifest_required |= needs_manifest;
+                    reified.push_str(if let Some(user_cache_dir) = dirs::cache_dir() {
+                        user_cache_dir.into_os_string().into_string().map_err(|e| {
+                            format!("Could not interpret the user cache directory as a utf-8 string: {e:?}")
+                        })?
+                    } else {
+                        parsed_fallback
+                    }.as_str())
+                }
                 Item::Placeholder(Placeholder::Scie) => reified.push_str(path_to_str(self.scie)?),
                 Item::Placeholder(Placeholder::ScieBase) => {
                     reified.push_str(path_to_str(&self.base)?)
@@ -615,7 +660,7 @@ pub(crate) fn select_command(
 #[cfg(test)]
 mod tests {
     use std::env;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use indexmap::IndexMap;
 
@@ -630,11 +675,16 @@ mod tests {
             size: 42,
             version: "0.1.0".to_string(),
         };
-        let tempdir = tempfile::tempdir().unwrap();
         let lift = Lift {
             name: "test".to_string(),
             description: None,
-            base: Some(tempdir.path().to_path_buf()),
+            base: Some(
+                PathBuf::from("{scie.user.cache_dir={scie.env.USER_CACHE_DIR=/tmp/nce}}")
+                    .join("example")
+                    .into_os_string()
+                    .into_string()
+                    .unwrap(),
+            ),
             load_dotenv: true,
             size: 137,
             hash: "abc".to_string(),
@@ -693,10 +743,23 @@ mod tests {
         );
 
         env.clear();
+        let expected_scie_base = dirs::cache_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp/nce"))
+            .join("example");
         assert_eq!(
             (
-                tempdir
-                    .path()
+                expected_scie_base
+                    .clone()
+                    .into_os_string()
+                    .into_string()
+                    .unwrap(),
+                false
+            ),
+            context.reify_string(&mut env, "{scie.base}").unwrap()
+        );
+        assert_eq!(
+            (
+                expected_scie_base
                     .join("abc")
                     .join("lift.json")
                     .to_str()
@@ -709,11 +772,20 @@ mod tests {
                 .unwrap()
         );
 
+        let mut invalid_lift = lift.clone();
+        invalid_lift.base = Some("{scie.lift}/circular".to_string());
+        assert_eq!(
+            "The scie.lift.base cannot use the placeholder {scie.lift} since that placeholder is \
+            calculated from the resolved location of the scie.lift.base, given: \
+            {scie.lift}/circular"
+                .to_string(),
+            Context::new(Path::new("scie_path"), &jump, &invalid_lift, &installer).unwrap_err()
+        );
+
         env.clear();
         assert_eq!(
             (
-                tempdir
-                    .path()
+                expected_scie_base
                     .join("def")
                     .join("file")
                     .to_str()
@@ -750,11 +822,10 @@ mod tests {
             size: 42,
             version: "0.1.0".to_string(),
         };
-        let tempdir = tempfile::tempdir().unwrap();
         let lift = Lift {
             name: "test".to_string(),
             description: None,
-            base: Some(tempdir.path().to_path_buf()),
+            base: Some("/tmp/nce".to_string()),
             load_dotenv: true,
             size: 137,
             hash: "abc".to_string(),
@@ -824,7 +895,10 @@ mod tests {
         assert_eq!(
             Process {
                 env: expected_env.clone(),
-                exe: tempdir.path().join("def").join("dist-v1/v2/binary").into(),
+                exe: PathBuf::from("/tmp/nce")
+                    .join("def")
+                    .join("dist-v1/v2/binary")
+                    .into(),
                 args: vec![],
             },
             process
@@ -835,7 +909,10 @@ mod tests {
         assert_eq!(
             Process {
                 env: expected_env.clone(),
-                exe: tempdir.path().join("def").join("dist-v1/v1/exe").into(),
+                exe: PathBuf::from("/tmp/nce")
+                    .join("def")
+                    .join("dist-v1/v1/exe")
+                    .into(),
                 args: vec![],
             },
             process
@@ -847,7 +924,10 @@ mod tests {
         assert_eq!(
             Process {
                 env: expected_env,
-                exe: tempdir.path().join("ghi").join("dist-v2/v2/binary").into(),
+                exe: PathBuf::from("/tmp/nce")
+                    .join("ghi")
+                    .join("dist-v2/v2/binary")
+                    .into(),
                 args: vec![],
             },
             process
@@ -861,11 +941,10 @@ mod tests {
             size: 42,
             version: "0.1.0".to_string(),
         };
-        let tempdir = tempfile::tempdir().unwrap();
         let lift = Lift {
             name: "test".to_string(),
             description: None,
-            base: Some(tempdir.path().to_path_buf()),
+            base: Some("/tmp/nce".to_string()),
             load_dotenv: true,
             size: 137,
             hash: "abc".to_string(),
