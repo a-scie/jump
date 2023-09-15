@@ -119,7 +119,7 @@ pub fn prepare_boot() -> Result<BootAction, String> {
         )
     })?;
     let data = unsafe {
-        memmap::Mmap::map(&file)
+        memmap2::Mmap::map(&file)
             .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.exe.display()))?
     };
 
@@ -160,7 +160,7 @@ pub fn prepare_boot() -> Result<BootAction, String> {
 
     if lift.load_dotenv {
         let _timer = timer!(Level::Debug; "jump::load_dotenv");
-        if let Ok(dotenv_file) = dotenv::dotenv() {
+        if let Ok(dotenv_file) = dotenvy::dotenv() {
             debug!("Loaded env file from {path}", path = dotenv_file.display());
         }
     }
