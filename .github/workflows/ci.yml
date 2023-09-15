@@ -15,7 +15,7 @@ jobs:
   org-check:
     name: Check GitHub Organization
     if: github.repository_owner == 'a-scie'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Noop
         run: "true"
@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-11, macos-13-aarch64, windows-2022]
+        os: [ubuntu-22.04, macos-12, macos-13-aarch64, windows-2022]
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
@@ -37,10 +37,10 @@ jobs:
       - name: Unit Tests
         run: cargo test --all
       - name: Build & Package
-        if: ${{ matrix.os != 'ubuntu-20.04' }}
+        if: ${{ matrix.os != 'ubuntu-22.04' }}
         run: cargo run -p package
       - name: Build & Package
-        if: ${{ matrix.os == 'ubuntu-20.04' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         run: |
           mkdir dist
           docker run --rm \
