@@ -12,14 +12,14 @@ jobs:
   org-check:
     name: Check GitHub Organization
     if: ${{ github.repository_owner == 'a-scie' }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Noop
         run: "true"
   determine-tag:
     name: Determine the release tag to operate against.
     needs: org-check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       release-tag: ${{ steps.determine-tag.outputs.release-tag }}
       release-version: ${{ steps.determine-tag.outputs.release-version }}
@@ -45,7 +45,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macos-11, macos-13-aarch64, windows-2022 ]
+        os: [ ubuntu-22.04, macos-12, macos-13-aarch64, windows-2022 ]
     environment: Release
     steps:
       - name: Checkout scie-jump ${{ needs.determine-tag.outputs.release-tag }}
@@ -53,10 +53,10 @@ jobs:
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.os != 'ubuntu-20.04' }}
+        if: ${{ matrix.os != 'ubuntu-22.04' }}
         run: cargo run -p package -- dist
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.os == 'ubuntu-20.04' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         run: |
           mkdir dist
           docker run --rm \
@@ -89,7 +89,7 @@ jobs:
     needs:
       - determine-tag
       - github-release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Trigger aarch64 release
         uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.0.5
