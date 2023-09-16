@@ -1,0 +1,16 @@
+name: Cargo Audit
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch: null
+jobs:
+  audit:
+    if: github.repository_owner == 'a-scie'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Cargo audit (for security vulnerabilities)
+        run: |
+          cargo install --version 0.18.1 cargo-audit
+          cargo audit
