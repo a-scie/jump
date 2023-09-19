@@ -452,7 +452,7 @@ impl<'a> Context<'a> {
             return Ok(selected_cmd);
         }
 
-        // BusyBox stylenox where basename indicates command name.
+        // BusyBox style where basename indicates command name.
         if let Some(name) = exe.name() {
             if let Some(selected_command) = self.select_cmd(name, false)? {
                 return Ok(selected_command);
