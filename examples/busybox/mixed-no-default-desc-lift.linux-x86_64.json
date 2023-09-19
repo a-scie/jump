@@ -1,0 +1,36 @@
+{
+  "scie": {
+    "lift": {
+      "name": "mixed-no-default-desc",
+      "description": "The scie's overall description.",
+      "boot": {
+        "commands": {
+          "": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))"]
+          },
+          "foo": {
+            "description": "Prints foo.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('foo')"]
+          },
+          "bar": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('bar')"]
+          },
+          "runs-baz": {
+            "description": "Runs baz.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('ran baz')"]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "cpython-3.11.5+20230826-x86_64-unknown-linux-gnu-install_only.tar.gz",
+          "key": "cpython"
+        }
+      ]
+    }
+  }
+}

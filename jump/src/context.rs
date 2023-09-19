@@ -212,10 +212,6 @@ pub(crate) struct Context<'a> {
     installed: HashSet<File>,
 }
 
-fn try_as_str(os_str: &OsStr) -> Option<&str> {
-    <[u8]>::from_os_str(os_str).and_then(|bytes| std::str::from_utf8(bytes).ok())
-}
-
 impl<'a> Context<'a> {
     #[time("debug", "Context::{}")]
     fn new(
@@ -432,7 +428,8 @@ impl<'a> Context<'a> {
         Ok(None)
     }
 
-    fn select_command(&mut self, invoked_as: &Path) -> Result<Option<SelectedCmd>, String> {
+    fn select_command(&mut self, scie_name: &str, exe: &CurrentExe) -> Result<SelectedCmd, String> {
+        // Forced command.
         if let Some(cmd) = env::var_os("SCIE_BOOT") {
             // Avoid subprocesses that re-execute this SCIE unintentionally getting in an infinite
             // loop.
@@ -440,27 +437,36 @@ impl<'a> Context<'a> {
             let name = cmd.into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_BOOT: {value:?}")
             })?;
-            return self.select_cmd(&name, false);
-        }
-        if let Some(selected_cmd) = self.select_cmd("", false)? {
-            return Ok(Some(selected_cmd));
-        }
-
-        #[cfg(windows)]
-        let basename = invoked_as.file_stem().and_then(try_as_str);
-
-        #[cfg(unix)]
-        let basename = invoked_as.file_name().and_then(try_as_str);
-
-        if let Some(basename) = basename {
-            if let Some(selected_command) = self.select_cmd(basename, false)? {
-                return Ok(Some(selected_command));
+            if let Some(selected_cmd) = self.select_cmd(&name, false)? {
+                return Ok(selected_cmd);
+            } else {
+                return Err(format!(
+                    "`SCIE_BOOT={name}` was found in the environment but \"{name}\" does \
+                        not correspond to any {scie_name} commands."
+                ));
             }
         }
-        if let Some(argv1) = env::args().nth(1) {
-            return self.select_cmd(&argv1, true);
+
+        // Default command.
+        if let Some(selected_cmd) = self.select_cmd("", false)? {
+            return Ok(selected_cmd);
         }
-        Ok(None)
+
+        // BusyBox stylenox where basename indicates command name.
+        if let Some(name) = exe.name() {
+            if let Some(selected_command) = self.select_cmd(name, false)? {
+                return Ok(selected_command);
+            }
+        }
+
+        // BusyBox style where 1st arg indicates command name.
+        if let Some(argv1) = env::args().nth(1) {
+            if let Some(selected_cmd) = self.select_cmd(&argv1, true)? {
+                return Ok(selected_cmd);
+            }
+        }
+
+        Err("Could not determine which command to run.".to_string())
     }
 
     fn get_path(&self, file: &File) -> PathBuf {
@@ -652,9 +658,9 @@ pub(crate) fn select_command(
     jump: &Jump,
     lift: &Lift,
     installer: &Installer,
-) -> Result<Option<SelectedCmd>, String> {
+) -> Result<SelectedCmd, String> {
     let mut context = Context::new(&current_exe.exe, jump, lift, installer)?;
-    context.select_command(&current_exe.invoked_as)
+    context.select_command(lift.name.as_str(), current_exe)
 }
 
 #[cfg(test)]

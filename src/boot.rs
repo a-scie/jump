@@ -33,45 +33,93 @@ pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
 }
 
 pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
-    let header = if select_boot.boots.iter().any(|boot| boot.default) {
-        ""
-    } else {
-        "This Scie binary has no default boot command.\n"
-    };
+    let default_cmd = select_boot
+        .boots
+        .iter()
+        .find(|boot| boot.default)
+        .map(|boot| {
+            (
+                "<default> (when SCIE_BOOT is not set in the environment)".to_string(),
+                boot.description.as_ref().cloned().unwrap_or_default(),
+            )
+        });
+    let mut selectable_cmds = select_boot
+        .boots
+        .iter()
+        .filter(|boot| !boot.default)
+        .filter_map(|boot| {
+            boot.description
+                .as_ref()
+                .map(|desc| (boot.name.clone(), desc.clone()))
+        })
+        .collect::<Vec<_>>();
+
+    // Only include hidden named commands when that's all there is.
+    if selectable_cmds.is_empty() && default_cmd.is_none() {
+        selectable_cmds.extend(
+            select_boot
+                .boots
+                .iter()
+                .filter(|boot| !boot.default)
+                .map(|boot| (boot.name.clone(), "".to_string())),
+        );
+    }
+
+    if selectable_cmds.is_empty() && default_cmd.is_none() {
+        return Err(Code::FAILURE.with_message(format!(
+            "The {scie} scie is malformed - it has no boot commands.\n\
+                \n\
+                You might begin debugging by inspecting the output of `SCIE=inspect {scie}`.",
+            scie = select_boot.scie.invoked_as()
+        )));
+    }
+
+    if default_cmd.is_some() && selectable_cmds.is_empty() {
+        return Err(Code::FAILURE.with_message(format!(
+            "{error_message}\n\
+                \n\
+                The {scie} scie contains no alternate boot commands.",
+            scie = select_boot.scie.invoked_as(),
+            error_message = select_boot.error_message
+        )));
+    }
+
+    let maybe_scie_description = select_boot
+        .description
+        .map(|description| format!("{description}\n\n"))
+        .unwrap_or_default();
+    let max_name_width = default_cmd
+        .iter()
+        .chain(selectable_cmds.iter())
+        .map(|(name, _)| name.len())
+        .max()
+        .expect("We verified we have at least one boot command earlier");
     Err(Code::FAILURE.with_message(format!(
-        "{description}\n\
+        "{error_message}\n\
+            \n\
+            {maybe_scie_description}\
             Please select from the following boot commands:\n\
             \n\
             {boot_commands}\n\
             \n\
-            You can select a boot command by passing it as the 1st argument or else by \
-            setting the SCIE_BOOT environment variable.\n\
-            {error_message}",
-        description = select_boot
-            .description
-            .map(|message| format!("{header}{message}\n"))
-            .unwrap_or_default(),
-        boot_commands = select_boot
-            .boots
-            .into_iter()
-            .map(|boot| if let Some(description) = boot.description {
-                format!(
-                    "{name}: {description}",
-                    name = if boot.default {
-                        "<default>"
-                    } else {
-                        boot.name.as_str()
-                    }
-                )
+            You can select a boot command by setting the SCIE_BOOT environment variable\
+            {or_else_by}.",
+        boot_commands = default_cmd
+            .iter()
+            .chain(selectable_cmds.iter())
+            .map(|(name, description)| if description.is_empty() {
+                name.to_string()
             } else {
-                boot.name
+                format!("{name:<max_name_width$}  {description}")
             })
             .collect::<Vec<_>>()
             .join("\n"),
-        error_message = select_boot
-            .error_message
-            .map(|err| format!("\nERROR: {err}"))
-            .unwrap_or_default()
+        or_else_by = if default_cmd.is_none() {
+            " or else by passing it as the 1st argument"
+        } else {
+            ""
+        },
+        error_message = select_boot.error_message
     )))
 }
 

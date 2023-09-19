@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.13.0
+
+This release improves the help screen for BusyBox scies with more clear messages for the various
+causes of boot command selection failure. It also adds the ability to hide internal-only named boot
+commands by omitting a description for those commands (This only kicks in if at least one named
+command has a description).
+
 ## 0.12.0
 
 This release adds support for using placeholders in the `scie.lift.base` lift manifest value as well

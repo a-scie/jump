@@ -288,7 +288,9 @@ variable, e.g.: `SCIE_BOOT=some_other_command ./coursier`. If there is no defaul
 and the `SCIE_BOOT` environment variable is not set, a help screen will be printed listing all the
 commands you defined in the lift manifest. You can add a "lift.description" to provide overall help
 in this help page as well as a "description" for each command to provide help displayed after the
-command name.
+command name. If any named command has a description (or there is a default command), then only
+named commands with descriptions will appear in the help page. You can use this behavior to hide
+internal-only commands by giving them no description.
 
 This style of multi-command scie with no default command is called a [BusyBox](
 https://busybox.net/), and it functions like one. Instead of using `SCIE_BOOT` to address a command,

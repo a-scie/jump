@@ -39,9 +39,10 @@ pub use crate::process::{execute, EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
 
 pub struct SelectBoot {
+    pub scie: CurrentExe,
     pub boots: Vec<ScieBoot>,
     pub description: Option<String>,
-    pub error_message: Option<String>,
+    pub error_message: String,
 }
 
 const HELP: &str = "\
@@ -93,9 +94,28 @@ pub fn config(jump: Jump, mut lift: Lift) -> Config {
     Config::new(jump, lift, other)
 }
 
-struct CurrentExe {
+pub struct CurrentExe {
     exe: PathBuf,
     invoked_as: PathBuf,
+}
+
+impl CurrentExe {
+    pub fn name(&self) -> Option<&str> {
+        #[cfg(windows)]
+        let invoked_as = self.invoked_as.file_stem();
+
+        #[cfg(unix)]
+        let invoked_as = self.invoked_as.file_name();
+
+        invoked_as.and_then(|basename| basename.to_str())
+    }
+
+    pub fn invoked_as(&self) -> String {
+        self.invoked_as
+            .to_str()
+            .map(|path| path.to_string())
+            .unwrap_or_else(|| format!("{}", self.invoked_as.display()))
+    }
 }
 
 fn find_current_exe() -> Result<CurrentExe, String> {
@@ -166,22 +186,23 @@ pub fn prepare_boot() -> Result<BootAction, String> {
     }
     let payload = &data[jump.size..data.len() - lift.size];
     let installer = Installer::new(payload);
-    let result = context::select_command(&current_exe, &jump, &lift, &installer);
-    if let Ok(Some(selected_command)) = result {
-        installer.install(&selected_command.files)?;
-        let process = selected_command.process;
-        trace!("Prepared {process:#?}");
-        env::set_var("SCIE", current_exe.exe.as_os_str());
-        env::set_var("SCIE_ARGV0", current_exe.invoked_as.as_os_str());
-        Ok(BootAction::Execute((
-            process,
-            selected_command.argv1_consumed,
-        )))
-    } else {
-        Ok(BootAction::Select(SelectBoot {
+    match context::select_command(&current_exe, &jump, &lift, &installer) {
+        Ok(selected_command) => {
+            installer.install(&selected_command.files)?;
+            let process = selected_command.process;
+            trace!("Prepared {process:#?}");
+            env::set_var("SCIE", current_exe.exe.as_os_str());
+            env::set_var("SCIE_ARGV0", current_exe.invoked_as.as_os_str());
+            Ok(BootAction::Execute((
+                process,
+                selected_command.argv1_consumed,
+            )))
+        }
+        Err(error_message) => Ok(BootAction::Select(SelectBoot {
+            scie: current_exe,
             boots: lift.boots(),
             description: lift.description,
-            error_message: result.err(),
-        }))
+            error_message,
+        })),
     }
 }
