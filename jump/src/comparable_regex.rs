@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use regex::Regex;
+use regex::bytes::Regex;
 
 #[derive(Clone, Debug)]
 pub struct ComparableRegex(Regex);
