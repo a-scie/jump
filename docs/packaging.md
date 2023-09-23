@@ -152,7 +152,9 @@ variable names will be removed. For example, `"BASH_.*": null` would remove all 
 variables whose name start with `BASH_` and `"=BASH_SOURCE": null` would just remove the
 `BASH_SOURCE` environment variable. When processing env entries, removals are done first, then
 defaults are set and finally overwrites are processed. This is regardless of the order of the env
-var entries in the lift manifest JSON document.
+var entries in the lift manifest JSON document. When evaluating environment variable removal regular
+expressions, the regular expression syntax is that supported by the Rust [`regex` crate](
+https://docs.rs/regex/latest/regex/).
 
 You can also supply a list of commands under "scie.lift.boot.bindings". These commands are objects
 with the same format as the "scie.lift.boot.commands" but they are not directly runnable by the end

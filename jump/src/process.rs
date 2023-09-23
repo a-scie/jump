@@ -7,6 +7,7 @@ use std::ffi::OsString;
 use std::process::{Child, Command, ExitStatus, Stdio};
 
 use logging_timer::time;
+use os_str_bytes::OsStrBytes;
 use sha2::{Digest, Sha256};
 
 use crate::comparable_regex::ComparableRegex;
@@ -64,19 +65,8 @@ impl EnvVars {
                 }
                 EnvVar::RemoveMatching(regex) => {
                     for (name, _) in env::vars_os() {
-                        match name.into_string() {
-                            Ok(name_utf8) => {
-                                if regex.is_match(&name_utf8) {
-                                    removals.insert(name_utf8.into());
-                                }
-                            }
-                            Err(name_os) => {
-                                warn!(
-                                    "Cannot process env removal matching regex '{regex}' for \
-                                    non-utf8 env var name {name_os:?}",
-                                    regex = regex.as_str()
-                                )
-                            }
+                        if regex.is_match(name.as_os_str().to_raw_bytes().as_ref()) {
+                            removals.insert(name);
                         }
                     }
                 }
@@ -213,6 +203,7 @@ mod tests {
     use std::ffi::OsString;
     use std::sync::{Arc, OnceLock};
 
+    use os_str_bytes::OsStrBytes;
     use parking_lot::ReentrantMutex;
 
     use crate::comparable_regex::ComparableRegex;
@@ -334,6 +325,25 @@ mod tests {
                 .to_env_vars(),
                 "Expected removal of an env var with a non-utf8 value to succeed."
             )
-        })
+        });
+
+        with_extra_env(&[(non_utf8.clone(), "baz".into())], || {
+            let mut re = String::new();
+            re.push('^');
+            for byte in non_utf8.as_os_str().to_raw_bytes().as_ref() {
+                re.push_str(format!(r"(?-u:\x{:X})", byte).as_str());
+            }
+            re.push('$');
+            assert_eq!(
+                vec![(non_utf8.clone(), None)],
+                EnvVars {
+                    vars: vec![EnvVar::RemoveMatching(
+                        ComparableRegex::try_from(re.as_str()).unwrap()
+                    )]
+                }
+                .to_env_vars(),
+                "Expected removal of an env var with a non-utf8 name to succeed."
+            )
+        });
     }
 }

@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.13.1
+
+Support regex removal of env vars with non-utf8 names in commands.
+
 ## 0.13.0
 
 This release improves the help screen for BusyBox scies with more clear messages for the various
