@@ -33,7 +33,7 @@ jobs:
           rustup toolchain add nightly -c rustfmt
           cargo +nightly fmt --check --all
       - name: Lint
-        run: cargo clippy --all
+        run: cargo clippy --locked --all
       - name: Unit Tests
         run: cargo test --all
       - name: Build & Package
