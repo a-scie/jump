@@ -1,5 +1,5 @@
 [toolchain]
-# N.B.: Update .github and .circleci yaml to use a matching imagae, if available.
+# N.B.: Update .github and .circleci yaml to use a matching image, if available.
 # Although a version match is not required (cargo downloads and installs the
 # toolchain described here if not present), it does speed up CI builds.
 channel = "1.73.0"
