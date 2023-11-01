@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.13.2
+
+When `load_dotenv` is requested, propagate errors loading any `.env` file found.
+
 ## 0.13.1
 
 Support regex removal of env vars with non-utf8 names in commands.

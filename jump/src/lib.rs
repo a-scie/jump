@@ -180,8 +180,20 @@ pub fn prepare_boot() -> Result<BootAction, String> {
 
     if lift.load_dotenv {
         let _timer = timer!(Level::Debug; "jump::load_dotenv");
-        if let Ok(dotenv_file) = dotenvy::dotenv() {
-            debug!("Loaded env file from {path}", path = dotenv_file.display());
+        match dotenvy::dotenv() {
+            Ok(dotenv_file) => debug!("Loaded env file from {path}", path = dotenv_file.display()),
+            Err(err) if err.not_found() => {
+                debug!(
+                    "No .env files found for invocation of {current_exe} from cwd of {cwd:?}",
+                    current_exe = current_exe.exe.display(),
+                    cwd = env::current_dir()
+                )
+            }
+            Err(err) => {
+                return Err(format!(
+                "This scie requested .env files be loaded but there was an error doing so: {err}"
+            ))
+            }
         }
     }
     let payload = &data[jump.size..data.len() - lift.size];

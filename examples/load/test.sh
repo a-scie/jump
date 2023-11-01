@@ -34,3 +34,12 @@ echo GET_CONFIG=alt-metadata.json > .env
 
 source .env
 grep "${GET_CONFIG}" "${GET_LOG_CONFIG}"
+
+# Motivated by: https://github.com/pantsbuild/scie-pants/issues/307
+# shellcheck disable=SC2016 # We with this text to be included verbatim in the .env file.
+echo 'PYTHONPATH="/foo/bar:$PYTHONPATH"' >> .env
+if ./cowsay "Should fail!"; then
+  die "The expected .env file loading failure did not happen."
+else
+  log "The expected .env file loading failure was successfully propagated."
+fi
