@@ -189,9 +189,11 @@ pub fn prepare_boot() -> Result<BootAction, String> {
                     cwd = env::current_dir()
                 )
             }
-            Err(err) => return Err(format!(
+            Err(err) => {
+                return Err(format!(
                 "This scie requested .env files be loaded but there was an error doing so: {err}"
-            )),
+            ))
+            }
         }
     }
     let payload = &data[jump.size..data.len() - lift.size];
