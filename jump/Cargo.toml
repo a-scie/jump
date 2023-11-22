@@ -1,6 +1,6 @@
 [package]
 name = "jump"
-version = "0.13.2"
+version = "0.13.3"
 description = "The bulk of the scie-jump binary logic."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
@@ -30,7 +30,7 @@ structure = "0.1"
 tar = "0.4"
 tempfile = { workspace = true }
 tuple = "0.5"
-xz2 = "0.1"
+xz2 = { version = "0.1", features = ["static"] }
 zip = { workspace = true }
 zstd = "0.12"
 walkdir = "2.3"

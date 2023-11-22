@@ -1,5 +1,9 @@
 # Release Notes
 
+## 0.13.3
+
+Ensure liblzma is statically linked.
+
 ## 0.13.2
 
 When `load_dotenv` is requested, propagate errors loading any `.env` file found.
