@@ -29,6 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Check Formatting
+        # TODO(John Sirois): https://github.com/a-scie/jump/issues/174
+        #  Undo once https://github.com/rust-lang/rustfmt/issues/5964 is fixed.
+        if: matrix.os != 'macos-13-aarch64'
         run: |
           rustup toolchain add nightly -c rustfmt
           cargo +nightly fmt --check --all
