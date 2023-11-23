@@ -26,10 +26,12 @@ jobs:
     resource_class: arm.medium
     steps:
       - checkout
-      - rust/install:
-          version: nightly
-      - rust/format:
-          nightly-toolchain: true
+      # TODO(John Sirois): https://github.com/a-scie/jump/issues/174
+      #  Undo once https://github.com/rust-lang/rustfmt/issues/5964 is fixed.
+      #- rust/install:
+      #    version: nightly
+      #- rust/format:
+      #    nightly-toolchain: true
       - rust/install
       - rust/clippy
       - rust/test:
