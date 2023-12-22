@@ -114,9 +114,31 @@ In the "lift" manifest, there are 3 required fields:
 
 ### Optional fields
 
-A scie "lift" can opt in to loading `.env` files via the "load_dotenv" boolean field. The [dotenv](
-https://crates.io/crates/dotenv) crate handles this loading. A lift's files and commands can also
-have additional configuration metadata described.
+A scie "lift" can opt in to loading `.env` files via the "load_dotenv" boolean field. The [dotenvs](
+https://crates.io/crates/dotenvs) crate handles this loading and the following behavior is
+guaranteed:
+
+Parsing rules:
+
+- `BASIC=basic` and `export BASIC=basic` both export an environment variable named `BASIC` with
+  value `basic`.
+- Empty lines are skipped.
+- Lines beginning with `#` are treated as comments.
+- A `#` marks the beginning of a comment (unless the value is wrapped in quotes).
+- Empty values become empty strings.
+- Inner quotes are maintained.
+- Whitespace is removed from both ends of unquoted values.
+- Single and double quoted values maintain whitespace from both ends.
+
+Expanding rules:
+
+- `$KEY` or `${KEY}` will expand to the ambient environment value of `KEY` (unless the value is
+  wrapped in single quotes). If there is no ambient environment value for `KEY`, the expanded value
+  will be an empty string.
+- `${KEY:-default}` will first attempt to expand `KEY` subject to the rules above. If `KEY` is not
+  defined, then it will return `default`.
+- `\$KEY` will escape the `$KEY` rather than expand when not wrapped with quotes or wrapped with
+  double quotes.
 
 A scie "lift" can also establish a custom `nce` cache directory via the "base" string field. Any
 placeholders  present in the custom value will be expanded save for the `{scie.lift}` placeholder

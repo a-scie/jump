@@ -180,19 +180,26 @@ pub fn prepare_boot() -> Result<BootAction, String> {
 
     if lift.load_dotenv {
         let _timer = timer!(Level::Debug; "jump::load_dotenv");
-        match dotenvy::dotenv() {
-            Ok(dotenv_file) => debug!("Loaded env file from {path}", path = dotenv_file.display()),
-            Err(err) if err.not_found() => {
+        match dotenv::from_filename(".env") {
+            Ok(env) => {
+                let mut iter = env.iter();
+                while let Some((key, value)) = iter.try_next().map_err(|err| {
+                    format!(
+                        "This scie requested .env files be loaded but there was an error doing so: \
+                        {err}"
+                    )
+                })? {
+                    if std::env::var(key).is_err() {
+                        std::env::set_var(key, value);
+                    }
+                }
+            }
+            Err(_) => {
                 debug!(
                     "No .env files found for invocation of {current_exe} from cwd of {cwd:?}",
                     current_exe = current_exe.exe.display(),
                     cwd = env::current_dir()
                 )
-            }
-            Err(err) => {
-                return Err(format!(
-                "This scie requested .env files be loaded but there was an error doing so: {err}"
-            ))
             }
         }
     }

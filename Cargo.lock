@@ -269,10 +269,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotenvy"
-version = "0.15.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+name = "dotenvs"
+version = "0.1.0"
+source = "git+https://github.com/jsirois/dotenvs-rs?rev=b2276ef3fd039ed8565b4c1cbedb7a5aeeca734e#b2276ef3fd039ed8565b4c1cbedb7a5aeeca734e"
+dependencies = [
+ "nom",
+]
 
 [[package]]
 name = "either"
@@ -436,14 +438,14 @@ dependencies = [
 
 [[package]]
 name = "jump"
-version = "0.13.3"
+version = "0.14.0"
 dependencies = [
  "bstr",
  "byteorder",
  "bzip2",
  "ctor",
  "dirs",
- "dotenvy",
+ "dotenvs",
  "env_logger",
  "fd-lock",
  "flate2",
@@ -551,6 +553,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -568,6 +576,16 @@ dependencies = [
  "bitflags 2.4.1",
  "cfg-if",
  "libc",
+]
+
+[[package]]
+name = "nom"
+version = "7.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
 ]
 
 [[package]]
@@ -781,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "scie-jump"
-version = "0.13.3"
+version = "0.14.0"
 dependencies = [
  "bstr",
  "env_logger",

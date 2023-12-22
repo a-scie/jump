@@ -36,8 +36,20 @@ source .env
 grep "${GET_CONFIG}" "${GET_LOG_CONFIG}"
 
 # Motivated by: https://github.com/pantsbuild/scie-pants/issues/307
+# And ammended by: https://github.com/a-scie/jump/issues/166
 # shellcheck disable=SC2016 # We with this text to be included verbatim in the .env file.
 echo 'PYTHONPATH="/foo/bar:$PYTHONPATH"' >> .env
+./cowsay "Should succeed!"
+
+# See motivating case here: https://github.com/arniu/dotenvs-rs/issues/4
+cat << EOF >> .env
+A=foo bar
+B="notenough
+C='toomany''
+D=valid
+export NOT_SET
+E=valid
+EOF
 if ./cowsay "Should fail!"; then
   die "The expected .env file loading failure did not happen."
 else

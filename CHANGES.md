@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.14.0
+
+Change `.env` parsing libraries to gain support for double quoted values with variable
+substitution; e.g.: the `.env` line `PYTHONPATH="/Users/A. Space:$PYTHONPATH"` now has the
+`$PYTHONPATH` portion of the value substituted.
+
 ## 0.13.3
 
 Ensure liblzma is statically linked.
