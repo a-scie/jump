@@ -93,9 +93,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Trigger aarch64 release
-        # Upgrade node16 -> node20: Out for review here:
-        #   https://github.com/CircleCI-Public/trigger-circleci-pipeline-action/pull/75
-        uses: a-scie/trigger-circleci-pipeline-action@5386b18a33d1d272a294422b78d35bd09256fb8f
+        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.2.0
         with:
           GHA_Meta: "${{ needs.determine-tag.outputs.release-tag }}"
         env:
