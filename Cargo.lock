@@ -511,9 +511,9 @@ checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
 name = "logging_timer"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64e96f261d684b7089aa576bb74e823241dccd994b27d30fabf1dcb3af284fe9"
+checksum = "5669c09dbcb4a0b5f6de8364154495574238e18d6736bbdaa7726307f3268471"
 dependencies = [
  "log",
  "logging_timer_proc_macros",
@@ -521,9 +521,9 @@ dependencies = [
 
 [[package]]
 name = "logging_timer_proc_macros"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a9062912d7952c5588cc474795e0b9ee008e7e6781127945b85413d4b99d81"
+checksum = "27906ca51651609191eeb2d1fdc6b52b8024789ec188b07aad88b6dfbe392fbe"
 dependencies = [
  "log",
  "proc-macro2",
