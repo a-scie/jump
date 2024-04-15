@@ -44,7 +44,7 @@ env_logger = { workspace = true }
 # low here.
 # TODO(John Sirois): Remove this dependency once we can upgrade to an image with musl support for
 # newer jobserver.
-jobserver = "<0.1.29"
+jobserver = "<0.1.31"
 
 jump = { path = "jump" }
 log = { workspace = true }
