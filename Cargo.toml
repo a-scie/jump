@@ -38,14 +38,6 @@ features = ["deflate"]
 [dependencies]
 bstr = { workspace = true }
 env_logger = { workspace = true }
-
-# The 0.1.29 release adds dependencies on libc preadv2 which are not available in musl until
-# 1.2.5 which our alpine image does not have access to yet; so we pin this transitive dependency
-# low here.
-# TODO(John Sirois): Remove this dependency once we can upgrade to an image with musl support for
-# newer jobserver.
-jobserver = "<0.1.29"
-
 jump = { path = "jump" }
 log = { workspace = true }
 logging_timer = { workspace = true }
