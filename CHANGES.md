@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.0.0
+
+This release updates various dependencies as well as upgrading to Rust
+1.78.0 and dropping support for Windows versions prior to Windows 10.
+
 ## 0.14.0
 
 Change `.env` parsing libraries to gain support for double quoted values with variable
