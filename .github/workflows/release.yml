@@ -49,6 +49,11 @@ jobs:
         # non-deprecated ARM Mac runner.
         os: [ ubuntu-22.04, macos-12, macos-14, windows-2022 ]
     environment: Release
+    permissions:
+      id-token: write
+      attestations: write
+      contents: write
+      discussions: write
     steps:
       - name: Checkout scie-jump ${{ needs.determine-tag.outputs.release-tag }}
         uses: actions/checkout@v4
@@ -66,6 +71,10 @@ jobs:
             -w /code \
             rust:1.79.0-alpine3.20 \
               sh -c 'apk add musl-dev && cargo run -p package -- dist'
+      - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: dist/scie-jump*
       - name: Prepare Changelog
         id: prepare-changelog
         uses: a-scie/actions/changelog@v1.6
@@ -74,10 +83,7 @@ jobs:
           version: ${{ needs.determine-tag.outputs.release-version }}
           setup-python: ${{ matrix.os != 'macos-13-aarch64' }}
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
-        # Upgrades node16 -> node20: in main but not tagged yet.
-        uses: softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.determine-tag.outputs.release-tag }}
           name: scie-jump ${{ needs.determine-tag.outputs.release-version }}
