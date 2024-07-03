@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.1.0
+
+This release updates various dependencies as well as upgrading to Rust
+1.79.0. In addition, this is the first release to include artifact
+attestations in Sigstore.
+
 ## 1.0.0
 
 This release updates various dependencies as well as upgrading to Rust
