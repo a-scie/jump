@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.1.1
+
+This release fixes missing attestations for Linux ARM64 artifacts.
+
 ## 1.1.0
 
 This release updates various dependencies as well as upgrading to Rust

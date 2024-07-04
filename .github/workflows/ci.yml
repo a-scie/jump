@@ -27,7 +27,7 @@ jobs:
       matrix:
         # N.B.: macos-12 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ubuntu-22.04, macos-12, macos-14, windows-2022]
+        os: [ubuntu-22.04, linux-arm64, macos-12, macos-14, windows-2022]
     steps:
       - uses: actions/checkout@v4
       - name: Check Formatting
@@ -39,16 +39,20 @@ jobs:
       - name: Unit Tests
         run: cargo test --all
       - name: Build & Package
-        if: ${{ matrix.os != 'ubuntu-22.04' }}
+        if: ${{ matrix.os != 'ubuntu-22.04' && matrix.os != 'linux-arm64' }}
         run: cargo run -p package
       - name: Build & Package
-        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'linux-arm64' }}
         run: |
-          mkdir dist
           docker run --rm \
             -v $PWD:/code \
             -w /code \
             rust:1.79.0-alpine3.20 \
-              sh -c 'apk add musl-dev && cargo run -p package'
+              sh -c "
+                apk add musl-dev &&
+                addgroup -g $(id -g) build &&
+                adduser -u $(id -u) -G build -D -H build &&
+                su build -c 'cargo run -p package -- dist'
+              "
       - name: Integration Tests
         run: examples/run.sh --no-package

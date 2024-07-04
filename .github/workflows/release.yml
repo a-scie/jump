@@ -47,7 +47,7 @@ jobs:
       matrix:
         # N.B.: macos-12 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ ubuntu-22.04, macos-12, macos-14, windows-2022 ]
+        os: [ ubuntu-22.04, linux-arm64, macos-12, macos-14, windows-2022 ]
     environment: Release
     permissions:
       id-token: write
@@ -60,17 +60,21 @@ jobs:
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.os != 'ubuntu-22.04' }}
+        if: ${{ matrix.os != 'ubuntu-22.04' && matrix.os != 'linux-arm64' }}
         run: cargo run -p package -- dist
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'linux-arm64' }}
         run: |
-          mkdir dist
           docker run --rm \
             -v $PWD:/code \
             -w /code \
             rust:1.79.0-alpine3.20 \
-              sh -c 'apk add musl-dev && cargo run -p package -- dist'
+              sh -c "
+                apk add musl-dev &&
+                addgroup -g $(id -g) build &&
+                adduser -u $(id -u) -G build -D -H build &&
+                su build -c 'cargo run -p package -- dist'
+              "
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
         uses: actions/attest-build-provenance@v1
         with:
@@ -81,7 +85,7 @@ jobs:
         with:
           changelog-file: ${{ github.workspace }}/CHANGES.md
           version: ${{ needs.determine-tag.outputs.release-version }}
-          setup-python: ${{ matrix.os != 'macos-13-aarch64' }}
+          setup-python: ${{ matrix.os != 'linux-arm64' }}
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v2
         with:
@@ -93,16 +97,3 @@ jobs:
           files: dist/scie-jump*
           fail_on_unmatched_files: true
           discussion_category_name: Announcements
-  aarch64-release-trigger:
-    name: Trigger Circle CI Linux aarch64 Github Release
-    needs:
-      - determine-tag
-      - github-release
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Trigger aarch64 release
-        uses: CircleCI-Public/trigger-circleci-pipeline-action@v1.2.0
-        with:
-          GHA_Meta: "${{ needs.determine-tag.outputs.release-tag }}"
-        env:
-          CCI_TOKEN: ${{ secrets.CCI_TOKEN }}
