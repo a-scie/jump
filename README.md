@@ -1,7 +1,7 @@
 # A scie-jump
 
 [![GitHub](https://img.shields.io/github/license/a-scie/jump)](LICENSE)
-[![Github Actions CI (x86_64 Linux / MacOS / Windows)](https://github.com/a-scie/jump/actions/workflows/ci.yml/badge.svg)](https://github.com/a-scie/jump/actions/workflows/ci.yml)
+[![Github Actions CI](https://github.com/a-scie/jump/actions/workflows/ci.yml/badge.svg)](https://github.com/a-scie/jump/actions/workflows/ci.yml)
 
 A Self Contained Interpreted Executable Launcher.
 
