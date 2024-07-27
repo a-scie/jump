@@ -2,6 +2,7 @@
 
 [![GitHub](https://img.shields.io/github/license/a-scie/jump)](LICENSE)
 [![Github Actions CI](https://github.com/a-scie/jump/actions/workflows/ci.yml/badge.svg)](https://github.com/a-scie/jump/actions/workflows/ci.yml)
+[![Discord](https://img.shields.io/discord/1113502044922322954)](https://scie.app/discord)
 
 A Self Contained Interpreted Executable Launcher.
 
