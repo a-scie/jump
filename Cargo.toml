@@ -20,7 +20,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.dependencies]
-bstr = "1.9"
+bstr = "1.10"
 env_logger = { version = "0.10", default-features = false }
 log = "0.4"
 logging_timer = "1.1"
