@@ -336,6 +336,7 @@ Having written a fully specified lift manifest like the one above by hand though
 the last file is a zip, scie cat assembly is just:
 ```
 cat \
+   scie-jump-linux-x86_64 \
    amazon-corretto-11.0.17.8.1-linux-x64.tar.gz \
    coursier.jar \
    lift.json > coursier
@@ -348,6 +349,7 @@ for readability. To package the scie for easier inspection, you can modify the `
 like so:
 ```
 cat \
+   scie-jump-linux-x86_64 \
    amazon-corretto-11.0.17.8.1-linux-x64.tar.gz \
    coursier.jar \
    <(echo) \
