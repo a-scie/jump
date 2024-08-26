@@ -38,14 +38,14 @@ function calculate_arch() {
   local arch
 
   if [[ "windows" == "$1" ]]; then
-    arch="$(pwsh -c '$Env:PROCESSOR_ARCHITECTURE')"
+    arch="$(pwsh -c '$Env:PROCESSOR_ARCHITECTURE.ToLower()')"
   else
     arch="$(uname -m)"
   fi
 
-  if [[ "${arch,,}" =~ x86[_-]64 ]]; then
-      echo x86_64
-  elif [[ "${arch,,}" =~ arm64|aarch64 ]]; then
+  if [[ "${arch}" =~ x86[_-]64 ]]; then
+    echo x86_64
+  elif [[ "${arch}" =~ arm64|aarch64 ]]; then
     echo aarch64
   else
     die "Integration tests are not supported for this chip architecture (${arch})."
