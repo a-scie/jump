@@ -43,7 +43,7 @@ function calculate_arch() {
     arch="$(uname -m)"
   fi
 
-  if [[ "${arch}" =~ x86[_-]64 ]]; then
+  if [[ "${arch}" =~ amd64|x86[_-]64 ]]; then
     echo x86_64
   elif [[ "${arch}" =~ arm64|aarch64 ]]; then
     echo aarch64
