@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.2.0
+
+This release adds support for Windows ARM64.
+
 ## 1.1.1
 
 This release fixes missing attestations for Linux ARM64 artifacts.

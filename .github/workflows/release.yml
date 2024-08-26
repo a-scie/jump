@@ -47,7 +47,7 @@ jobs:
       matrix:
         # N.B.: macos-12 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ ubuntu-22.04, linux-arm64, macos-12, macos-14, windows-2022 ]
+        os: [ ubuntu-22.04, linux-arm64, macos-12, macos-14, windows-2022, windows-arm64 ]
     environment: Release
     permissions:
       id-token: write
@@ -85,7 +85,7 @@ jobs:
         with:
           changelog-file: ${{ github.workspace }}/CHANGES.md
           version: ${{ needs.determine-tag.outputs.release-version }}
-          setup-python: ${{ matrix.os != 'linux-arm64' }}
+          setup-python: ${{ matrix.os != 'linux-arm64' && matrix.os != 'windows-arm64' }}
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
         uses: softprops/action-gh-release@v2
         with:
