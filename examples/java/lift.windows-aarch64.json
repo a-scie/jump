@@ -1,0 +1,38 @@
+{
+  "scie": {
+    "lift": {
+      "name": "coursier",
+      "boot": {
+        "commands": {
+          "": {
+            "env": {
+              "=JAVA_HOME": "{jdk}/jdk11.0.17_8",
+              "=PATH": "{jdk}/jdk11.0.17_8/bin:{scie.env.PATH}"
+            },
+            "exe": "{jdk}/jdk11.0.17_8/bin/java",
+            "args": [
+              "-jar",
+              "{coursier.jar}"
+            ]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "amazon-corretto-11.0.17.8.1-windows-x64-jdk.zip",
+          "key": "jdk"
+        },
+        {
+          "name": "coursier.jar"
+        }
+      ]
+    }
+  },
+  "fetch": [
+    "https://corretto.aws/downloads/resources/11.0.17.8.1/amazon-corretto-11.0.17.8.1-windows-x64-jdk.zip"
+  ],
+  "custom": {
+    "arbitrary": 3
+  },
+  "more": ["and", "more"]
+}
