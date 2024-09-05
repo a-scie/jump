@@ -47,7 +47,7 @@ jobs:
           docker run --rm \
             -v $PWD:/code \
             -w /code \
-            rust:1.80.1-alpine3.20 \
+            rust:1.81.0-alpine3.20 \
               sh -c "
                 apk add musl-dev &&
                 addgroup -g $(id -g) build &&
