@@ -111,6 +111,8 @@ impl Debug for LoadProcess {
     }
 }
 
+// The two largest variants are Install at ~136 bytes and LoadAndInstall at ~616 bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum FileEntry {
     Skip(usize),
