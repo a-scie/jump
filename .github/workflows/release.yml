@@ -45,9 +45,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # N.B.: macos-12 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
+        # N.B.: macos-13 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ ubuntu-22.04, linux-arm64, macos-12, macos-14, windows-2022, windows-arm64 ]
+        os: [ ubuntu-22.04, linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
     environment: Release
     permissions:
       id-token: write
