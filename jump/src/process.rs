@@ -218,7 +218,7 @@ mod tests {
 
     fn with_env<T>(func: T)
     where
-        T: FnOnce() -> (),
+        T: FnOnce(),
     {
         let _env_lock = ENV_LOCK
             .get_or_init(|| Arc::new(ReentrantMutex::new(())))
@@ -228,7 +228,7 @@ mod tests {
 
     fn with_extra_env<T>(extra_env: &[(OsString, OsString)], func: T)
     where
-        T: FnOnce() -> (),
+        T: FnOnce(),
     {
         with_env(|| {
             let mut original_env = vec![];

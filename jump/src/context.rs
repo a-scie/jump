@@ -721,7 +721,7 @@ mod tests {
         assert_eq!(
             ("".to_string(), false),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__}")
+                .reify_string(&env, "{scie.env.__DNE__}")
                 .unwrap()
         );
 
@@ -729,7 +729,7 @@ mod tests {
         assert_eq!(
             ("default".to_string(), false),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__=default}")
+                .reify_string(&env, "{scie.env.__DNE__=default}")
                 .unwrap()
         );
 
@@ -738,7 +738,7 @@ mod tests {
         assert_eq!(
             ("foo".to_string(), false),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__=default}")
+                .reify_string(&env, "{scie.env.__DNE__=default}")
                 .unwrap()
         );
 
@@ -746,7 +746,7 @@ mod tests {
         assert_eq!(
             ("scie_path".to_string(), false),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__={scie}}")
+                .reify_string(&env, "{scie.env.__DNE__={scie}}")
                 .unwrap()
         );
 
@@ -763,7 +763,7 @@ mod tests {
                     .unwrap(),
                 false
             ),
-            context.reify_string(&mut env, "{scie.base}").unwrap()
+            context.reify_string(&env, "{scie.base}").unwrap()
         );
         assert_eq!(
             (
@@ -776,7 +776,7 @@ mod tests {
                 true
             ),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__={scie.lift}}")
+                .reify_string(&env, "{scie.env.__DNE__={scie.lift}}")
                 .unwrap()
         );
 
@@ -802,7 +802,7 @@ mod tests {
                 false
             ),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__={file}}")
+                .reify_string(&env, "{scie.env.__DNE__={file}}")
                 .unwrap()
         );
 
@@ -810,7 +810,7 @@ mod tests {
         assert_eq!(
             ("42".to_string(), false),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .reify_string(&env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
         );
 
@@ -819,7 +819,7 @@ mod tests {
         assert_eq!(
             ("bar".to_string(), false),
             context
-                .reify_string(&mut env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .reify_string(&env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
         );
     }
@@ -899,7 +899,7 @@ mod tests {
             ],
         };
 
-        let process = context.prepare_process(&cmd).unwrap();
+        let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
                 env: expected_env.clone(),
@@ -913,7 +913,7 @@ mod tests {
         );
 
         env::set_var("SELECT", "v1");
-        let process = context.prepare_process(&cmd).unwrap();
+        let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
                 env: expected_env.clone(),
@@ -928,7 +928,7 @@ mod tests {
         env::remove_var("SELECT");
 
         env::set_var("SELECT", "v2");
-        let process = context.prepare_process(&cmd).unwrap();
+        let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
                 env: expected_env,
@@ -1001,7 +1001,7 @@ mod tests {
 
         let cmd = lift.boot.commands.get("").unwrap();
 
-        let process = context.prepare_process(&cmd).unwrap();
+        let process = context.prepare_process(cmd).unwrap();
         let reified_path = format!("c:e:{}", env::var("PATH").unwrap());
         assert_eq!(
             Process {
@@ -1021,7 +1021,7 @@ mod tests {
         );
 
         env::set_var("D", "d");
-        let process = context.prepare_process(&cmd).unwrap();
+        let process = context.prepare_process(cmd).unwrap();
         let reified_path = format!("d:e:{}", env::var("PATH").unwrap());
         assert_eq!(
             Process {
