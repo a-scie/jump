@@ -720,9 +720,7 @@ mod tests {
         let mut env = IndexMap::new();
         assert_eq!(
             ("".to_string(), false),
-            context
-                .reify_string(&env, "{scie.env.__DNE__}")
-                .unwrap()
+            context.reify_string(&env, "{scie.env.__DNE__}").unwrap()
         );
 
         env.clear();
