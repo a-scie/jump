@@ -76,7 +76,7 @@ impl Serialize for FileType {
 
 struct FileTypeVisitor;
 
-impl<'de> Visitor<'de> for FileTypeVisitor {
+impl Visitor<'_> for FileTypeVisitor {
     type Value = FileType;
 
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
@@ -159,7 +159,7 @@ impl Serialize for EnvVar {
 
 struct EnvVarVisitor;
 
-impl<'de> Visitor<'de> for EnvVarVisitor {
+impl Visitor<'_> for EnvVarVisitor {
     type Value = EnvVar;
 
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
