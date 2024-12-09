@@ -24,12 +24,18 @@ You might begin debugging by inspecting the output of \`SCIE=inspect ./no-comman
 EOF
 ) "${OUTPUT}"
 
+# Set the expected Python version.
+if [[ "${ARCH}" == "armv7l" ]]; then
+    PYTHON_VERSION="3.11.11"
+else
+    PYTHON_VERSION="3.11.5"
+fi
 
 # Test no named commands error.
 "${SCIE_JUMP}" "default-only-lift.${OS_ARCH}.json"
 gc "${PWD}/default-only${EXE_EXT}"
 
-diff -u <(echo "3.11.5") <(./default-only)
+diff -u <(echo "${PYTHON_VERSION}") <(./default-only)
 
 SCIE_BOOT=dne ./default-only 2>"${OUTPUT}" && die "Expected SCIE_BOOT=dne ./default-only to fail to execute."
 diff -u \
@@ -97,8 +103,8 @@ EOF
 "${SCIE_JUMP}" "mixed-no-default-desc-lift.${OS_ARCH}.json"
 gc "${PWD}/mixed-no-default-desc${EXE_EXT}"
 
-diff -u <(echo "3.11.5") <(./mixed-no-default-desc)
-diff -u <(echo "3.11.5") <(./mixed-no-default-desc "1st arg goes to default command which ignores all args.")
+diff -u <(echo "${PYTHON_VERSION}") <(./mixed-no-default-desc)
+diff -u <(echo "${PYTHON_VERSION}") <(./mixed-no-default-desc "1st arg goes to default command which ignores all args.")
 diff -u <(echo "foo") <(SCIE_BOOT=foo ./mixed-no-default-desc)
 diff -u <(echo "bar") <(SCIE_BOOT=bar ./mixed-no-default-desc)
 diff -u <(echo "ran baz") <(SCIE_BOOT=runs-baz ./mixed-no-default-desc)
