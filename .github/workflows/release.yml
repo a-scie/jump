@@ -40,14 +40,18 @@ jobs:
             exit 1
           fi
   github-release:
-    name: (${{ matrix.os }}) Create Github Release
     needs: determine-tag
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         # N.B.: macos-13 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ ubuntu-22.04, linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
+        os: [ linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
+        include:
+          - os: ubuntu-22.04
+            target: x86_64
+          - os: ubuntu-22.04
+            target: armv7l
     environment: Release
     permissions:
       id-token: write
@@ -60,10 +64,10 @@ jobs:
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.os != 'ubuntu-22.04' && matrix.os != 'linux-arm64' }}
+        if: ${{ runner.os != 'Linux' }}
         run: cargo run -p package -- dist
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'linux-arm64' }}
+        if: ${{ runner.os == 'Linux' && matrix.target != 'armv7l' }}
         run: |
           docker run --rm \
             -v $PWD:/code \
@@ -75,6 +79,14 @@ jobs:
                 adduser -u $(id -u) -G build -D -H build &&
                 su build -c 'cargo run -p package -- dist'
               "
+      - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
+        if: ${{ matrix.target == 'armv7l' }}
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          docker build . \
+            -f Dockerfile.armv7l \
+            -t jump/armv7l
+          docker cp $(docker create jump/armv7l):/code/dist .
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
         uses: actions/attest-build-provenance@v1
         with:

@@ -21,6 +21,12 @@ const PATHSEP: &str = ";";
 #[cfg(target_family = "unix")]
 const PATHSEP: &str = ":";
 
+#[cfg(all(target_os = "linux", target_arch = "arm", target_pointer_width = "32"))]
+const ARCH: &str = "armv7l";
+
+#[cfg(not(all(target_os = "linux", target_arch = "arm", target_pointer_width = "32")))]
+const ARCH: &str = env::consts::ARCH;
+
 fn add_magic(path: &Path) -> ExitResult {
     let mut binary = std::fs::OpenOptions::new()
         .append(true)
@@ -181,7 +187,7 @@ fn main() -> ExitResult {
     let file_name = format!(
         "{BINARY}-{os}-{arch}{exe}",
         os = env::consts::OS,
-        arch = env::consts::ARCH,
+        arch = ARCH,
         exe = env::consts::EXE_SUFFIX
     );
     let dst = dest_dir.join(&file_name);

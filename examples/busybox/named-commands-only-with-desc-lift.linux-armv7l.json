@@ -1,0 +1,31 @@
+{
+  "scie": {
+    "lift": {
+      "name": "named-commands-only-with-desc",
+      "boot": {
+        "commands": {
+          "foo": {
+            "description": "Prints foo.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('foo')"]
+          },
+          "bar": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('bar')"]
+          },
+          "runs-baz": {
+            "description": "Runs baz.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('ran baz')"]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "cpython-3.11.11+20241206-armv7-unknown-linux-gnueabihf-install_only_stripped.tar.gz",
+          "key": "cpython"
+        }
+      ]
+    }
+  }
+}

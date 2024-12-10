@@ -47,6 +47,8 @@ function calculate_arch() {
     echo x86_64
   elif [[ "${arch}" =~ arm64|aarch64 ]]; then
     echo aarch64
+  elif [[ "${arch}" =~ armv8l|armv7l ]]; then
+    echo armv7l
   else
     die "Integration tests are not supported for this chip architecture (${arch})."
   fi

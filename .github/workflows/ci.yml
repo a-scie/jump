@@ -20,14 +20,18 @@ jobs:
       - name: Noop
         run: "true"
   ci:
-    name: (${{ matrix.os }}) CI
     needs: org-check
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         # N.B.: macos-13 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ ubuntu-22.04, linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
+        os: [ linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
+        include:
+          - os: ubuntu-22.04
+            target: x86_64
+          - os: ubuntu-22.04
+            target: armv7l
     steps:
       - uses: actions/checkout@v4
       - name: Check Formatting
@@ -39,10 +43,10 @@ jobs:
       - name: Unit Tests
         run: cargo test --all
       - name: Build & Package
-        if: ${{ matrix.os != 'ubuntu-22.04' && matrix.os != 'linux-arm64' }}
+        if: ${{ runner.os != 'Linux' }}
         run: cargo run -p package
       - name: Build & Package
-        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'linux-arm64' }}
+        if: ${{ runner.os == 'Linux' && matrix.target != 'armv7l' }}
         run: |
           docker run --rm \
             -v $PWD:/code \
@@ -54,5 +58,28 @@ jobs:
                 adduser -u $(id -u) -G build -D -H build &&
                 su build -c 'cargo run -p package -- dist'
               "
+      - name: Build & Package
+        if: ${{ matrix.target == 'armv7l' }}
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          docker build . \
+            -f Dockerfile.armv7l \
+            -t jump/armv7l
+          docker cp $(docker create jump/armv7l):/code/dist .
       - name: Integration Tests
+        if: ${{ matrix.target != 'armv7l' }}
         run: examples/run.sh --no-package
+      - name: Integration Tests
+        if: ${{ matrix.target == 'armv7l' }}
+        run: |
+          docker run --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform=linux/arm/v7 \
+            ubuntu:22.04 \
+              bash -c "
+                apt-get update &&
+                apt-get --no-install-recommends install -y git jq curl ca-certificates &&
+                git config --global --add safe.directory /code &&
+                ./examples/run.sh --no-package
+              "
