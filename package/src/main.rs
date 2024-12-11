@@ -21,10 +21,20 @@ const PATHSEP: &str = ";";
 #[cfg(target_family = "unix")]
 const PATHSEP: &str = ":";
 
-#[cfg(all(target_os = "linux", target_arch = "arm", target_pointer_width = "32"))]
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "arm",
+    target_pointer_width = "32",
+    target_endian = "little"
+))]
 const ARCH: &str = "armv7l";
 
-#[cfg(not(all(target_os = "linux", target_arch = "arm", target_pointer_width = "32")))]
+#[cfg(not(all(
+    target_os = "linux",
+    target_arch = "arm",
+    target_pointer_width = "32",
+    target_endian = "little"
+)))]
 const ARCH: &str = env::consts::ARCH;
 
 fn add_magic(path: &Path) -> ExitResult {
