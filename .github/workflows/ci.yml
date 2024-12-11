@@ -29,15 +29,17 @@ jobs:
         # non-deprecated ARM Mac runner.
         include:
           - os: ubuntu-24.04
-            name: Linux x86-64
+            name: Linux x86-64 (glibc)
+          - os: ubuntu-24.04
+            name: Linux x86-64 (musl)
             cross-target: x86_64-unknown-linux-musl
             docker-platform: linux/amd64
           - os: ubuntu-24.04
-            name: Linux aarch64
+            name: Linux aarch64 (musl)
             cross-target: aarch64-unknown-linux-musl
             docker-platform: linux/arm64
           - os: ubuntu-24.04
-            name: Linux armv7l
+            name: Linux armv7l (musl)
             cross-target: armv7-unknown-linux-musleabihf
             docker-platform: linux/arm/v7
           - os: macos-13
@@ -85,7 +87,7 @@ jobs:
       - name: Integration Tests
         if: matrix.cross-target != ''
         run: |
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          docker run --privileged --rm tonistiigi/binfmt --install all
           docker run --rm \
             -v $PWD:/code \
             -w /code \
