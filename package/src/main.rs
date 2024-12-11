@@ -155,8 +155,11 @@ fn main() -> ExitResult {
     // script forwards them.
     let out_dir = env!("OUT_DIR");
     let target = args.target.unwrap_or_else(|| env!("TARGET").to_string());
+
     // Just in case this target is not already installed.
-    execute(Command::new("rustup").args(["target", "add", &target]))?;
+    if let Ok(rustup) = which::which("rustup") {
+        execute(Command::new(rustup).args(["target", "add", &target]))?;
+    }
 
     let workspace_root = PathBuf::from(cargo_manifest_dir).join("..");
     let output_root = PathBuf::from(out_dir).join("dist");

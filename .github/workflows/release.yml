@@ -12,14 +12,14 @@ jobs:
   org-check:
     name: Check GitHub Organization
     if: ${{ github.repository_owner == 'a-scie' }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Noop
         run: "true"
   determine-tag:
     name: Determine the release tag to operate against.
     needs: org-check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       release-tag: ${{ steps.determine-tag.outputs.release-tag }}
       release-version: ${{ steps.determine-tag.outputs.release-version }}
@@ -40,18 +40,31 @@ jobs:
             exit 1
           fi
   github-release:
+    name: ${{ matrix.name }} Create Github Release
     needs: determine-tag
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         # N.B.: macos-13 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
         include:
-          - os: ubuntu-22.04
-            target: x86_64
-          - os: ubuntu-22.04
-            target: armv7l
+          - os: ubuntu-24.04
+            name: Linux x86-64
+            cross-target: x86_64-unknown-linux-musl
+          - os: ubuntu-24.04
+            name: Linux aarch64
+            cross-target: aarch64-unknown-linux-musl
+          - os: ubuntu-24.04
+            name: Linux armv7l
+            cross-target: armv7-unknown-linux-musleabihf
+          - os: macos-13
+            name: macOS x86-64
+          - os: macos-14
+            name: macOS aarch64
+          - os: windows-2022
+            name: Windows x86-64
+          - os: windows-arm64
+            name: Windows aarch64
     environment: Release
     permissions:
       id-token: write
@@ -64,29 +77,13 @@ jobs:
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ runner.os != 'Linux' }}
+        if: matrix.cross-target == ''
         run: cargo run -p package -- dist
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ runner.os == 'Linux' && matrix.target != 'armv7l' }}
+        if: matrix.cross-target != ''
         run: |
-          docker run --rm \
-            -v $PWD:/code \
-            -w /code \
-            rust:1.83.0-alpine3.20 \
-              sh -c "
-                apk add musl-dev &&
-                addgroup -g $(id -g) build &&
-                adduser -u $(id -u) -G build -D -H build &&
-                su build -c 'cargo run -p package -- dist'
-              "
-      - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: ${{ matrix.target == 'armv7l' }}
-        run: |
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          docker build . \
-            -f Dockerfile.armv7l \
-            -t jump/armv7l
-          docker cp $(docker create jump/armv7l):/code/dist .
+          cargo install cross --locked
+          cross run -p package --target ${{ matrix.cross-target }}
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
         uses: actions/attest-build-provenance@v1
         with:
