@@ -17,7 +17,7 @@ this sort of artifact.
 
 The `run.sh` script then looks for the default lift manifest for the example. The default lift
 manifest is named `lift.<os>-<arch>.json` in the example directory where `<os>` is currently one of
-`linux`, `macos` or `windows` and `<arch>` is currently one of `armv7l`, `aarch64` or `x86_64`. If that lift
+`linux`, `macos` or `windows` and `<arch>` is currently one of `armv7l` (Linux only), `aarch64` or `x86_64`. If that lift
 manifest has a top-level "fetch" key, it's expected to have a list of URL string values and all of
 those will be fetched. Use this facility when writing a new example to ensure platform-specific
 artifacts are fetched - typically the interpreter distribution being used by the example.
