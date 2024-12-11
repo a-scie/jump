@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.3.0
+
+This release adds support for Linux ARM (armv7l and armv8l 32 bit mode).
+
 ## 1.2.0
 
 This release adds support for Windows ARM64.

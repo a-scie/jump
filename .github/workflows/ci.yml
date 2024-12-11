@@ -15,44 +15,87 @@ jobs:
   org-check:
     name: Check GitHub Organization
     if: github.repository_owner == 'a-scie'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Noop
         run: "true"
   ci:
-    name: (${{ matrix.os }}) CI
+    name: ${{ matrix.name }} CI
     needs: org-check
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         # N.B.: macos-13 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
         # non-deprecated ARM Mac runner.
-        os: [ ubuntu-22.04, linux-arm64, macos-13, macos-14, windows-2022, windows-arm64 ]
+        include:
+          - os: ubuntu-24.04
+            name: Linux x86-64 (glibc)
+          - os: ubuntu-24.04
+            name: Linux x86-64 (musl)
+            cross-target: x86_64-unknown-linux-musl
+            docker-platform: linux/amd64
+          - os: ubuntu-24.04
+            name: Linux aarch64 (musl)
+            cross-target: aarch64-unknown-linux-musl
+            docker-platform: linux/arm64
+          - os: ubuntu-24.04
+            name: Linux armv7l (musl)
+            cross-target: armv7-unknown-linux-musleabihf
+            docker-platform: linux/arm/v7
+          - os: macos-13
+            name: macOS x86-64
+          - os: macos-14
+            name: macOS aarch64
+          - os: windows-2022
+            name: Windows x86-64
+          - os: windows-arm64
+            name: Windows aarch64
     steps:
       - uses: actions/checkout@v4
       - name: Check Formatting
+        if: matrix.cross-target == ''
         run: |
           rustup toolchain add nightly -c rustfmt
           cargo +nightly fmt --check --all
+      - name: Install Cross
+        if: matrix.cross-target != ''
+        run: |
+          cargo install cross --locked
       - name: Lint
+        if: matrix.cross-target == ''
         run: cargo clippy --locked --all
+      - name: Lint
+        if: matrix.cross-target != ''
+        run: cross clippy --locked --all --target ${{ matrix.cross-target }}
       - name: Unit Tests
+        if: matrix.cross-target == ''
         run: cargo test --all
+      - name: Unit Tests
+        if: matrix.cross-target != ''
+        run: cross test --all --target ${{ matrix.cross-target }}
       - name: Build & Package
-        if: ${{ matrix.os != 'ubuntu-22.04' && matrix.os != 'linux-arm64' }}
+        if: matrix.cross-target == ''
         run: cargo run -p package
       - name: Build & Package
-        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'linux-arm64' }}
+        if: matrix.cross-target != ''
         run: |
+          cargo install cross --locked
+          cross run -p package --target ${{ matrix.cross-target }}
+      - name: Integration Tests
+        if: matrix.cross-target == ''
+        run: examples/run.sh --no-package
+      - name: Integration Tests
+        if: matrix.cross-target != ''
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
           docker run --rm \
             -v $PWD:/code \
             -w /code \
-            rust:1.83.0-alpine3.20 \
-              sh -c "
-                apk add musl-dev &&
-                addgroup -g $(id -g) build &&
-                adduser -u $(id -u) -G build -D -H build &&
-                su build -c 'cargo run -p package -- dist'
+            --platform ${{ matrix.docker-platform }} \
+            ubuntu:24.04 \
+              bash -c "
+                apt-get update &&
+                apt-get --no-install-recommends install -y git jq curl ca-certificates &&
+                git config --global --add safe.directory /code &&
+                ./examples/run.sh --no-package
               "
-      - name: Integration Tests
-        run: examples/run.sh --no-package

@@ -407,7 +407,7 @@ Further placeholders you can use in command "exe", "args" and "env" values inclu
 + `{scie.lift}`: This expands to the path to the lift manifest, which is extracted to disk when you
   use this placeholder. This can be used to read custom metadata stored in the lift manifest.
 + `{scie.platform}`: The `<OS>-<ARCH>` value for the current platform where `<OS>` is one of
-  `linux`, `macos` or `windows` and `<ARCH>` is either `aarch64` or `x86_64`.
+  `linux`, `macos` or `windows` and `<ARCH>` is either `armv7l` (Linux only), `aarch64` or `x86_64`.
 + `{scie.platform.arch}`: The current chip architecture as described by `<ARCH>` above.
 + `{scie.platform.os}`: The current operating system as described by `<OS>` above.
 + `{scie.user.cache_dir=<fallback>}`: The default user cache dir or `<fallback>` if there is none.
