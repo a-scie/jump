@@ -42,6 +42,10 @@ jobs:
             name: Linux armv7l (musl)
             cross-target: armv7-unknown-linux-musleabihf
             docker-platform: linux/arm/v7
+          - os: ubuntu-24.04
+            name: Linux s390x
+            cross-target: s390x-unknown-linux-gnu
+            docker-platform: linux/s390x
           - os: macos-13
             name: macOS x86-64
           - os: macos-14

@@ -1,0 +1,25 @@
+{
+  "scie": {
+    "lift": {
+      "name": "named-commands-only-no-desc",
+      "boot": {
+        "commands": {
+          "foo": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('foo')"]
+          },
+          "bar": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('bar')"]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "cpython-3.11.11+20241206-s390x-unknown-linux-gnu-install_only_stripped.tar.gz",
+          "key": "cpython"
+        }
+      ]
+    }
+  }
+}
