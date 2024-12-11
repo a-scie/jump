@@ -25,11 +25,7 @@ EOF
 ) "${OUTPUT}"
 
 # Set the expected Python version.
-if [[ "${ARCH}" == "armv7l" ]]; then
-    PYTHON_VERSION="3.11.11"
-else
-    PYTHON_VERSION="3.11.5"
-fi
+PYTHON_VERSION="3.11.11"
 
 # Test no named commands error.
 "${SCIE_JUMP}" "default-only-lift.${OS_ARCH}.json"
