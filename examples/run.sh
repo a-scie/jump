@@ -49,6 +49,8 @@ function calculate_arch() {
     echo aarch64
   elif [[ "${arch}" =~ armv8l|armv7l ]]; then
     echo armv7l
+  elif [[ "${arch}" == "s390x" ]]; then
+    echo s390x
   else
     die "Integration tests are not supported for this chip architecture (${arch})."
   fi
