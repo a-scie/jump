@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.4.1
+
+This release fixes the `scie.platform` and `scie.platform.arch` placeholders for armv7l.
+
 ## 1.4.0
 
 This release adds support for Linux s390x.

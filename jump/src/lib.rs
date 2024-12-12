@@ -31,6 +31,7 @@ use logging_timer::{time, timer};
 pub use crate::archive::create_options;
 use crate::config::Config;
 pub use crate::config::Jump;
+pub use crate::context::ARCH;
 use crate::installer::Installer;
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
