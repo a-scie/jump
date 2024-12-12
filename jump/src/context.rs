@@ -21,6 +21,22 @@ use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
 use crate::process::{EnvVar, Process};
 use crate::{config, CurrentExe, EnvVars, Jump, Source};
 
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "arm",
+    target_pointer_width = "32",
+    target_endian = "little"
+))]
+pub const ARCH: &str = "armv7l";
+
+#[cfg(not(all(
+    target_os = "linux",
+    target_arch = "arm",
+    target_pointer_width = "32",
+    target_endian = "little"
+)))]
+pub const ARCH: &str = env::consts::ARCH;
+
 fn expanduser(path: &Path) -> Result<PathBuf, String> {
     if !<[u8]>::from_path(path)
         .ok_or_else(|| {
@@ -637,17 +653,9 @@ impl<'a> Context<'a> {
                     lift_manifest_required = true;
                     reified.push_str(path_to_str(&self.lift_manifest.path)?);
                 }
-                Item::Placeholder(Placeholder::SciePlatform) => reified.push_str(
-                    format!(
-                        "{os}-{arch}",
-                        os = env::consts::OS,
-                        arch = env::consts::ARCH
-                    )
-                    .as_str(),
-                ),
-                Item::Placeholder(Placeholder::SciePlatformArch) => {
-                    reified.push_str(env::consts::ARCH)
-                }
+                Item::Placeholder(Placeholder::SciePlatform) => reified
+                    .push_str(format!("{os}-{arch}", os = env::consts::OS, arch = ARCH).as_str()),
+                Item::Placeholder(Placeholder::SciePlatformArch) => reified.push_str(ARCH),
                 Item::Placeholder(Placeholder::SciePlatformOs) => reified.push_str(env::consts::OS),
             }
         }
