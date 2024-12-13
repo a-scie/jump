@@ -1,0 +1,18 @@
+{
+  "scie": {
+    "lift": {
+      "name": "no-commands",
+      "boot": {
+        "commands": {}
+      },
+      "files": [
+        {
+          "name": "cpython-3.11.11+20241206-ppc64le-unknown-linux-gnu-install_only_stripped.tar.gz"
+        }
+      ]
+    }
+  },
+  "fetch": [
+    "https://github.com/indygreg/python-build-standalone/releases/download/20241206/cpython-3.11.11+20241206-ppc64le-unknown-linux-gnu-install_only_stripped.tar.gz"
+  ]
+}

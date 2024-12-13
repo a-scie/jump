@@ -1,0 +1,37 @@
+{
+  "scie": {
+    "lift": {
+      "name": "mixed-with-default-desc",
+      "description": "The scie's overall description.",
+      "boot": {
+        "commands": {
+          "": {
+            "description": "Prints the Python version.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))"]
+          },
+          "foo": {
+            "description": "Prints foo.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('foo')"]
+          },
+          "bar": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('bar')"]
+          },
+          "runs-baz": {
+            "description": "Runs baz.",
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "print('ran baz')"]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "cpython-3.11.11+20241206-ppc64le-unknown-linux-gnu-install_only_stripped.tar.gz",
+          "key": "cpython"
+        }
+      ]
+    }
+  }
+}

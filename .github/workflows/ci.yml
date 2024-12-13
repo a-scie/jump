@@ -46,6 +46,10 @@ jobs:
             name: Linux s390x
             cross-target: s390x-unknown-linux-gnu
             docker-platform: linux/s390x
+          - os: ubuntu-24.04
+            name: Linux powerpc64le
+            cross-target: powerpc64le-unknown-linux-gnu
+            docker-platform: linux/ppc64le
           - os: macos-13
             name: macOS x86-64
           - os: macos-14
