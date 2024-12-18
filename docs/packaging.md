@@ -24,7 +24,7 @@ reasonably hermetic interpreter distribution for the platforms you want to targe
 Some common languages and runtimes that are known to work when packaged as scies include:
 
 + Python: You might use [Python Build Standalone](
-  https://github.com/indygreg/python-build-standalone/releases) as a source for your portable Python
+  https://github.com/astral-sh/python-build-standalone/releases) as a source for your portable Python
   distribution and [Pex](https://github.com/pantsbuild/pex/releases) to package up your code and
   dependencies.
 + JavaScript: You might use [Node.js](https://nodejs.org/en/download/) for your runtime

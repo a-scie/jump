@@ -13,6 +13,6 @@
     }
   },
   "fetch": [
-    "https://github.com/indygreg/python-build-standalone/releases/download/20241206/cpython-3.11.11+20241206-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+    "https://github.com/astral-sh/python-build-standalone/releases/download/20241206/cpython-3.11.11+20241206-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
   ]
 }
