@@ -61,7 +61,7 @@
     }
   },
   "fetch": [
-    "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.8.14+20221002-x86_64-apple-darwin-install_only.tar.gz",
-    "https://github.com/indygreg/python-build-standalone/releases/download/20221002/cpython-3.9.14+20221002-x86_64-apple-darwin-install_only.tar.gz"
+    "https://github.com/astral-sh/python-build-standalone/releases/download/20221002/cpython-3.8.14+20221002-x86_64-apple-darwin-install_only.tar.gz",
+    "https://github.com/astral-sh/python-build-standalone/releases/download/20221002/cpython-3.9.14+20221002-x86_64-apple-darwin-install_only.tar.gz"
   ]
 }
