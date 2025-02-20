@@ -10,7 +10,7 @@ description = "The self contained interpreted executable launcher."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
 ]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [profile.release]
