@@ -6,7 +6,7 @@ use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
-use jump::{check_is_zip, create_options, fingerprint, load_lift, File, Jump, Lift, Source};
+use jump::{File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_lift};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
 use zip::{CompressionMethod, ZipWriter};
