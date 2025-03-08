@@ -7,18 +7,18 @@ use std::path::{Path, PathBuf};
 use log::debug;
 use logging_timer::time;
 use walkdir::WalkDir;
-use zip::write::FileOptions;
+use zip::write::SimpleFileOptions;
 
 #[cfg(not(target_family = "unix"))]
-pub fn create_options(_metadata: &Metadata) -> Result<FileOptions, String> {
-    Ok(FileOptions::default())
+pub fn create_options(_metadata: &Metadata) -> Result<SimpleFileOptions, String> {
+    Ok(SimpleFileOptions::default())
 }
 
 #[cfg(target_family = "unix")]
-pub fn create_options(metadata: &Metadata) -> Result<FileOptions, String> {
+pub fn create_options(metadata: &Metadata) -> Result<SimpleFileOptions, String> {
     use std::os::unix::fs::PermissionsExt;
     let perms = metadata.permissions();
-    Ok(FileOptions::default().unix_permissions(perms.mode()))
+    Ok(SimpleFileOptions::default().unix_permissions(perms.mode()))
 }
 
 fn create_zip(dir: &Path) -> Result<PathBuf, String> {
