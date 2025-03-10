@@ -249,7 +249,7 @@ impl<'a> Installer<'a> {
                     let mut scie_tote = ZipArchive::new(Cursor::new(
                         &self.payload[location..(location + tote_file.size)],
                     ))
-                    .map_err(|e| format!("{e}"))?;
+                    .map_err(|e| format!("Failed to load scie-tote {tote_file:?}: {e}"))?;
 
                     for (file, dst) in entries {
                         let entry = scie_tote.by_name_seek(&file.name).map_err(|e| {
