@@ -148,13 +148,7 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
                     Code::FAILURE
                         .with_message(format!("Failed to open scie-jump for extraction: {e}"))
                 })?;
-            if let Some(permissions) = executable_permissions() {
-                dst.set_permissions(permissions).map_err(|e| {
-                    Code::FAILURE.with_message(format!(
-                        "Failed to open file metadata for the scie-jump: {e}"
-                    ))
-                })?;
-            }
+            mark_executable(&mut dst)?;
             let mut src = scie
                 .try_clone()
                 .map_err(|e| Code::FAILURE.with_message(format!("Failed to dup scie handle: {e}")))?
@@ -186,7 +180,7 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
                     for file in lift.files.iter() {
                         if file.size == 0 && file.source == Source::Scie {
                             print!(
-                                "{path} {size}",
+                                "{path} {size} {file_type}",
                                 path = base.join(&file.name).display(),
                                 size = zip_archive
                                     .by_name(&file.name)
@@ -194,7 +188,8 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
                                         "Expected to find {file} in the scie-tote: {e}",
                                         file = file.name
                                     )))?
-                                    .size()
+                                    .size(),
+                                file_type = file_type(file)
                             );
                             if let Some(key) = &file.key {
                                 print!(" ({key})");
@@ -218,11 +213,19 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
             } else {
                 for file in lift.files.iter() {
                     if let Some(maybe_selected_file) = chosen_files.selected(file) {
+                        let selected_file =
+                            maybe_selected_file.expect("Split files were selected.");
+                        let mut src = zip_archive.by_name(file.name.as_str()).map_err(|e| {
+                            Code::FAILURE.with_message(format!(
+                                "The selected file {selected_file} could not be found in this \
+                                scie: {e}"
+                            ))
+                        })?;
                         if dry_run {
                             print!(
                                 "{path} {size} {file_type}",
                                 path = base.join(&file.name).display(),
-                                size = file.size,
+                                size = src.size(),
                                 file_type = file_type(file)
                             );
                             if let Some(key) = &file.key {
@@ -230,22 +233,6 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
                             }
                             println!();
                         } else {
-                            let selected_file =
-                                maybe_selected_file.expect("Split files were selected.");
-                            let mut src = if let Some(index) =
-                                zip_archive.index_for_name(file.name.as_str())
-                            {
-                                zip_archive.by_index(index).map_err(|err| {
-                                    Code::FAILURE.with_message(format!(
-                                        "Failed to extract {selected_file} fro this scie: {err}"
-                                    ))
-                                })?
-                            } else {
-                                return Err(Code::FAILURE.with_message(format!(
-                                    "The selected file {selected_file} could not be found in \
-                                        this scie."
-                                )));
-                            };
                             extract_to(&base, file, &mut src)?;
                         }
                     }
@@ -367,6 +354,9 @@ fn extract_to<P: AsRef<Path>, R: Read>(base: P, file: &File, reader: &mut R) -> 
                 dst = dst.display()
             ))
         })?;
+    if file.executable.unwrap_or_default() {
+        mark_executable(&mut out)?;
+    }
     std::io::copy(reader, &mut out).map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to extract {file} to {dst}: {e}",
@@ -374,6 +364,18 @@ fn extract_to<P: AsRef<Path>, R: Read>(base: P, file: &File, reader: &mut R) -> 
             dst = dst.display()
         ))
     })
+}
+
+fn mark_executable(file: &mut std::fs::File) -> Result<(), Exit> {
+    if let Some(permissions) = executable_permissions() {
+        file.set_permissions(permissions).map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to open file metadata for the scie-jump: {e}"
+            ))
+        })
+    } else {
+        Ok(())
+    }
 }
 
 struct EmbeddedZipReader<'a, S> {
