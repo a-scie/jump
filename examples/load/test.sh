@@ -16,8 +16,8 @@ if [ "get.sh 319 executable" != "${split_dry_run_output}" ]; then
 fi
 gc "${PWD}/split"
 SCIE="split" ./cowsay split -- get.sh
-if [ ! -x split/get.sh ]; then
-  die "The get.sh script should retain its executable bit."
+if [ "${OS}" != "windows" ] && [ ! -x split/get.sh ]; then
+  die "The get.sh script should retain its executable bit on Unix."
 fi
 
 # Force downloads to occur to exercise the load functionality even if nce cache has the JDK and the
