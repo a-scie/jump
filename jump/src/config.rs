@@ -329,7 +329,7 @@ impl Config {
         Ok(config)
     }
 
-    pub fn serialize<W: Write>(&self, mut stream: W, fmt: Fmt) -> Result<(), String> {
+    pub fn serialize<W: Write>(&self, stream: &mut W, fmt: Fmt) -> Result<(), String> {
         let mut write_bytes = |bytes| {
             stream
                 .write_all(bytes)

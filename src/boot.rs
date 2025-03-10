@@ -28,7 +28,7 @@ pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
     let config = jump::config(jump, lift);
     let fmt = Fmt::new().pretty(true).trailing_newline(true);
     config
-        .serialize(std::io::stdout(), fmt)
+        .serialize(&mut std::io::stdout(), fmt)
         .map_err(|e| Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}")))
 }
 

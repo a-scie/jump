@@ -5,7 +5,7 @@ description = "Packages the scie-jump binary into its final form."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
 ]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
