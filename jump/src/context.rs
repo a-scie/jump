@@ -84,7 +84,7 @@ impl LiftManifest {
     fn install(&self) -> Result<(), String> {
         atomic_path(&self.path, Target::File, |path| {
             config(self.jump.clone(), self.lift.clone()).serialize(
-                std::fs::OpenOptions::new()
+                &mut std::fs::OpenOptions::new()
                     .write(true)
                     .create_new(true)
                     .open(path)

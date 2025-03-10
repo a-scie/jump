@@ -1,12 +1,13 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::fmt::Debug;
 use std::fs::{OpenOptions, Permissions};
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
 use logging_timer::time;
-use tempfile::TempDir;
+use zip::ZipArchive;
 
 use crate::atomic::{atomic_path, Target};
 use crate::config::{ArchiveType, Compression, FileType};
@@ -245,42 +246,19 @@ impl<'a> Installer<'a> {
                     0
                 }
                 FileEntry::ScieTote((tote_file, entries)) => {
-                    let mut scie_tote: Option<TempDir> = None;
-                    let mut scie_tote_src = || {
-                        if let Some(tempdir) = scie_tote.as_ref() {
-                            return Ok::<_, String>(tempdir.path().join(&tote_file.name));
-                        }
-                        let scie_tote_tmpdir = TempDir::new().map_err(|e| {
-                            format!(
-                                "Failed to create a temporary directory to extract the scie-tote \
-                                to: {e}"
-                            )
-                        })?;
-                        let path = scie_tote_tmpdir.path().join(&tote_file.name);
-                        let bytes = &self.payload[location..(location + tote_file.size)];
-                        unpack(
-                            tote_file.file_type,
-                            tote_file.executable.unwrap_or(false),
-                            || Ok((Cursor::new(bytes), ())),
-                            tote_file.hash.as_str(),
-                            &path,
-                        )?;
-                        scie_tote = Some(scie_tote_tmpdir);
-                        Ok(path)
-                    };
+                    let mut scie_tote = ZipArchive::new(Cursor::new(
+                        &self.payload[location..(location + tote_file.size)],
+                    ))
+                    .map_err(|e| format!("Failed to load scie-tote {tote_file:?}: {e}"))?;
 
                     for (file, dst) in entries {
-                        let file_src = || {
-                            let scie_tote_path = scie_tote_src()?;
-                            let src_path = scie_tote_path.join(&file.name);
-                            let file = std::fs::File::open(&src_path).map_err(|e| {
-                                format!(
-                                    "Failed to open {file:?} at {src} from the unpacked scie-tote: {e}",
-                                    src = src_path.display()
-                                )
-                            })?;
-                            Ok((file, ()))
-                        };
+                        let entry = scie_tote.by_name_seek(&file.name).map_err(|e| {
+                            format!(
+                                "Failed to find {name} in the scie-tote: {e}",
+                                name = file.name
+                            )
+                        })?;
+                        let file_src = || Ok((entry, ()));
                         unpack(
                             file.file_type,
                             file.executable.unwrap_or(false),

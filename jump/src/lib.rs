@@ -73,10 +73,11 @@ install (-s|--symlink) [dest dir]*
 
 list: List the names of the commands contained in this scie.
 
-split [directory]?
+split (-n|--dry-run) [directory]? [-- [file]*]?
 
     Split this scie into its component files in the given directory or
-    else the current directory if no argument is given.
+    else the current directory if no argument is given. To just split out
+    certain files, list their names or ids after `--`.
 ";
 
 pub enum BootAction {
