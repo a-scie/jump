@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.6.0
+
+This release adds support for restricting `SCIE=split` to a subset of files in the scie as well as
+adding support for a `-n` / `--dry-run` mode.
+
 ## 1.5.0
 
 This release adds support for Linux powerpc64le.
