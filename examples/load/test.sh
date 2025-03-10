@@ -15,7 +15,7 @@ split_dry_run_output="$(SCIE="split" ./cowsay -n -- get.sh)"
 if [ "${OS}" == "windows" ] && [ "get.sh 332 blob" != "${split_dry_run_output}" ]; then
   die "
 Expected a split dry run to indicate get.sh is a blob on Windows. Got:\n${split_dry_run_output}"
-elif [ "get.sh 319 executable" != "${split_dry_run_output}" ]; then
+elif [ "${OS}" != "windows" ] && [ "get.sh 319 executable" != "${split_dry_run_output}" ]; then
   die "
 Expected a split dry run to indicate get.sh is executable on Unix. Got:\n${split_dry_run_output}"
 fi
