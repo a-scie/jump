@@ -7,11 +7,10 @@ use std::path::Path;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 pub const EOF_MAGIC: u32 = 0x534a7219;
-pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use crate::config::Jump;
 
-pub fn load(data: &[u8], path: &Path) -> Result<Option<Jump>, String> {
+pub fn load(scie_jump_version: &str, data: &[u8], path: &Path) -> Result<Option<Jump>, String> {
     let mut magic = Cursor::new(&data[data.len() - 8..]);
     magic.seek(SeekFrom::End(-4)).map_err(|e| format!("{e}"))?;
     if let Ok(EOF_MAGIC) = magic.read_u32::<LittleEndian>() {
@@ -38,7 +37,7 @@ pub fn load(data: &[u8], path: &Path) -> Result<Option<Jump>, String> {
             ));
         }
         return Ok(Some(Jump {
-            version: VERSION.to_string(),
+            version: scie_jump_version.to_string(),
             size: size as usize,
         }));
     }
