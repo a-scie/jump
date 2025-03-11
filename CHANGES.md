@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.6.1
+
+The `SCIE=split` file selection feature now warns when selected files can't be found in the scie.
+
 ## 1.6.0
 
 This release adds support for restricting `SCIE=split` to a subset of files in the scie as well as
