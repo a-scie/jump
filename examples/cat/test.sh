@@ -20,7 +20,7 @@ gc "${PWD}/${JAVA}.sha256"
 
 ./"${JAVA}" "scie-jump boot-pack"
 gc "${PWD}/split"
-SCIE="split" ./"${JAVA}" split
+SCIE="split" ./"${JAVA}" split -- scie-jump
 
 # N.B.: For unknown reasons, macOS tail -1 split/scie-jump* includes garbage; i.e.: more than just
 # the last line. This, though, works.

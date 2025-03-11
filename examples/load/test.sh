@@ -10,6 +10,21 @@ check_cmd mktemp
 gc "${PWD}/cowsay"
 "${SCIE_JUMP}" "${LIFT}"
 
+# N.B.: The file size differences here are due to CRLF line endings on git checkout under Windows.
+split_dry_run_output="$(SCIE="split" ./cowsay -n -- get.sh)"
+if [ "${OS}" == "windows" ] && [ "get.sh 332 blob" != "${split_dry_run_output}" ]; then
+  die "
+Expected a split dry run to indicate get.sh is a blob on Windows. Got:\n${split_dry_run_output}"
+elif [ "${OS}" != "windows" ] && [ "get.sh 319 executable" != "${split_dry_run_output}" ]; then
+  die "
+Expected a split dry run to indicate get.sh is executable on Unix. Got:\n${split_dry_run_output}"
+fi
+gc "${PWD}/split"
+SCIE="split" ./cowsay split -- get.sh
+if [ "${OS}" != "windows" ] && [ ! -x split/get.sh ]; then
+  die "The get.sh script should retain its executable bit on Unix."
+fi
+
 # Force downloads to occur to exercise the load functionality even if nce cache has the JDK and the
 # cowsay jars already from other examples.
 SCIE_BASE="$(mktemp -d)"

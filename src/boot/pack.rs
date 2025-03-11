@@ -209,7 +209,7 @@ fn pack(
             })?;
         };
     }
-    if let Some(tote) = scie_tote.as_mut() {
+    if let Some(mut tote) = scie_tote {
         tote.zip_writer
             .finish()
             .map_err(|e| format!("Failed to finalize the scie-tote zip: {e}"))?;
@@ -249,7 +249,7 @@ fn pack(
         .pretty(!single_line)
         .leading_newline(true)
         .trailing_newline(true);
-    config.serialize(binary, fmt).map_err(|e| {
+    config.serialize(&mut binary, fmt).map_err(|e| {
         format!(
             "Failed to serialize the lift manifest to {binary}: {e}",
             binary = binary_path.display()

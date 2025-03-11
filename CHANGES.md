@@ -1,5 +1,14 @@
 # Release Notes
 
+## 1.6.0
+
+This release adds support for restricting `SCIE=split` to a subset of files in the scie as well as
+adding support for a `-n` / `--dry-run` mode.
+
+In addition, the bare `scie-jump` now displays a help message when executed without arguments and
+there is no `lift.json` manifest in the current directory. Help can also be requested via
+`-h` / `--help` and the `scie-jump` version can be displayed via `-V` / `--version`.
+
 ## 1.5.0
 
 This release adds support for Linux powerpc64le.
