@@ -25,6 +25,7 @@ use std::env;
 use std::env::current_exe;
 use std::path::PathBuf;
 
+use itertools::Itertools;
 use log::Level;
 use logging_timer::{time, timer};
 
@@ -46,21 +47,26 @@ pub struct SelectBoot {
     pub error_message: String,
 }
 
-const HELP: &str = "\
+pub const BOOT_PACK_HELP: &str = "\
+(-sj|--jump|--scie-jump [PATH])
+(-1|--single-lift-line|--no-single-lift-line)
+[lift manifest]*
+
+Pack the given lift manifests into scie executables. If no manifests
+are given, looks for `lift.json` in the current directory. By
+default the current scie-jump is used as the scie tip, but an
+alternate scie-jump binary can be specified using --scie-jump. By
+default the lift manifest is appended to the tail of the scie as a
+single line JSON document, but can be made a multi-line
+pretty-printed JSON document by passing --no-single-lift-line.";
+
+fn help() -> String {
+    format!(
+        "\
 For SCIE=<boot_command> you can select from the following:
 
 boot-pack
-    (-sj|--jump|--scie-jump [PATH])
-    (-1|--single-lift-line|--no-single-lift-line)
-    [lift manifest]*
-
-    Pack the given lift manifests into scie executables. If no manifests
-    are given, looks for `lift.json` in the current directory. By
-    default the current scie-jump is used as the scie tip, but an
-    alternate scie-jump binary can be specified using --scie-jump. By
-    default the lift manifest is appended to the tail of the scie as a
-    single line JSON document, but can be made a multi-line
-    pretty-printed JSON document by passing --no-single-lift-line.
+    {boot_pack_help}
 
 help: Display this help message.
 
@@ -76,8 +82,12 @@ list: List the names of the commands contained in this scie.
 split [directory]?
 
     Split this scie into its component files in the given directory or
-    else the current directory if no argument is given.
-";
+    else the current directory if no argument is given. To just split out
+    certain files, list their names or ids after `--`.
+",
+        boot_pack_help = BOOT_PACK_HELP.split('\n').join("\n    ")
+    )
+}
 
 pub enum BootAction {
     Execute((Process, bool)),
@@ -131,7 +141,7 @@ fn find_current_exe() -> Result<CurrentExe, String> {
 }
 
 #[time("debug", "jump::{}")]
-pub fn prepare_boot() -> Result<BootAction, String> {
+pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
     let current_exe = find_current_exe()?;
     let file = std::fs::File::open(&current_exe.exe).map_err(|e| {
         format!(
@@ -144,7 +154,7 @@ pub fn prepare_boot() -> Result<BootAction, String> {
             .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.exe.display()))?
     };
 
-    if let Some(jump) = jump::load(&data, &current_exe.exe)? {
+    if let Some(jump) = jump::load(scie_jump_version, &data, &current_exe.exe)? {
         return Ok(BootAction::Pack((jump, current_exe.exe)));
     }
 
@@ -158,7 +168,7 @@ pub fn prepare_boot() -> Result<BootAction, String> {
         if "boot-pack" == value {
             return Ok(BootAction::Pack((jump, current_exe.exe)));
         } else if "help" == value {
-            return Ok(BootAction::Help((format!("{HELP}\n"), 0)));
+            return Ok(BootAction::Help((format!("{help}\n", help = help()), 0)));
         } else if "inspect" == value {
             return Ok(BootAction::Inspect((jump, lift)));
         } else if "install" == value {
@@ -172,8 +182,9 @@ pub fn prepare_boot() -> Result<BootAction, String> {
                 "The SCIE environment variable is set to {value:?} which is not a scie path\n\
                 or one of the known SCIE boot commands.\n\
                 \n\
-                {HELP}\
-                "
+                {help}\
+                ",
+                help = help()
             );
             return Ok(BootAction::Help((help_message, 1)));
         }

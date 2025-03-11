@@ -51,10 +51,12 @@ fn exec(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> ExitResult {
         .map(|_| ())
 }
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() -> ExitResult {
     env_logger::init();
 
-    let action = jump::prepare_boot().map_err(|e| {
+    let action = jump::prepare_boot(VERSION).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
 

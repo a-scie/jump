@@ -6,7 +6,9 @@ use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
-use jump::{File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_lift};
+use jump::{
+    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_lift,
+};
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
 use zip::{CompressionMethod, ZipWriter};
@@ -256,12 +258,35 @@ fn pack(
     finalize_executable(&binary_path)
 }
 
+fn print_help() -> ExitResult {
+    println!("{BOOT_PACK_HELP}");
+    Code::SUCCESS.ok()
+}
+
+fn print_usage(message: &str) -> ExitResult {
+    println!(
+        "Usage: {argv0}",
+        argv0 = env::args().next().unwrap_or_else(|| env::current_exe()
+            .ok()
+            .map(|pb| pb.display().to_string())
+            .unwrap_or_else(|| "scie-jump".to_string()))
+    );
+    println!("{BOOT_PACK_HELP}");
+    println!();
+    Err(Code::FAILURE.with_message(message.to_string()))
+}
+
 pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
     let mut lifts = vec![];
     let mut single_line = true;
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "-h" | "--help" => return print_help(),
+            "-V" | "--version" => {
+                println!("{version}", version = jump.version);
+                return Code::SUCCESS.ok();
+            }
             "-1" | "--single-lift-line" => single_line = true,
             "--no-single-lift-line" => single_line = false,
             "-sj" | "--jump" | "--scie-jump" => {
@@ -290,19 +315,21 @@ pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
     }
     if lifts.is_empty() {
         if let Ok(cwd) = env::current_dir() {
-            let (lift, path) =
-                load_manifest(&cwd, &jump).map_err(|e| Code::FAILURE.with_message(e))?;
-            lifts.push((lift, path));
+            if let Ok((lift, path)) =
+                load_manifest(&cwd, &jump).map_err(|e| Code::FAILURE.with_message(e))
+            {
+                lifts.push((lift, path));
+            } else {
+                return print_usage(
+                    "\
+Found no lift manifests to process. Either include paths to lift manifest
+files as arguments or else paths to directories containing lift manifest files
+named `lift.json`.",
+                );
+            }
         }
     }
 
-    if lifts.is_empty() {
-        return Err(Code::FAILURE.with_message(
-            "Found no lift manifests to process. Either include paths to lift manifest \
-                files as arguments or else paths to directories containing lift manifest files \
-                named `lift.json`.",
-        ));
-    }
     let results = lifts
         .into_iter()
         .map(|(lift, manifest)| {
