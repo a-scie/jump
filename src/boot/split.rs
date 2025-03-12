@@ -1,7 +1,7 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::fs::Permissions;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -38,43 +38,65 @@ fn executable_permissions() -> Option<Permissions> {
 }
 
 struct ChosenFiles {
-    files: HashSet<String>,
+    files: Option<BTreeMap<String, bool>>,
 }
 
 impl ChosenFiles {
     fn new() -> Self {
-        Self {
-            files: HashSet::new(),
-        }
+        Self { files: None }
     }
 
     fn add(&mut self, file: String) {
-        self.files.insert(file);
+        self.files.get_or_insert_default().insert(file, false);
     }
 
     fn is_empty(&self) -> bool {
-        self.files.is_empty()
-    }
-
-    fn contains(&self, name: &str) -> bool {
-        self.files.is_empty() || self.files.contains(name)
-    }
-
-    fn selected<'b, 'a: 'b>(&'a self, file: &'b File) -> Option<Option<&'b String>> {
-        if self.files.is_empty() {
-            Some(None)
-        } else if self.files.contains(file.name.as_str()) {
-            Some(Some(&file.name))
-        } else if file
-            .key
+        self.files
             .as_ref()
-            .map(|key| self.files.contains(key))
-            .unwrap_or(false)
-        {
-            Some(file.key.as_ref())
-        } else {
-            None
+            .map(|files| files.is_empty())
+            .unwrap_or(true)
+    }
+
+    fn contains(&mut self, name: &str) -> bool {
+        if self.is_empty() {
+            return true;
         }
+        if let Some(files) = self.files.as_mut() {
+            if let Some(selected) = files.get_mut(name) {
+                *selected = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    fn selected<'b, 'a: 'b>(&'a mut self, file: &'b File) -> Option<Option<&'b String>> {
+        if self.is_empty() {
+            return Some(None);
+        } else if let Some(files) = self.files.as_mut() {
+            if let Some(selected) = files.get_mut(&file.name) {
+                *selected = true;
+                return Some(Some(&file.name));
+            } else if let Some(Some(selected)) = file.key.as_ref().map(|key| files.get_mut(key)) {
+                *selected = true;
+                return Some(file.key.as_ref());
+            }
+        }
+        None
+    }
+
+    fn unselected(&self) -> Vec<&str> {
+        self.files
+            .as_ref()
+            .map(|files| {
+                files
+                    .iter()
+                    .filter_map(
+                        |(file, selected)| if *selected { None } else { Some(file.as_str()) },
+                    )
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -313,6 +335,15 @@ pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResul
         };
     }
 
+    let missing = chosen_files.unselected();
+    if !missing.is_empty() {
+        eprintln!();
+        eprintln!(
+            "The following selected files could not be found in this scie:\n+ {missing}",
+            missing = missing.join("\n+ ")
+        );
+        let _ = io::stderr().lock().flush();
+    }
     Code::SUCCESS.ok()
 }
 
