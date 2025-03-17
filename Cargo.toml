@@ -27,7 +27,7 @@ logging_timer = "1.1"
 tempfile = "3.18"
 
 [workspace.dependencies.zip]
-version = "2.2"
+version = "2.3"
 default-features = false
 # We specifically don't include "time" which is otherwise default. Without time, zip creation
 # always uses 1/1/1980 and gives us reproducible zip creation by default.
