@@ -5,7 +5,7 @@ description = "The bulk of the scie-jump binary logic."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
 ]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
@@ -41,4 +41,3 @@ rev = "b2276ef3fd039ed8565b4c1cbedb7a5aeeca734e"
 [dev-dependencies]
 ctor = "0.2"
 env_logger = { workspace = true }
-parking_lot = "0.12"

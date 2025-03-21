@@ -15,10 +15,10 @@ use sha2::{Digest, Sha256};
 
 const BINARY: &str = "scie-jump";
 
-#[cfg(target_family = "windows")]
+#[cfg(windows)]
 const PATHSEP: &str = ";";
 
-#[cfg(target_family = "unix")]
+#[cfg(not(windows))]
 const PATHSEP: &str = ":";
 
 fn add_magic(path: &Path) -> ExitResult {

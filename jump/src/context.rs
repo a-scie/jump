@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fmt::{Debug, Formatter};
 use std::path::{Component, Path, PathBuf};
 use std::process::Child;
@@ -12,14 +12,14 @@ use bstr::ByteSlice;
 use indexmap::IndexMap;
 use logging_timer::time;
 
-use crate::atomic::{atomic_path, Target};
-use crate::cmd_env::{parse_scie_env_placeholder, prepare_env, ParsedEnv};
+use crate::atomic::{Target, atomic_path};
+use crate::cmd_env::{ParsedEnv, parse_scie_env_placeholder, prepare_env};
 use crate::config::{Cmd, Fmt};
 use crate::installer::Installer;
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
 use crate::process::{EnvVar, Process};
-use crate::{config, CurrentExe, EnvVars, Jump, Source};
+use crate::{CurrentExe, EnvVars, Jump, Source, config};
 
 #[cfg(all(
     target_os = "linux",
@@ -154,7 +154,7 @@ impl Binding {
 
             let result = self
                 .process
-                .execute(vec![("SCIE_BINDING_ENV".into(), lock.into())]);
+                .execute(None, vec![("SCIE_BINDING_ENV".into(), Some(lock.into()))]);
 
             match result {
                 Err(err) => Err(format!("Failed to launch boot binding: {err}")),
@@ -228,6 +228,7 @@ pub(crate) struct Context<'a> {
     lift_manifest_installed: bool,
     bound: HashMap<String, Binding>,
     installed: HashSet<File>,
+    ambient_env: IndexMap<OsString, OsString>,
 }
 
 impl<'a> Context<'a> {
@@ -237,6 +238,7 @@ impl<'a> Context<'a> {
         jump: &'a Jump,
         lift: &'a Lift,
         installer: &'a Installer,
+        custom_env: Option<HashMap<String, String>>,
     ) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
         for file in &lift.files {
@@ -255,6 +257,13 @@ impl<'a> Context<'a> {
             PathBuf::from("~/.nce")
         };
         let base = expanduser(base.as_path())?;
+        let ambient_env = custom_env
+            .map(|c| {
+                c.into_iter()
+                    .map(|(n, v)| (n.into(), v.into()))
+                    .collect::<IndexMap<_, _>>()
+            })
+            .unwrap_or_else(|| env::vars_os().collect::<IndexMap<_, _>>());
         let mut context = Context {
             scie,
             lift,
@@ -271,21 +280,13 @@ impl<'a> Context<'a> {
             lift_manifest_installed: false,
             bound: HashMap::new(),
             installed: HashSet::new(),
+            ambient_env,
         };
 
         // Now patch up the base and the lift path (which is derived from it) with any placeholder
         // resolving that may be required.
-        let mut env = IndexMap::new();
-        for (key, value) in env::vars_os() {
-            // TODO(John Sirois): Move from IndexMap to a trait with the method
-            //  `get(&str) -> Option<&str>`. That will allow detecting key accesses with non-UTF-8
-            //  values to warn or error.
-            if let (Some(key), Some(value)) = (key.into_string().ok(), value.into_string().ok()) {
-                env.insert(key, value);
-            }
-        }
         let (parsed_base, needs_lift_manifest) = context.reify_string(
-            &env,
+            None,
             &context
                 .base
                 .clone()
@@ -303,20 +304,20 @@ impl<'a> Context<'a> {
                 base = context.base.display()
             ));
         }
-        context.base = PathBuf::from(parsed_base.clone());
+        context.base = PathBuf::from(parsed_base);
         context.lift_manifest.path = context.base.join(&lift.hash).join("lift.json");
         Ok(context)
     }
 
     fn prepare_process(&mut self, cmd: &'a Cmd) -> Result<Process, String> {
-        let mut env = prepare_env(cmd)?;
+        let mut env = prepare_env(cmd, &self.ambient_env)?;
         let mut needs_lift_manifest = false;
-        let (exe, needs_manifest) = self.reify_string(&env, &cmd.exe)?;
+        let (exe, needs_manifest) = self.reify_string(Some(&env), &cmd.exe)?;
         needs_lift_manifest |= needs_manifest;
 
         let mut args = vec![];
         for arg in &cmd.args {
-            let (reified_arg, needs_manifest) = self.reify_string(&env, arg)?;
+            let (reified_arg, needs_manifest) = self.reify_string(Some(&env), arg)?;
             needs_lift_manifest |= needs_manifest;
             args.push(reified_arg.into());
         }
@@ -324,7 +325,7 @@ impl<'a> Context<'a> {
         for (key, value) in cmd.env.iter() {
             let final_value = match value {
                 Some(val) => {
-                    let (reified_value, needs_manifest) = self.reify_string(&env, val)?;
+                    let (reified_value, needs_manifest) = self.reify_string(Some(&env), val)?;
                     needs_lift_manifest |= needs_manifest;
                     match key {
                         config::EnvVar::Default(name) => {
@@ -449,9 +450,6 @@ impl<'a> Context<'a> {
     fn select_command(&mut self, scie_name: &str, exe: &CurrentExe) -> Result<SelectedCmd, String> {
         // Forced command.
         if let Some(cmd) = env::var_os("SCIE_BOOT") {
-            // Avoid subprocesses that re-execute this SCIE unintentionally getting in an infinite
-            // loop.
-            env::remove_var("SCIE_BOOT");
             let name = cmd.into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_BOOT: {value:?}")
             })?;
@@ -505,10 +503,10 @@ impl<'a> Context<'a> {
 
     fn parse_env(
         &mut self,
-        env: &IndexMap<String, String>,
+        cmd_env: Option<&IndexMap<String, String>>,
         env_var: &str,
     ) -> Result<(ParsedEnv, bool), String> {
-        let (parsed_env, needs_lift_manifest) = self.reify_string(env, env_var)?;
+        let (parsed_env, needs_lift_manifest) = self.reify_string(cmd_env, env_var)?;
         Ok((
             parse_scie_env_placeholder(&parsed_env)?,
             needs_lift_manifest,
@@ -562,7 +560,7 @@ impl<'a> Context<'a> {
 
     fn reify_string(
         &mut self,
-        env: &IndexMap<String, String>,
+        cmd_env: Option<&IndexMap<String, String>>,
         value: &str,
     ) -> Result<(String, bool), String> {
         let mut reified = String::with_capacity(value.len());
@@ -574,7 +572,7 @@ impl<'a> Context<'a> {
                 Item::LeftBrace => reified.push('{'),
                 Item::Text(text) => reified.push_str(text),
                 Item::Placeholder(Placeholder::FileHash(name)) => {
-                    let (parsed_name, needs_manifest) = self.reify_string(env, name)?;
+                    let (parsed_name, needs_manifest) = self.reify_string(cmd_env, name)?;
                     lift_manifest_required |= needs_manifest;
                     let file = self
                         .files_by_name
@@ -585,7 +583,7 @@ impl<'a> Context<'a> {
                     reified.push_str(&file.hash);
                 }
                 Item::Placeholder(Placeholder::FileName(name)) => {
-                    let (parsed_name, needs_manifest) = self.reify_string(env, name)?;
+                    let (parsed_name, needs_manifest) = self.reify_string(cmd_env, name)?;
                     lift_manifest_required |= needs_manifest;
                     let file = self
                         .files_by_name
@@ -598,14 +596,17 @@ impl<'a> Context<'a> {
                     self.replacements.insert(file);
                 }
                 Item::Placeholder(Placeholder::Env(env_var)) => {
-                    let (parsed_env, needs_manifest) = self.parse_env(env, env_var)?;
+                    let (parsed_env, needs_manifest) = self.parse_env(cmd_env, env_var)?;
                     lift_manifest_required |= needs_manifest;
-                    let value = if let Some(val) = env
-                        .get(&parsed_env.name)
+                    let value = if let Some(val) = cmd_env
+                        .and_then(|e| e.get(&parsed_env.name))
                         .map(String::to_owned)
-                        .or_else(|| env::var(&parsed_env.name).ok())
-                    {
-                        let (parsed_value, needs_manifest) = self.reify_string(env, &val)?;
+                        .or_else(|| {
+                            self.ambient_env
+                                .get(&OsString::from(&parsed_env.name))
+                                .and_then(|val| val.clone().into_string().ok())
+                        }) {
+                        let (parsed_value, needs_manifest) = self.reify_string(cmd_env, &val)?;
                         lift_manifest_required |= needs_manifest;
                         parsed_value
                     } else {
@@ -614,7 +615,7 @@ impl<'a> Context<'a> {
                     reified.push_str(&value)
                 }
                 Item::Placeholder(Placeholder::UserCacheDir(fallback)) => {
-                    let (parsed_fallback, needs_manifest) = self.reify_string(env, fallback)?;
+                    let (parsed_fallback, needs_manifest) = self.reify_string(cmd_env, fallback)?;
                     lift_manifest_required |= needs_manifest;
                     reified.push_str(if let Some(user_cache_dir) = dirs::cache_dir() {
                         user_cache_dir.into_os_string().into_string().map_err(|e| {
@@ -640,7 +641,7 @@ impl<'a> Context<'a> {
                     env: env_var,
                 })) => {
                     let binding_env = self.bind(binding)?;
-                    let (parsed_env, needs_manifest) = self.parse_env(env, env_var)?;
+                    let (parsed_env, needs_manifest) = self.parse_env(cmd_env, env_var)?;
                     lift_manifest_required |= needs_manifest;
                     let value = binding_env
                         .get(&parsed_env.name)
@@ -668,14 +669,15 @@ pub(crate) fn select_command(
     jump: &Jump,
     lift: &Lift,
     installer: &Installer,
+    custom_env: Option<HashMap<String, String>>,
 ) -> Result<SelectedCmd, String> {
-    let mut context = Context::new(&current_exe.exe, jump, lift, installer)?;
+    let mut context = Context::new(&current_exe.exe, jump, lift, installer, custom_env)?;
     context.select_command(lift.name.as_str(), current_exe)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use std::collections::HashMap;
     use std::path::{Path, PathBuf};
 
     use indexmap::IndexMap;
@@ -683,7 +685,7 @@ mod tests {
     use super::Context;
     use crate::config::{ArchiveType, Boot, Cmd, Compression, FileType};
     use crate::installer::Installer;
-    use crate::{config, process, File, Jump, Lift, Process, Source};
+    use crate::{File, Jump, Lift, Process, Source, config, process};
 
     #[test]
     fn env() {
@@ -721,21 +723,28 @@ mod tests {
             other: None,
         };
         let installer = Installer::new(&[]);
-        let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
-
-        assert!(env::var_os("__DNE__").is_none());
+        let mut context = Context::new(
+            Path::new("scie_path"),
+            &jump,
+            &lift,
+            &installer,
+            Some(HashMap::new()),
+        )
+        .unwrap();
 
         let mut env = IndexMap::new();
         assert_eq!(
             ("".to_string(), false),
-            context.reify_string(&env, "{scie.env.__DNE__}").unwrap()
+            context
+                .reify_string(Some(&env), "{scie.env.__DNE__}")
+                .unwrap()
         );
 
         env.clear();
         assert_eq!(
             ("default".to_string(), false),
             context
-                .reify_string(&env, "{scie.env.__DNE__=default}")
+                .reify_string(Some(&env), "{scie.env.__DNE__=default}")
                 .unwrap()
         );
 
@@ -744,7 +753,7 @@ mod tests {
         assert_eq!(
             ("foo".to_string(), false),
             context
-                .reify_string(&env, "{scie.env.__DNE__=default}")
+                .reify_string(Some(&env), "{scie.env.__DNE__=default}")
                 .unwrap()
         );
 
@@ -752,7 +761,7 @@ mod tests {
         assert_eq!(
             ("scie_path".to_string(), false),
             context
-                .reify_string(&env, "{scie.env.__DNE__={scie}}")
+                .reify_string(Some(&env), "{scie.env.__DNE__={scie}}")
                 .unwrap()
         );
 
@@ -769,7 +778,7 @@ mod tests {
                     .unwrap(),
                 false
             ),
-            context.reify_string(&env, "{scie.base}").unwrap()
+            context.reify_string(Some(&env), "{scie.base}").unwrap()
         );
         assert_eq!(
             (
@@ -782,7 +791,7 @@ mod tests {
                 true
             ),
             context
-                .reify_string(&env, "{scie.env.__DNE__={scie.lift}}")
+                .reify_string(Some(&env), "{scie.env.__DNE__={scie.lift}}")
                 .unwrap()
         );
 
@@ -793,7 +802,14 @@ mod tests {
             calculated from the resolved location of the scie.lift.base, given: \
             {scie.lift}/circular"
                 .to_string(),
-            Context::new(Path::new("scie_path"), &jump, &invalid_lift, &installer).unwrap_err()
+            Context::new(
+                Path::new("scie_path"),
+                &jump,
+                &invalid_lift,
+                &installer,
+                None
+            )
+            .unwrap_err()
         );
 
         env.clear();
@@ -808,7 +824,7 @@ mod tests {
                 false
             ),
             context
-                .reify_string(&env, "{scie.env.__DNE__={file}}")
+                .reify_string(Some(&env), "{scie.env.__DNE__={file}}")
                 .unwrap()
         );
 
@@ -816,7 +832,7 @@ mod tests {
         assert_eq!(
             ("42".to_string(), false),
             context
-                .reify_string(&env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .reify_string(Some(&env), "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
         );
 
@@ -825,7 +841,7 @@ mod tests {
         assert_eq!(
             ("bar".to_string(), false),
             context
-                .reify_string(&env, "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
+                .reify_string(Some(&env), "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
         );
     }
@@ -895,7 +911,14 @@ mod tests {
             other: None,
         };
         let installer = Installer::new(&[]);
-        let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
+        let mut context = Context::new(
+            Path::new("scie_path"),
+            &jump,
+            &lift,
+            &installer,
+            Some(HashMap::new()),
+        )
+        .unwrap();
 
         let cmd = lift.boot.commands.get("").unwrap();
         let expected_env = process::EnvVars {
@@ -918,7 +941,14 @@ mod tests {
             process
         );
 
-        env::set_var("SELECT", "v1");
+        context = Context::new(
+            Path::new("scie_path"),
+            &jump,
+            &lift,
+            &installer,
+            Some([("SELECT".into(), "v1".into())].into()),
+        )
+        .unwrap();
         let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
@@ -931,9 +961,15 @@ mod tests {
             },
             process
         );
-        env::remove_var("SELECT");
 
-        env::set_var("SELECT", "v2");
+        context = Context::new(
+            Path::new("scie_path"),
+            &jump,
+            &lift,
+            &installer,
+            Some([("SELECT".into(), "v2".into())].into()),
+        )
+        .unwrap();
         let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
@@ -946,7 +982,6 @@ mod tests {
             },
             process
         );
-        env::remove_var("SELECT")
     }
 
     #[test]
@@ -1003,12 +1038,19 @@ mod tests {
             other: None,
         };
         let installer = Installer::new(&[]);
-        let mut context = Context::new(Path::new("scie_path"), &jump, &lift, &installer).unwrap();
+        let mut context = Context::new(
+            Path::new("scie_path"),
+            &jump,
+            &lift,
+            &installer,
+            Some([("PATH".into(), "/test/path".into())].into()),
+        )
+        .unwrap();
 
         let cmd = lift.boot.commands.get("").unwrap();
 
         let process = context.prepare_process(cmd).unwrap();
-        let reified_path = format!("c:e:{}", env::var("PATH").unwrap());
+        let reified_path = "c:e:/test/path";
         assert_eq!(
             Process {
                 env: process::EnvVars {
@@ -1016,7 +1058,7 @@ mod tests {
                         process::EnvVar::Replace(("A".into(), "c".into())),
                         process::EnvVar::Replace(("B".into(), "c".into())),
                         process::EnvVar::Replace(("C".into(), "c".into())),
-                        process::EnvVar::Replace(("PATH".into(), reified_path.clone().into())),
+                        process::EnvVar::Replace(("PATH".into(), reified_path.into())),
                         process::EnvVar::Replace(("F".into(), reified_path.into())),
                     ]
                 },
@@ -1026,9 +1068,22 @@ mod tests {
             process
         );
 
-        env::set_var("D", "d");
+        context = Context::new(
+            Path::new("scie_path"),
+            &jump,
+            &lift,
+            &installer,
+            Some(
+                [
+                    ("D".into(), "d".into()),
+                    ("PATH".into(), "/test/path".into()),
+                ]
+                .into(),
+            ),
+        )
+        .unwrap();
         let process = context.prepare_process(cmd).unwrap();
-        let reified_path = format!("d:e:{}", env::var("PATH").unwrap());
+        let reified_path = "d:e:/test/path";
         assert_eq!(
             Process {
                 env: process::EnvVars {
@@ -1036,7 +1091,7 @@ mod tests {
                         process::EnvVar::Replace(("A".into(), "d".into())),
                         process::EnvVar::Replace(("B".into(), "d".into())),
                         process::EnvVar::Replace(("C".into(), "d".into())),
-                        process::EnvVar::Replace(("PATH".into(), reified_path.clone().into())),
+                        process::EnvVar::Replace(("PATH".into(), reified_path.into())),
                         process::EnvVar::Replace(("F".into(), reified_path.into())),
                     ]
                 },
@@ -1045,6 +1100,5 @@ mod tests {
             },
             process
         );
-        env::remove_var("D");
     }
 }

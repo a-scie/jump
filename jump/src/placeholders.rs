@@ -117,13 +117,13 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                                     "The {{scie.user.cache_dir}} requires a fallback value; e.g.: \
                                     {{scie.user.cache_dir=~/.cache}}"
                                         .to_string(),
-                                )
+                                );
                             }
                             _ => {
                                 return Err(format!(
                                     "Unrecognized placeholder in the {{scie.user.*}} \
                                     namespace: {{scie.user.{cache_dir}}}"
-                                ))
+                                ));
                             }
                         }
                     }
@@ -155,7 +155,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, Item, Placeholder};
+    use super::{Item, Placeholder, parse};
     use crate::placeholders::ScieBindingEnv;
 
     #[test]

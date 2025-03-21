@@ -9,7 +9,7 @@ use std::path::Path;
 use logging_timer::time;
 use zip::ZipArchive;
 
-use crate::atomic::{atomic_path, Target};
+use crate::atomic::{Target, atomic_path};
 use crate::config::{ArchiveType, Compression, FileType};
 use crate::context::FileEntry;
 use crate::fingerprint;
@@ -97,12 +97,12 @@ where
     })
 }
 
-#[cfg(not(target_family = "unix"))]
+#[cfg(windows)]
 fn executable_permissions() -> Option<Permissions> {
     None
 }
 
-#[cfg(target_family = "unix")]
+#[cfg(unix)]
 fn executable_permissions() -> Option<Permissions> {
     use std::os::unix::fs::PermissionsExt;
     Some(Permissions::from_mode(0o755))
@@ -210,8 +210,7 @@ impl<'a> Installer<'a> {
                                 {binding:?}: {e}"
                             )
                         })?;
-                        let mut child =
-                            binding.spawn_stdout(vec![file.name.as_str()].as_slice())?;
+                        let mut child = binding.spawn_stdout(&[file.name.as_str()])?;
                         let mut stdout = child.stdout.take().ok_or_else(|| {
                             format!(
                                 "Failed to grab stdout attempting to load {file:?} via binding."
