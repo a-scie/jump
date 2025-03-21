@@ -26,12 +26,12 @@ fn ensure_parent_dir(base: &Path, file: &File) -> Result<PathBuf, Exit> {
     Ok(dst)
 }
 
-#[cfg(not(target_family = "unix"))]
+#[cfg(windows)]
 fn executable_permissions() -> Option<Permissions> {
     None
 }
 
-#[cfg(target_family = "unix")]
+#[cfg(unix)]
 fn executable_permissions() -> Option<Permissions> {
     use std::os::unix::fs::PermissionsExt;
     Some(Permissions::from_mode(0o755))

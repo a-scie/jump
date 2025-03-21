@@ -5,7 +5,7 @@ description = "The bulk of the scie-jump binary logic."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
 ]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]

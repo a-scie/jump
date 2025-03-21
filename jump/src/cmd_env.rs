@@ -1,8 +1,7 @@
 // Copyright 2023 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::env;
-
+use std::ffi::OsString;
 use indexmap::IndexMap;
 
 use crate::config::{Cmd, EnvVar};
@@ -19,33 +18,35 @@ pub(crate) struct ParsedEnv {
 pub(crate) fn parse_scie_env_placeholder(env_var: &str) -> Result<ParsedEnv, String> {
     match env_var.splitn(2, '=').collect::<Vec<_>>()[..] {
         [name] => Ok(ParsedEnv {
-            name: name.to_string(),
+            name: name.into(),
             default: None,
         }),
         [name, default] => Ok(ParsedEnv {
-            name: name.to_string(),
-            default: Some(default.to_string()),
+            name: name.into(),
+            default: Some(default.into()),
         }),
-        _ => Err(
-            "Expected {{scie.env.<name>}} <name> placeholder to be a non-empty string".to_string(),
-        ),
+        _ => Err("Expected {{scie.env.<name>}} <name> placeholder to be a non-empty string".into()),
     }
 }
 
-struct EnvParser {
+struct EnvParser<'a> {
+    ambient_env: &'a IndexMap<OsString, OsString>,
     env: IndexMap<String, String>,
     key_stack: Vec<String>,
     parsed: IndexMap<String, String>,
 }
 
-impl EnvParser {
-    fn new(env_vars: &IndexMap<EnvVar, Option<String>>) -> Self {
+impl<'a> EnvParser<'a> {
+    fn new(
+        env_vars: &IndexMap<EnvVar, Option<String>>,
+        ambient_env: &'a IndexMap<OsString, OsString>,
+    ) -> Self {
         let mut env = IndexMap::new();
         for (key, value) in env_vars.iter() {
             if let Some(val) = value {
                 match key {
                     EnvVar::Default(name) => {
-                        if env::var_os(name).is_none() {
+                        if ambient_env.get(&OsString::from(name)).is_none() {
                             env.insert(name.to_owned(), val.to_owned());
                         }
                     }
@@ -56,6 +57,7 @@ impl EnvParser {
             }
         }
         Self {
+            ambient_env,
             env,
             key_stack: vec![],
             parsed: IndexMap::new(),
@@ -110,7 +112,7 @@ impl EnvParser {
             // If we're already calculating a Cmd env var value for `key`, we can only
             // pull references to that `key` needed to compute the value from the
             // ambient environment.
-            if let Ok(val) = env::var(&parsed_env.name) {
+            if let Some(val) = self.ambient_env.get(&OsString::from(&parsed_env.name)).and_then(|v| v.to_owned().into_string().ok()) {
                 val
             } else {
                 parsed_env.default.unwrap_or_default()
@@ -119,7 +121,7 @@ impl EnvParser {
             .env
             .get(&parsed_env.name)
             .map(|v| v.to_owned())
-            .or_else(|| env::var(&parsed_env.name).ok())
+            .or_else(|| self.ambient_env.get(&OsString::from(&parsed_env.name)).and_then(|v| v.to_owned().into_string().ok()))
         {
             self.parse_env_var(&parsed_env.name, &val)?
         } else {
@@ -138,10 +140,10 @@ impl EnvParser {
 
     fn parse_entry(&mut self, key: &str, value: &str) -> Result<(), String> {
         if !self.parsed.contains_key(key) {
-            self.key_stack.push(key.to_string());
+            self.key_stack.push(key.into());
             let parsed_value = self.reify_env(value)?;
             self.key_stack.pop();
-            self.parsed.insert(key.to_string(), parsed_value);
+            self.parsed.insert(key.into(), parsed_value);
         }
         Ok(())
     }
@@ -155,39 +157,40 @@ impl EnvParser {
     }
 }
 
-pub(crate) fn prepare_env(cmd: &Cmd) -> Result<IndexMap<String, String>, String> {
-    EnvParser::new(&cmd.env).parse_env()
+pub(crate) fn prepare_env(
+    cmd: &Cmd,
+    ambient_env: &IndexMap<OsString, OsString>,
+) -> Result<IndexMap<String, String>, String> {
+    EnvParser::new(&cmd.env, ambient_env).parse_env()
 }
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use indexmap::IndexMap;
 
-    use crate::cmd_env::{parse_scie_env_placeholder, EnvParser, ParsedEnv};
+    use crate::cmd_env::{EnvParser, ParsedEnv, parse_scie_env_placeholder};
     use crate::config::EnvVar;
 
     #[test]
     fn parse_env_placeholder() {
         assert_eq!(
             ParsedEnv {
-                name: "FOO".to_string(),
+                name: "FOO".into(),
                 default: None
             },
             parse_scie_env_placeholder("FOO").unwrap()
         );
         assert_eq!(
             ParsedEnv {
-                name: "FOO".to_string(),
-                default: Some("bar".to_string())
+                name: "FOO".into(),
+                default: Some("bar".into())
             },
             parse_scie_env_placeholder("FOO=bar").unwrap()
         );
         assert_eq!(
             ParsedEnv {
-                name: "FOO".to_string(),
-                default: Some("bar=baz".to_string())
+                name: "FOO".into(),
+                default: Some("bar=baz".into())
             },
             parse_scie_env_placeholder("FOO=bar=baz").unwrap()
         );
@@ -195,229 +198,238 @@ mod tests {
 
     #[test]
     fn self_recurse() {
+        let ambient_env = [("PATH".into(), "/test/path".into())].into();
         let env_parser = EnvParser::new(
             &[(
-                EnvVar::Replace("PATH".to_string()),
-                Some("foo:{scie.env.PATH}".to_string()),
+                EnvVar::Replace("PATH".into()),
+                Some("foo:{scie.env.PATH}".into()),
             )]
-            .into_iter()
-            .collect::<IndexMap<_, _>>(),
+            .into(),
+            &ambient_env,
         );
 
-        let expected = [(
-            "PATH".to_string(),
-            format!("foo:{path}", path = env::var("PATH").unwrap()),
-        )]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> = [("PATH".into(), "foo:/test/path".into())].into();
 
         assert_eq!(expected, env_parser.parse_env().unwrap());
     }
 
     #[test]
     fn multi_step_recurse() {
+        let ambient_env = [("PATH".into(), "/test/path".into())].into();
         let env_parser = EnvParser::new(
             &[
                 (
-                    EnvVar::Replace("PATH".to_string()),
-                    Some("foo:{scie.env.X}".to_string()),
+                    EnvVar::Replace("PATH".into()),
+                    Some("foo:{scie.env.X}".into()),
                 ),
                 (
-                    EnvVar::Replace("X".to_string()),
-                    Some("{scie.env.PATH}:bar".to_string()),
+                    EnvVar::Replace("X".into()),
+                    Some("{scie.env.PATH}:bar".into()),
                 ),
             ]
-            .into_iter()
-            .collect::<IndexMap<_, _>>(),
+            .into(),
+            &ambient_env,
         );
 
-        let expected_path = env::var("PATH").unwrap();
-        let expected = [
-            ("PATH".to_string(), format!("foo:{expected_path}:bar")),
-            ("X".to_string(), format!("{expected_path}:bar")),
+        let expected: IndexMap<String, String> = [
+            ("PATH".into(), "foo:/test/path:bar".into()),
+            ("X".into(), "/test/path:bar".into()),
         ]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        .into();
 
         assert_eq!(expected, env_parser.parse_env().unwrap());
     }
 
     #[test]
     fn test_dynamic_env_var_name() {
-        let cmd_env = &[
+        let cmd_env: IndexMap<EnvVar, Option<String>> = [
             (
-                EnvVar::Replace("__PYTHON_3_8".to_string()),
-                Some("{cpython38}/python/bin/python3.8".to_string()),
+                EnvVar::Replace("__PYTHON_3_8".into()),
+                Some("{cpython38}/python/bin/python3.8".into()),
             ),
             (
-                EnvVar::Replace("__PYTHON_3_9".to_string()),
-                Some("{cpython39}/python/bin/python3.9".to_string()),
+                EnvVar::Replace("__PYTHON_3_9".into()),
+                Some("{cpython39}/python/bin/python3.9".into()),
             ),
             (
-                EnvVar::Replace("__PYTHON".to_string()),
-                Some("{scie.env.__PYTHON_3_{scie.env.__PYTHON_MINOR=9}}".to_string()),
-            ),
-        ]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
-
-        let expected = [
-            (
-                "__PYTHON_3_8".to_string(),
-                "{scie.files.cpython38}/python/bin/python3.8".to_string(),
-            ),
-            (
-                "__PYTHON_3_9".to_string(),
-                "{scie.files.cpython39}/python/bin/python3.9".to_string(),
-            ),
-            (
-                "__PYTHON".to_string(),
-                "{scie.files.cpython39}/python/bin/python3.9".to_string(),
+                EnvVar::Replace("__PYTHON".into()),
+                Some("{scie.env.__PYTHON_3_{scie.env.__PYTHON_MINOR=9}}".into()),
             ),
         ]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        .into();
 
-        assert_eq!(expected, EnvParser::new(cmd_env).parse_env().unwrap());
-
-        env::set_var("__PYTHON_MINOR", "8");
-        let expected = [
+        let expected: IndexMap<String, String> = [
             (
-                "__PYTHON_3_8".to_string(),
-                "{scie.files.cpython38}/python/bin/python3.8".to_string(),
+                "__PYTHON_3_8".into(),
+                "{scie.files.cpython38}/python/bin/python3.8".into(),
             ),
             (
-                "__PYTHON_3_9".to_string(),
-                "{scie.files.cpython39}/python/bin/python3.9".to_string(),
+                "__PYTHON_3_9".into(),
+                "{scie.files.cpython39}/python/bin/python3.9".into(),
             ),
             (
-                "__PYTHON".to_string(),
-                "{scie.files.cpython38}/python/bin/python3.8".to_string(),
+                "__PYTHON".into(),
+                "{scie.files.cpython39}/python/bin/python3.9".into(),
             ),
         ]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        .into();
 
-        assert_eq!(expected, EnvParser::new(cmd_env).parse_env().unwrap());
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &IndexMap::new())
+                .parse_env()
+                .unwrap()
+        );
+
+        let expected: IndexMap<String, String> = [
+            (
+                "__PYTHON_3_8".into(),
+                "{scie.files.cpython38}/python/bin/python3.8".into(),
+            ),
+            (
+                "__PYTHON_3_9".into(),
+                "{scie.files.cpython39}/python/bin/python3.9".into(),
+            ),
+            (
+                "__PYTHON".into(),
+                "{scie.files.cpython38}/python/bin/python3.8".into(),
+            ),
+        ]
+        .into();
+
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &[("__PYTHON_MINOR".into(), "8".into())].into())
+                .parse_env()
+                .unwrap()
+        );
     }
 
     #[test]
     fn test_dynamic_env_var_default() {
-        let cmd_env = [(
-            EnvVar::Replace("FOO".to_string()),
-            Some("{scie.env.BAR={scie.env.BAZ=spam}}".to_string()),
+        let cmd_env: IndexMap<EnvVar, Option<String>> = [(
+            EnvVar::Replace("FOO".into()),
+            Some("{scie.env.BAR={scie.env.BAZ=spam}}".into()),
         )]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        .into();
 
-        let expected = [("FOO".to_string(), "spam".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> = [("FOO".into(), "spam".into())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &IndexMap::new())
+                .parse_env()
+                .unwrap()
+        );
 
-        env::set_var("BAZ", "eggs");
-        let expected = [("FOO".to_string(), "eggs".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> = [("FOO".to_string(), "eggs".to_string())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
-        env::remove_var("BAZ");
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &[("BAZ".into(), "eggs".into())].into())
+                .parse_env()
+                .unwrap()
+        );
 
-        env::set_var("BAR", "cheese");
-        let expected = [("FOO".to_string(), "cheese".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> = [("FOO".to_string(), "cheese".to_string())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
-        env::remove_var("BAR");
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &[("BAR".into(), "cheese".into())].into())
+                .parse_env()
+                .unwrap()
+        );
     }
 
     #[test]
     fn test_excessively_dynamic_env() {
         let cmd_env = [(
-            EnvVar::Replace("A".to_string()),
-            Some("PreA{scie.env.PreB{scie.env.B}PostB=PreC{scie.env.C=c}PostC}PostA".to_string()),
+            EnvVar::Replace("A".into()),
+            Some("PreA{scie.env.PreB{scie.env.B}PostB=PreC{scie.env.C=c}PostC}PostA".into()),
         )]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        .into();
 
-        let expected = [("A".to_string(), "PreAPreCcPostCPostA".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> =
+            [("A".into(), "PreAPreCcPostCPostA".into())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &IndexMap::new())
+                .parse_env()
+                .unwrap()
+        );
 
-        env::set_var("C", "_Cee_");
-        let expected = [("A".to_string(), "PreAPreC_Cee_PostCPostA".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> =
+            [("A".into(), "PreAPreC_Cee_PostCPostA".into())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
-        env::remove_var("C");
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &[("C".into(), "_Cee_".into())].into())
+                .parse_env()
+                .unwrap()
+        );
 
-        env::set_var("PreBPostB", "_Bee_");
-        let expected = [("A".to_string(), "PreA_Bee_PostA".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> = [("A".into(), "PreA_Bee_PostA".into())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
-        env::remove_var("PreBPostB");
+        assert_eq!(
+            expected,
+            EnvParser::new(&cmd_env, &[("PreBPostB".into(), "_Bee_".into())].into())
+                .parse_env()
+                .unwrap()
+        );
 
-        env::set_var("B", "_Bee_");
-        env::set_var("PreB_Bee_PostB", "_Buzz_");
-        let expected = [("A".to_string(), "PreA_Buzz_PostA".to_string())]
-            .into_iter()
-            .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> = [("A".into(), "PreA_Buzz_PostA".into())].into();
 
-        assert_eq!(expected, EnvParser::new(&cmd_env).parse_env().unwrap());
-        env::remove_var("B");
-        env::remove_var("PreB_Bee_PostB");
+        assert_eq!(
+            expected,
+            EnvParser::new(
+                &cmd_env,
+                &[
+                    ("B".into(), "_Bee_".into()),
+                    ("PreB_Bee_PostB".into(), "_Buzz_".into())
+                ]
+                .into()
+            )
+            .parse_env()
+            .unwrap()
+        );
     }
 
     #[test]
     fn test_ignored_placeholders() {
+        let ambient_env = [("PATH".into(), "/test/path".into())].into();
         let env_parser = EnvParser::new(
             &[(
-                EnvVar::Replace("PATH".to_string()),
-                Some(
-                    "{foo}:{scie.env.PATH}:{scie}:{scie.base}:{scie.files.bar}:baz{{}".to_string(),
-                ),
+                EnvVar::Replace("PATH".into()),
+                Some("{foo}:{scie.env.PATH}:{scie}:{scie.base}:{scie.files.bar}:baz{{}".into()),
             )]
-            .into_iter()
-            .collect::<IndexMap<_, _>>(),
+            .into(),
+            &ambient_env,
         );
 
-        let expected = [(
-            "PATH".to_string(),
-            format!(
-                "{{scie.files.foo}}:{path}:{{scie}}:{{scie.base}}:{{scie.files.bar}}:baz{{}}",
-                path = env::var("PATH").unwrap()
-            ),
+        let expected: IndexMap<String, String> = [(
+            "PATH".into(),
+            "{scie.files.foo}:/test/path:{scie}:{scie.base}:{scie.files.bar}:baz{}".into(),
         )]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        .into();
 
         assert_eq!(expected, env_parser.parse_env().unwrap());
     }
 
     #[test]
     fn test_user_cache_dir_placeholder() {
+        let ambient_env = IndexMap::new();
         let env_parser = EnvParser::new(
             &[(
-                EnvVar::Replace("SCIE_BASE".to_string()),
-                Some("{scie.user.cache_dir=foo}".to_string()),
+                EnvVar::Replace("SCIE_BASE".into()),
+                Some("{scie.user.cache_dir=foo}".into()),
             )]
-            .into_iter()
-            .collect::<IndexMap<_, _>>(),
+            .into(),
+            &ambient_env,
         );
 
-        let expected = [(
-            "SCIE_BASE".to_string(),
-            "{scie.user.cache_dir=foo}".to_string(),
-        )]
-        .into_iter()
-        .collect::<IndexMap<_, _>>();
+        let expected: IndexMap<String, String> =
+            [("SCIE_BASE".into(), "{scie.user.cache_dir=foo}".into())].into();
 
         assert_eq!(expected, env_parser.parse_env().unwrap());
     }

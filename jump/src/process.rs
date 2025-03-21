@@ -1,9 +1,9 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::process::{Child, Command, ExitStatus, Stdio};
 
 use logging_timer::time;
@@ -48,10 +48,14 @@ pub struct EnvVars {
 impl EnvVars {
     // Translates this `EnvVars` into a sequence of env var set and env var remove instructions
     // that, when carried out in order, will place the environment in the requested state.
-    fn to_env_vars(&self) -> Vec<(OsString, Option<OsString>)> {
+    pub fn to_env_vars(
+        &self,
+        ambient_env: impl Iterator<Item = (OsString, OsString)>,
+    ) -> Vec<(OsString, Option<OsString>)> {
         let mut defaults = vec![];
         let mut replacements = vec![];
         let mut removals: HashSet<OsString> = HashSet::new();
+        let mut env = ambient_env.collect::<HashMap<_, _>>();
         for env_var in &self.vars {
             match env_var {
                 EnvVar::Default((name, val)) => {
@@ -64,9 +68,9 @@ impl EnvVars {
                     removals.insert(name.to_owned());
                 }
                 EnvVar::RemoveMatching(regex) => {
-                    for (name, _) in env::vars_os() {
+                    for name in env.keys() {
                         if regex.is_match(name.as_os_str().to_raw_bytes().as_ref()) {
-                            removals.insert(name);
+                            removals.insert(name.to_owned());
                         }
                     }
                 }
@@ -80,7 +84,7 @@ impl EnvVars {
             let value = if removals.contains(&name) {
                 default
             } else {
-                env::var_os(&name).unwrap_or(default)
+                env.remove(&name).unwrap_or(default)
             };
             env_vars.push((name, Some(value)))
         }
@@ -89,25 +93,6 @@ impl EnvVars {
         }
         env_vars
     }
-
-    pub fn export(&self) {
-        for (name, value) in self.to_env_vars() {
-            match value {
-                Some(val) => env::set_var(name, val),
-                None => env::remove_var(name),
-            }
-        }
-    }
-}
-
-pub fn execute(exe: OsString, args: Vec<OsString>, argv_skip: usize) -> Result<ExitStatus, String> {
-    Command::new(&exe)
-        .args(&args)
-        .args(env::args().skip(argv_skip))
-        .spawn()
-        .map_err(|e| format!("Failed to spawn {exe:?} {args:?}: {e}"))?
-        .wait()
-        .map_err(|e| format!("Spawned {exe:?} {args:?} but failed to gather its exit status: {e}"))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -132,19 +117,28 @@ impl Process {
         for arg in &self.args {
             hasher.update(as_bytes(arg)?);
         }
-        for (key, value) in self.env.to_env_vars() {
+        for (name, value) in self.env.to_env_vars(env::vars_os()) {
             if let Some(val) = value {
-                hasher.update(as_bytes(&key)?);
+                hasher.update(as_bytes(&name)?);
                 hasher.update(as_bytes(&val)?);
             }
         }
         Ok(format!("{digest:x}", digest = hasher.finalize()))
     }
 
-    fn as_command(&self) -> Command {
+    fn as_command(
+        &self,
+        extra_args: impl IntoIterator<Item = impl AsRef<OsStr>>,
+        extra_env: impl IntoIterator<Item = (OsString, Option<OsString>)>,
+    ) -> Command {
         let mut command = Command::new(&self.exe);
-        command.args(&self.args);
-        for (name, value) in self.env.to_env_vars() {
+        command.args(&self.args).args(extra_args);
+        for (name, value) in self
+            .env
+            .to_env_vars(env::vars_os())
+            .into_iter()
+            .chain(extra_env)
+        {
             match value {
                 Some(val) => {
                     command.env(name, val);
@@ -159,10 +153,10 @@ impl Process {
 
     pub fn execute(
         &self,
-        extra_env: impl IntoIterator<Item = (OsString, OsString)>,
+        extra_args: impl IntoIterator<Item = OsString>,
+        extra_env: impl IntoIterator<Item = (OsString, Option<OsString>)>,
     ) -> Result<ExitStatus, String> {
-        self.as_command()
-            .envs(extra_env)
+        self.as_command(extra_args, extra_env)
             .spawn()
             .map_err(|e| {
                 format!(
@@ -183,8 +177,7 @@ impl Process {
     }
 
     pub fn spawn_stdout(&self, args: &[&str]) -> Result<Child, String> {
-        self.as_command()
-            .args(args)
+        self.as_command(args, None)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .spawn()
@@ -201,80 +194,41 @@ impl Process {
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
-    use std::sync::{Arc, OnceLock};
 
     use os_str_bytes::OsStrBytes;
-    use parking_lot::ReentrantMutex;
 
     use crate::comparable_regex::ComparableRegex;
     use crate::{EnvVar, EnvVars};
-
-    static ENV_LOCK: OnceLock<Arc<ReentrantMutex<()>>> = OnceLock::new();
 
     #[ctor::ctor]
     fn init() {
         env_logger::init();
     }
 
-    fn with_env<T>(func: T)
-    where
-        T: FnOnce(),
-    {
-        let _env_lock = ENV_LOCK
-            .get_or_init(|| Arc::new(ReentrantMutex::new(())))
-            .lock();
-        func();
-    }
-
-    fn with_extra_env<T>(extra_env: &[(OsString, OsString)], func: T)
-    where
-        T: FnOnce(),
-    {
-        with_env(|| {
-            let mut original_env = vec![];
-            for (name, value) in extra_env {
-                original_env.push((name, std::env::var_os(name)));
-                std::env::set_var(name, value);
-            }
-            func();
-            for (name, value) in original_env {
-                if let Some(val) = value {
-                    std::env::set_var(name, val);
-                } else {
-                    std::env::remove_var(name);
-                }
-            }
-        });
-    }
-
     #[test]
     fn to_env_vars_empty() {
-        with_env(|| {
-            assert_eq!(
-                Vec::<(OsString, Option<OsString>)>::new(),
-                EnvVars { vars: vec![] }.to_env_vars()
-            )
-        })
+        assert_eq!(
+            Vec::<(OsString, Option<OsString>)>::new(),
+            EnvVars { vars: vec![] }.to_env_vars([].into_iter())
+        )
     }
 
-    fn assert_to_env_vars() {
-        with_env(|| {
-            assert_eq!(
-                vec![("foo".into(), Some("bar".into()))],
-                EnvVars {
-                    vars: vec![
-                        EnvVar::Replace(("foo".into(), "bar".into())),
-                        EnvVar::RemoveMatching(ComparableRegex::try_from("__DNE__.*").unwrap())
-                    ]
-                }
-                .to_env_vars()
-            )
-        })
+    fn assert_to_env_vars(ambient_env: &[(OsString, OsString)]) {
+        assert_eq!(
+            vec![("foo".into(), Some("bar".into()))],
+            EnvVars {
+                vars: vec![
+                    EnvVar::Replace(("foo".into(), "bar".into())),
+                    EnvVar::RemoveMatching(ComparableRegex::try_from("__DNE__.*").unwrap())
+                ]
+            }
+            .to_env_vars(ambient_env.iter().map(|tup| tup.to_owned()))
+        )
     }
 
     #[test]
     fn to_env_vars() {
-        assert_to_env_vars()
+        assert_to_env_vars(&[])
     }
 
     #[cfg(windows)]
@@ -288,7 +242,7 @@ mod tests {
         // >   sequence that would otherwise map to code points U+D800..U+DFFF is ill-
         // >   formed.
         //
-        // As such it is valid utf16 but we expect it to fail to convert to utf8.
+        // As such it is valid utf16, but we expect it to fail to convert to utf8.
         OsString::from_wide(&[0xD800])
     }
 
@@ -306,44 +260,40 @@ mod tests {
         let non_utf8 = create_non_utf8_string();
         assert!(non_utf8.clone().into_string().is_err());
 
-        with_extra_env(&[(non_utf8.clone(), "baz".into())], assert_to_env_vars);
-        with_extra_env(&[("baz".into(), non_utf8.clone())], assert_to_env_vars);
-        with_extra_env(&[(non_utf8.clone(), non_utf8.clone())], assert_to_env_vars);
+        assert_to_env_vars(&[(non_utf8.clone(), "baz".into())]);
+        assert_to_env_vars(&[("baz".into(), non_utf8.clone())]);
+        assert_to_env_vars(&[(non_utf8.clone(), non_utf8.clone())]);
 
-        with_extra_env(&[("baz".into(), non_utf8.clone())], || {
-            assert_eq!(
-                // N.B.: Our docs guaranty removals are done first, then defaults are set and
-                // finally overwrites are processed. This is regardless of the order of the env var
-                // entries in the lift manifest JSON document.
-                vec![("baz".into(), None), ("foo".into(), Some("bar".into()))],
-                EnvVars {
-                    vars: vec![
-                        EnvVar::Replace(("foo".into(), "bar".into())),
-                        EnvVar::RemoveMatching(ComparableRegex::try_from("^baz$").unwrap())
-                    ]
-                }
-                .to_env_vars(),
-                "Expected removal of an env var with a non-utf8 value to succeed."
-            )
-        });
-
-        with_extra_env(&[(non_utf8.clone(), "baz".into())], || {
-            let mut re = String::new();
-            re.push('^');
-            for byte in non_utf8.as_os_str().to_raw_bytes().as_ref() {
-                re.push_str(format!(r"(?-u:\x{:X})", byte).as_str());
+        assert_eq!(
+            // N.B.: Our docs guaranty removals are done first, then defaults are set and
+            // finally overwrites are processed. This is regardless of the order of the env var
+            // entries in the lift manifest JSON document.
+            vec![("baz".into(), None), ("foo".into(), Some("bar".into()))],
+            EnvVars {
+                vars: vec![
+                    EnvVar::Replace(("foo".into(), "bar".into())),
+                    EnvVar::RemoveMatching(ComparableRegex::try_from("^baz$").unwrap())
+                ]
             }
-            re.push('$');
-            assert_eq!(
-                vec![(non_utf8.clone(), None)],
-                EnvVars {
-                    vars: vec![EnvVar::RemoveMatching(
-                        ComparableRegex::try_from(re.as_str()).unwrap()
-                    )]
-                }
-                .to_env_vars(),
-                "Expected removal of an env var with a non-utf8 name to succeed."
-            )
-        });
+            .to_env_vars([("baz".into(), non_utf8.clone())].into_iter()),
+            "Expected removal of an env var with a non-utf8 value to succeed."
+        );
+
+        let mut re = String::new();
+        re.push('^');
+        for byte in non_utf8.as_os_str().to_raw_bytes().as_ref() {
+            re.push_str(format!(r"(?-u:\x{:X})", byte).as_str());
+        }
+        re.push('$');
+        assert_eq!(
+            vec![(non_utf8.clone(), None)],
+            EnvVars {
+                vars: vec![EnvVar::RemoveMatching(
+                    ComparableRegex::try_from(re.as_str()).unwrap()
+                )]
+            }
+            .to_env_vars([(non_utf8.clone(), "baz".into())].into_iter()),
+            "Expected removal of an env var with a non-utf8 name to succeed."
+        );
     }
 }
