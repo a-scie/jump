@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::ffi::OsString;
+
 use indexmap::IndexMap;
 
 use crate::config::{Cmd, EnvVar};
@@ -112,7 +113,11 @@ impl<'a> EnvParser<'a> {
             // If we're already calculating a Cmd env var value for `key`, we can only
             // pull references to that `key` needed to compute the value from the
             // ambient environment.
-            if let Some(val) = self.ambient_env.get(&OsString::from(&parsed_env.name)).and_then(|v| v.to_owned().into_string().ok()) {
+            if let Some(val) = self
+                .ambient_env
+                .get(&OsString::from(&parsed_env.name))
+                .and_then(|v| v.to_owned().into_string().ok())
+            {
                 val
             } else {
                 parsed_env.default.unwrap_or_default()
@@ -121,7 +126,11 @@ impl<'a> EnvParser<'a> {
             .env
             .get(&parsed_env.name)
             .map(|v| v.to_owned())
-            .or_else(|| self.ambient_env.get(&OsString::from(&parsed_env.name)).and_then(|v| v.to_owned().into_string().ok()))
+            .or_else(|| {
+                self.ambient_env
+                    .get(&OsString::from(&parsed_env.name))
+                    .and_then(|v| v.to_owned().into_string().ok())
+            })
         {
             self.parse_env_var(&parsed_env.name, &val)?
         } else {
