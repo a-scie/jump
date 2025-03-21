@@ -20,8 +20,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.dependencies]
-bstr = "1.11"
-env_logger = { version = "0.10", default-features = false }
+env_logger = { version = "0.11", default-features = false }
 log = "0.4"
 logging_timer = "1.1"
 tempfile = "3.19"
@@ -36,7 +35,6 @@ default-features = false
 features = ["deflate"]
 
 [dependencies]
-bstr = { workspace = true }
 env_logger = { workspace = true }
 jump = { path = "jump" }
 log = { workspace = true }
