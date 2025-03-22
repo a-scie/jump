@@ -21,8 +21,10 @@ mod placeholders;
 mod process;
 mod zip;
 
+use std::collections::HashMap;
 use std::env;
 use std::env::current_exe;
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use itertools::Itertools;
@@ -36,8 +38,8 @@ pub use crate::context::ARCH;
 use crate::installer::Installer;
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC;
-pub use crate::lift::{load_lift, File, Lift, ScieBoot, Source};
-pub use crate::process::{execute, EnvVar, EnvVars, Process};
+pub use crate::lift::{File, Lift, ScieBoot, Source, load_lift};
+pub use crate::process::{EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
 
 pub struct SelectBoot {
@@ -90,7 +92,7 @@ split (-n|--dry-run) [directory]? [-- [file]*]?
 }
 
 pub enum BootAction {
-    Execute((Process, bool)),
+    Execute((Process, bool, Vec<(OsString, Option<OsString>)>)),
     Help((String, i32)),
     Inspect((Jump, Lift)),
     Install((PathBuf, Vec<ScieBoot>)),
@@ -190,19 +192,22 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
         }
     }
 
+    let mut custom_env: Option<HashMap<String, String>> = None;
     if lift.load_dotenv {
         let _timer = timer!(Level::Debug; "jump::load_dotenv");
         match dotenv::from_filename(".env") {
             Ok(env) => {
                 let mut iter = env.iter();
-                while let Some((key, value)) = iter.try_next().map_err(|err| {
+                while let Some((name, value)) = iter.try_next().map_err(|err| {
                     format!(
                         "This scie requested .env files be loaded but there was an error doing so: \
                         {err}"
                     )
                 })? {
-                    if std::env::var(key).is_err() {
-                        std::env::set_var(key, value);
+                    if env::var(name).is_err() {
+                        custom_env
+                            .get_or_insert_default()
+                            .insert(name.into(), value);
                     }
                 }
             }
@@ -217,16 +222,24 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
     }
     let payload = &data[jump.size..data.len() - lift.size];
     let installer = Installer::new(payload);
-    match context::select_command(&current_exe, &jump, &lift, &installer) {
+    match context::select_command(&current_exe, &jump, &lift, &installer, custom_env) {
         Ok(selected_command) => {
             installer.install(&selected_command.files)?;
             let process = selected_command.process;
-            trace!("Prepared {process:#?}");
-            env::set_var("SCIE", current_exe.exe.as_os_str());
-            env::set_var("SCIE_ARGV0", current_exe.invoked_as.as_os_str());
+            let extra_env: Vec<(OsString, Option<OsString>)> = vec![
+                ("SCIE".into(), Some(current_exe.exe.into_os_string())),
+                (
+                    "SCIE_ARGV0".into(),
+                    Some(current_exe.invoked_as.into_os_string()),
+                ),
+                // Avoid subprocesses that re-execute this SCIE unintentionally getting in an
+                // infinite loop.
+                ("SCIE_BOOT".into(), None),
+            ];
             Ok(BootAction::Execute((
                 process,
                 selected_command.argv1_consumed,
+                extra_env,
             )))
         }
         Err(error_message) => Ok(BootAction::Select(SelectBoot {

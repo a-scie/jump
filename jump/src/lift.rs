@@ -126,7 +126,7 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
                     return Err(format!(
                         "This archive has no type declared and it could not be guessed from \
                             its name: {name}",
-                    ))
+                    ));
                 }
             };
             let file_type = if let Some(archive_type) = ArchiveType::from_ext(ext) {
@@ -143,12 +143,12 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
     ))
 }
 
-#[cfg(not(target_family = "unix"))]
+#[cfg(windows)]
 fn is_executable(_path: &Path) -> Result<bool, String> {
     Ok(false)
 }
 
-#[cfg(target_family = "unix")]
+#[cfg(unix)]
 fn is_executable(path: &Path) -> Result<bool, String> {
     use std::os::unix::fs::PermissionsExt;
     let metadata = path.metadata().map_err(|e| {
