@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.7.0
+
+Add support for the `{scie.argv0}` placeholder and plumb `SCIE` and `SCIE_ARGV0` env vars into
+the `{scie.env.SCIE}` and `{scie.env.SCIE_ARGV0}` env var placeholders respectively. Previously
+these two env vars were set and observable by the executing command, but they were not available
+for env var substitutions.
+
 ## 1.6.1
 
 The `SCIE=split` file selection feature now warns when selected files can't be found in the scie.

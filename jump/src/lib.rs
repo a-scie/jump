@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::env;
 use std::env::current_exe;
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 use log::Level;
@@ -107,12 +107,20 @@ pub fn config(jump: Jump, mut lift: Lift) -> Config {
     Config::new(jump, lift, other)
 }
 
+#[derive(Debug)]
 pub struct CurrentExe {
     exe: PathBuf,
     invoked_as: PathBuf,
 }
 
 impl CurrentExe {
+    pub fn from_path(exe: &Path) -> Self {
+        CurrentExe {
+            exe: exe.to_path_buf(),
+            invoked_as: exe.to_path_buf(),
+        }
+    }
+
     pub fn name(&self) -> Option<&str> {
         #[cfg(windows)]
         let invoked_as = self.invoked_as.file_stem();

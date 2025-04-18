@@ -85,6 +85,7 @@ impl<'a> EnvParser<'a> {
                     reified.push_str(&format!("{{scie.user.cache_dir={fallback}}}"))
                 }
                 Item::Placeholder(Placeholder::Scie) => reified.push_str("{scie}"),
+                Item::Placeholder(Placeholder::ScieArgv0) => reified.push_str("{scie.argv0}"),
                 Item::Placeholder(Placeholder::ScieBase) => reified.push_str("{scie.base}"),
                 Item::Placeholder(Placeholder::ScieBindings) => reified.push_str("{scie.bindings}"),
                 Item::Placeholder(Placeholder::ScieBindingCmd(cmd)) => {
