@@ -1,7 +1,6 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
 use std::env;
 use std::ffi::OsString;
 
@@ -33,6 +32,7 @@ fn exec(
     argv_skip: usize,
     extra_env: Vec<(OsString, Option<OsString>)>,
 ) -> ExitResult {
+    use std::collections::HashMap;
     use std::ffi::CString;
     use std::os::unix::ffi::OsStringExt;
 
