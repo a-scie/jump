@@ -16,6 +16,7 @@ pub(crate) enum Placeholder<'a> {
     FileName(&'a str),
     UserCacheDir(&'a str),
     Scie,
+    ScieArgv0,
     ScieBase,
     ScieBindings,
     ScieBindingCmd(&'a str),
@@ -86,6 +87,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                 }
                 match symbol.splitn(3, '.').collect::<Vec<_>>()[..] {
                     ["scie"] => items.push(Item::Placeholder(Placeholder::Scie)),
+                    ["scie", "argv0"] => items.push(Item::Placeholder(Placeholder::ScieArgv0)),
                     ["scie", "base"] => items.push(Item::Placeholder(Placeholder::ScieBase)),
                     ["scie", "bindings"] => {
                         items.push(Item::Placeholder(Placeholder::ScieBindings))

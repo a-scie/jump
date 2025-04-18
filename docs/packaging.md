@@ -381,14 +381,17 @@ Runtime external control variables:
 Runtime read-only variables:
 
 + `SCIE`: The absolute path of the scie executable. This can be used to re-execute the scie.
-+ `SCIE_ARGV0`: The value of the 1st command line argument. If the scie was launched via a symlink
-  The symlink name will be preserved here whereas it would be resolved in `SCIE` on Unix systems.
-  This can be used to implement BusyBox-style re-direction.
++ `SCIE_ARGV0`: The value of the 1st command line argument the scie was launched with. If the scie
+  was launched via a symlink The symlink name will be preserved here whereas it would be resolved
+  in `SCIE` on Unix systems. This can be used to implement BusyBox-style re-direction.
 
 ## Advanced placeholders
 
 Further placeholders you can use in command "exe", "args" and "env" values include:
 
++ `{scie}`: The absolute path of the scie executable. The same as the `SCIE` environment variable.
++ `{scie.argv0}`: The value of the 1st command line argument the scie was launched with. The same as
+  the `SCIE_ARGV0` environment variable.
 + `{scie.base}`: The value of the active `SCIE_BASE`.
 + `{scie.env.<env var name>[=<default env var value>]}`: This expands to the value of the env var
   named. If the env var is not in the ambient runtime environment or the defined command environment
