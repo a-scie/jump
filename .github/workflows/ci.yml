@@ -85,7 +85,7 @@ jobs:
         if: matrix.cross-target == ''
         run: cargo run -p package
       - name: Build & Package
-        if: matrix.cross-target != ''
+        if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
         run: |
           cargo install cross --locked
           cross run -p package --target ${{ matrix.cross-target }}
@@ -98,11 +98,9 @@ jobs:
       - name: Integration Tests
         if: matrix.cross-target != '' && matrix.docker-platform == 'linux/ppc64le'
         run: |
-          # We run into illegal instruction errors using the scie-jump build via cross above; so
-          # we remove that and add rust to the target image to ensure it builds a compatible
-          # scie-jump to execute in the container.
-          rm -rf dist
-
+          # We run into illegal instruction errors using the scie-jump built via cross; so we avoid
+          # that and add rust to the target image to ensure it builds a compatible scie-jump to
+          # execute in the container.
           docker run --rm \
             -v $PWD:/code \
             -w /code \
@@ -110,10 +108,11 @@ jobs:
             ubuntu:24.04 \
               bash -c "
                 apt-get update &&
-                apt-get --no-install-recommends install -y git jq curl ca-certificates &&
+                apt-get --no-install-recommends install -y ca-certificates curl gcc git jq &&
                 git config --global --add safe.directory /code &&
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -y
-                ./examples/run.sh --no-package
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
+                . "$HOME/.cargo/env" &&
+                ./examples/run.sh
               "
       - name: Integration Tests
         if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
