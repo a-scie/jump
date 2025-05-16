@@ -69,6 +69,12 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           cargo install cross --locked
+      - name: Setup QEMU
+        if: matrix.docker-platform == 'linux/ppc64le'
+        run: |
+          # Work around illegal instruction errors (signal 4) by taking the guess-work out of
+          # qemu selecting the target cpu type.
+          echo "QEMU_CPU=POWER8" >> "${GITHUB_ENV}"
       - name: Lint
         if: matrix.cross-target == ''
         run: cargo clippy --locked --all
@@ -96,17 +102,8 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           docker run --privileged --rm tonistiigi/binfmt --install all
-
-          ENV_FILE=$PWD/ci.env
-          touch $ENV_FILE
-          if [[ "${{ matrix.docker-platform }}" == "linux/ppc64le" ]]; then
-            # Work around illegal instruction errors (signal 4) by taking the guess-work out of
-            # qemu selecting the target cpu type.
-            echo "QEMU_CPU=POWER8" >> $ENV_FILE
-          fi
-
           docker run --rm \
-            --env-file $ENV_FILE \
+            --env-file "${GITHUB_ENV}" \
             -v $PWD:/code \
             -w /code \
             --platform ${{ matrix.docker-platform }} \
