@@ -110,8 +110,9 @@ jobs:
                 apt-get update &&
                 apt-get --no-install-recommends install -y ca-certificates curl gcc git jq &&
                 git config --global --add safe.directory /code &&
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
-                . "$HOME/.cargo/env" &&
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+                  | sh -s -- -y --profile minimal &&
+                . "\$HOME/.cargo/env" &&
                 ./examples/run.sh
               "
       - name: Integration Tests
