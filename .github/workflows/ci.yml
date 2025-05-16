@@ -96,7 +96,17 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           docker run --privileged --rm tonistiigi/binfmt --install all
+
+          ENV_FILE=$PWD/ci.env
+          touch $ENV_FILE
+          if [[ "${{ matrix.docker-platform }}" == "linux/ppc64le" ]]; then
+            # Work around illegal instruction errors (signal 4) by taking the guess-work out of
+            # qemu selecting the target cpu type.
+            echo "QEMU_CPU=POWER8" >> $ENV_FILE
+          fi
+
           docker run --rm \
+            --env-file $ENV_FILE \
             -v $PWD:/code \
             -w /code \
             --platform ${{ matrix.docker-platform }} \
