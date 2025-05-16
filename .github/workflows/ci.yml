@@ -108,7 +108,13 @@ jobs:
             ubuntu:24.04 \
               bash -c "
                 apt-get update &&
-                apt-get --no-install-recommends install -y ca-certificates curl gcc git jq &&
+                apt-get --no-install-recommends install -y \
+                  ca-certificates \
+                  curl \
+                  gcc \
+                  git \
+                  jq \
+                  libc6-dev &&
                 git config --global --add safe.directory /code &&
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
                   | sh -s -- -y --profile minimal &&
