@@ -74,7 +74,7 @@ jobs:
         run: |
           # Work around illegal instruction errors (signal 4) by taking the guess-work out of
           # qemu selecting the target cpu type.
-          echo "QEMU_CPU=POWER8" >> "${GITHUB_ENV}"
+          echo "QEMU_CPU=power8" >> "${GITHUB_ENV}"
       - name: Lint
         if: matrix.cross-target == ''
         run: cargo clippy --locked --all
@@ -94,7 +94,7 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           cargo install cross --locked
-          cross run -p package --target ${{ matrix.cross-target }}
+          CROSS_CONTAINER_OPTS="--env-file \"${GITHUB_ENV}\"" cross run -p package --target ${{ matrix.cross-target }}
       - name: Integration Tests
         if: matrix.cross-target == ''
         run: examples/run.sh --no-package
