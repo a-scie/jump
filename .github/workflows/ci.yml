@@ -69,12 +69,6 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           cargo install cross --locked
-      - name: Setup QEMU
-        if: matrix.docker-platform == 'linux/ppc64le'
-        run: |
-          # Work around illegal instruction errors (signal 4) by taking the guess-work out of
-          # qemu selecting the target cpu type.
-          echo "QEMU_CPU=power10" >> "${GITHUB_ENV}"
       - name: Lint
         if: matrix.cross-target == ''
         run: cargo clippy --locked --all
@@ -94,16 +88,37 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           cargo install cross --locked
-          CROSS_CONTAINER_OPTS="--env-file \"${GITHUB_ENV}\"" cross run -p package --target ${{ matrix.cross-target }}
+          cross run -p package --target ${{ matrix.cross-target }}
       - name: Integration Tests
         if: matrix.cross-target == ''
         run: examples/run.sh --no-package
-      - name: Integration Tests
+      - name: Setup QEMU
         if: matrix.cross-target != ''
+        run: docker run --privileged --rm tonistiigi/binfmt --install all
+      - name: Integration Tests
+        if: matrix.cross-target != '' && matrix.docker-platform == 'linux/ppc64le'
         run: |
-          docker run --privileged --rm tonistiigi/binfmt --install all
+          # We run into illegal instruction errors using the scie-jump build via cross above; so
+          # we remove that and add rust to the target image to ensure it builds a compatible
+          # scie-jump to execute in the container.
+          rm -rf dist
+
           docker run --rm \
-            --env-file "${GITHUB_ENV}" \
+            -v $PWD:/code \
+            -w /code \
+            --platform ${{ matrix.docker-platform }} \
+            ubuntu:24.04 \
+              bash -c "
+                apt-get update &&
+                apt-get --no-install-recommends install -y git jq curl ca-certificates &&
+                git config --global --add safe.directory /code &&
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -y
+                ./examples/run.sh --no-package
+              "
+      - name: Integration Tests
+        if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
+        run: |
+          docker run --rm \
             -v $PWD:/code \
             -w /code \
             --platform ${{ matrix.docker-platform }} \
