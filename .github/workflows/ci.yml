@@ -85,17 +85,45 @@ jobs:
         if: matrix.cross-target == ''
         run: cargo run -p package
       - name: Build & Package
-        if: matrix.cross-target != ''
+        if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
         run: |
           cargo install cross --locked
           cross run -p package --target ${{ matrix.cross-target }}
       - name: Integration Tests
         if: matrix.cross-target == ''
         run: examples/run.sh --no-package
-      - name: Integration Tests
+      - name: Setup QEMU
         if: matrix.cross-target != ''
+        run: docker run --privileged --rm tonistiigi/binfmt --install all
+      - name: Integration Tests
+        if: matrix.cross-target != '' && matrix.docker-platform == 'linux/ppc64le'
         run: |
-          docker run --privileged --rm tonistiigi/binfmt --install all
+          # We run into illegal instruction errors using the scie-jump built via cross; so we avoid
+          # that and add rust to the target image to ensure it builds a compatible scie-jump to
+          # execute in the container.
+          docker run --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform ${{ matrix.docker-platform }} \
+            ubuntu:24.04 \
+              bash -c "
+                apt-get update &&
+                apt-get --no-install-recommends install -y \
+                  ca-certificates \
+                  curl \
+                  gcc \
+                  git \
+                  jq \
+                  libc6-dev &&
+                git config --global --add safe.directory /code &&
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+                  | sh -s -- -y --profile minimal &&
+                . "\$HOME/.cargo/env" &&
+                ./examples/run.sh
+              "
+      - name: Integration Tests
+        if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
+        run: |
           docker run --rm \
             -v $PWD:/code \
             -w /code \
