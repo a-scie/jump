@@ -74,7 +74,7 @@ jobs:
         run: |
           # Work around illegal instruction errors (signal 4) by taking the guess-work out of
           # qemu selecting the target cpu type.
-          echo "QEMU_CPU=power8" >> "${GITHUB_ENV}"
+          echo "QEMU_CPU=power10" >> "${GITHUB_ENV}"
       - name: Lint
         if: matrix.cross-target == ''
         run: cargo clippy --locked --all
