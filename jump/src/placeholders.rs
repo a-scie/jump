@@ -54,7 +54,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
                 .to_string(),
         );
     }
-    for (index, current_char) in text.chars().enumerate() {
+    for (index, current_char) in text.char_indices() {
         match current_char {
             '{' if inside_placeholder == 0 => {
                 if index - start > 0 {
