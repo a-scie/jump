@@ -45,8 +45,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # N.B.: macos-13 is the oldest non-deprecated Intel Mac runner and macos-14 is the oldest
-        # non-deprecated ARM Mac runner.
+        # N.B.: macos-14 is the oldest non-deprecated ARM Mac runner.
         include:
           - os: ubuntu-24.04
             name: Linux x86-64
@@ -63,7 +62,7 @@ jobs:
           - os: ubuntu-24.04
             name: Linux powerpc64le
             cross-target: powerpc64le-unknown-linux-gnu
-          - os: macos-13
+          - os: macos-x86_64
             name: macOS x86-64
           - os: macos-14
             name: macOS aarch64
