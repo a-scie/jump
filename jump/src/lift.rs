@@ -111,8 +111,8 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
     if path.is_dir() {
         return Ok(FileType::Directory);
     }
-    if path.is_file() {
-        if let Some(basename) = path.file_name() {
+    if path.is_file()
+        && let Some(basename) = path.file_name() {
             let name = <[u8]>::from_os_str(basename)
                 .ok_or_else(|| format!("Failed to decode {basename:?} as a utf-8 path name"))?
                 .to_str()
@@ -136,7 +136,6 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
             };
             return Ok(file_type);
         }
-    }
     Err(format!(
         "Could not identify the file type of {path}",
         path = path.display()

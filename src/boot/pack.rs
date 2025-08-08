@@ -27,15 +27,14 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
         ));
     }
     let (maybe_jump, lift) = load_lift(&manifest_path)?;
-    if let Some(ref configured_jump) = maybe_jump {
-        if jump != configured_jump {
+    if let Some(ref configured_jump) = maybe_jump
+        && jump != configured_jump {
             return Err(format!(
                 "The lift manifest {manifest} specifies a scie jump binary of \
                     {configured_jump:?} that does not match the current of {jump:?}.",
                 manifest = manifest_path.display()
             ));
         }
-    }
     Ok((lift, manifest_path))
 }
 
@@ -313,8 +312,8 @@ pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
             }
         }
     }
-    if lifts.is_empty() {
-        if let Ok(cwd) = env::current_dir() {
+    if lifts.is_empty()
+        && let Ok(cwd) = env::current_dir() {
             if let Ok((lift, path)) =
                 load_manifest(&cwd, &jump).map_err(|e| Code::FAILURE.with_message(e))
             {
@@ -328,7 +327,6 @@ named `lift.json`.",
                 );
             }
         }
-    }
 
     let results = lifts
         .into_iter()

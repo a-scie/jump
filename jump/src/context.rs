@@ -362,8 +362,8 @@ impl<'a> Context<'a> {
 
         let mut load_entries = vec![];
         for file in &self.lift.files {
-            if self.replacements.contains(&file) && !self.installed.contains(file) {
-                if let Source::LoadBinding(binding_name) = &file.source {
+            if self.replacements.contains(&file) && !self.installed.contains(file)
+                && let Source::LoadBinding(binding_name) = &file.source {
                     let path = self.get_path(file);
                     let file_source_process = self.prepare_process(
                         self.lift
@@ -388,7 +388,6 @@ impl<'a> Context<'a> {
                         path,
                     )))
                 }
-            }
         }
 
         let mut scie_tote = vec![];
@@ -471,18 +470,16 @@ impl<'a> Context<'a> {
         }
 
         // BusyBox style where basename indicates command name.
-        if let Some(name) = self.scie.name() {
-            if let Some(selected_command) = self.select_cmd(name, false)? {
+        if let Some(name) = self.scie.name()
+            && let Some(selected_command) = self.select_cmd(name, false)? {
                 return Ok(selected_command);
             }
-        }
 
         // BusyBox style where 1st arg indicates command name.
-        if let Some(argv1) = env::args().nth(1) {
-            if let Some(selected_cmd) = self.select_cmd(&argv1, true)? {
+        if let Some(argv1) = env::args().nth(1)
+            && let Some(selected_cmd) = self.select_cmd(&argv1, true)? {
                 return Ok(selected_cmd);
             }
-        }
 
         Err("Could not determine which command to run.".to_string())
     }
