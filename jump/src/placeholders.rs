@@ -41,7 +41,7 @@ pub(crate) struct Parsed<'a> {
     pub items: Vec<Item<'a>>,
 }
 
-pub(crate) fn parse(text: &str) -> Result<Parsed, String> {
+pub(crate) fn parse(text: &str) -> Result<Parsed<'_>, String> {
     let mut items = vec![];
 
     let mut previous_char: Option<char> = None;

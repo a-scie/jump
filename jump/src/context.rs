@@ -362,32 +362,33 @@ impl<'a> Context<'a> {
 
         let mut load_entries = vec![];
         for file in &self.lift.files {
-            if self.replacements.contains(&file) && !self.installed.contains(file) {
-                if let Source::LoadBinding(binding_name) = &file.source {
-                    let path = self.get_path(file);
-                    let file_source_process = self.prepare_process(
-                        self.lift
-                            .boot
-                            .bindings
-                            .get(binding_name)
-                            .ok_or_else(|| format!("No boot binding named {binding_name}."))?,
-                    )?;
-                    let lift_manifest = if !self.lift_manifest_installed
-                        && self.lift_manifest_dependants.contains(&file_source_process)
-                    {
-                        Some(self.lift_manifest.clone())
-                    } else {
-                        None
-                    };
-                    load_entries.push(FileEntry::LoadAndInstall((
-                        LoadProcess {
-                            lift_manifest,
-                            process: file_source_process,
-                        },
-                        file.clone(),
-                        path,
-                    )))
-                }
+            if self.replacements.contains(&file)
+                && !self.installed.contains(file)
+                && let Source::LoadBinding(binding_name) = &file.source
+            {
+                let path = self.get_path(file);
+                let file_source_process = self.prepare_process(
+                    self.lift
+                        .boot
+                        .bindings
+                        .get(binding_name)
+                        .ok_or_else(|| format!("No boot binding named {binding_name}."))?,
+                )?;
+                let lift_manifest = if !self.lift_manifest_installed
+                    && self.lift_manifest_dependants.contains(&file_source_process)
+                {
+                    Some(self.lift_manifest.clone())
+                } else {
+                    None
+                };
+                load_entries.push(FileEntry::LoadAndInstall((
+                    LoadProcess {
+                        lift_manifest,
+                        process: file_source_process,
+                    },
+                    file.clone(),
+                    path,
+                )))
             }
         }
 
@@ -471,17 +472,17 @@ impl<'a> Context<'a> {
         }
 
         // BusyBox style where basename indicates command name.
-        if let Some(name) = self.scie.name() {
-            if let Some(selected_command) = self.select_cmd(name, false)? {
-                return Ok(selected_command);
-            }
+        if let Some(name) = self.scie.name()
+            && let Some(selected_command) = self.select_cmd(name, false)?
+        {
+            return Ok(selected_command);
         }
 
         // BusyBox style where 1st arg indicates command name.
-        if let Some(argv1) = env::args().nth(1) {
-            if let Some(selected_cmd) = self.select_cmd(&argv1, true)? {
-                return Ok(selected_cmd);
-            }
+        if let Some(argv1) = env::args().nth(1)
+            && let Some(selected_cmd) = self.select_cmd(&argv1, true)?
+        {
+            return Ok(selected_cmd);
         }
 
         Err("Could not determine which command to run.".to_string())

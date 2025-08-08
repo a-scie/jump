@@ -131,15 +131,13 @@ where
                     blob_dst = blob_dst.display()
                 )
             })?;
-        if executable {
-            if let Some(permissions) = executable_permissions() {
-                blob_out.set_permissions(permissions).map_err(|e| {
-                    format!(
-                        "Failed to set executable premissions on {dst}: {e}",
-                        dst = dst.display()
-                    )
-                })?;
-            }
+        if executable && let Some(permissions) = executable_permissions() {
+            blob_out.set_permissions(permissions).map_err(|e| {
+                format!(
+                    "Failed to set executable premissions on {dst}: {e}",
+                    dst = dst.display()
+                )
+            })?;
         }
         std::io::copy(&mut hashed_bytes, &mut blob_out)
             .map(|_| ())

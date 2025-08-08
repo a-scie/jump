@@ -61,11 +61,11 @@ impl ChosenFiles {
         if self.is_empty() {
             return true;
         }
-        if let Some(files) = self.files.as_mut() {
-            if let Some(selected) = files.get_mut(name) {
-                *selected = true;
-                return true;
-            }
+        if let Some(files) = self.files.as_mut()
+            && let Some(selected) = files.get_mut(name)
+        {
+            *selected = true;
+            return true;
         }
         false
     }
