@@ -112,30 +112,31 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
         return Ok(FileType::Directory);
     }
     if path.is_file()
-        && let Some(basename) = path.file_name() {
-            let name = <[u8]>::from_os_str(basename)
-                .ok_or_else(|| format!("Failed to decode {basename:?} as a utf-8 path name"))?
-                .to_str()
-                .map_err(|e| {
-                    format!("Failed to interpret file name {basename:?} as a utf-8 string: {e}")
-                })?;
-            let ext = match name.rsplitn(3, '.').collect::<Vec<_>>()[..] {
-                [_, "tar", stem] => name.trim_start_matches(stem).trim_start_matches('.'),
-                [ext, ..] => ext,
-                _ => {
-                    return Err(format!(
-                        "This archive has no type declared and it could not be guessed from \
+        && let Some(basename) = path.file_name()
+    {
+        let name = <[u8]>::from_os_str(basename)
+            .ok_or_else(|| format!("Failed to decode {basename:?} as a utf-8 path name"))?
+            .to_str()
+            .map_err(|e| {
+                format!("Failed to interpret file name {basename:?} as a utf-8 string: {e}")
+            })?;
+        let ext = match name.rsplitn(3, '.').collect::<Vec<_>>()[..] {
+            [_, "tar", stem] => name.trim_start_matches(stem).trim_start_matches('.'),
+            [ext, ..] => ext,
+            _ => {
+                return Err(format!(
+                    "This archive has no type declared and it could not be guessed from \
                             its name: {name}",
-                    ));
-                }
-            };
-            let file_type = if let Some(archive_type) = ArchiveType::from_ext(ext) {
-                FileType::Archive(archive_type)
-            } else {
-                FileType::Blob
-            };
-            return Ok(file_type);
-        }
+                ));
+            }
+        };
+        let file_type = if let Some(archive_type) = ArchiveType::from_ext(ext) {
+            FileType::Archive(archive_type)
+        } else {
+            FileType::Blob
+        };
+        return Ok(file_type);
+    }
     Err(format!(
         "Could not identify the file type of {path}",
         path = path.display()

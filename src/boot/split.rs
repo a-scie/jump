@@ -62,10 +62,11 @@ impl ChosenFiles {
             return true;
         }
         if let Some(files) = self.files.as_mut()
-            && let Some(selected) = files.get_mut(name) {
-                *selected = true;
-                return true;
-            }
+            && let Some(selected) = files.get_mut(name)
+        {
+            *selected = true;
+            return true;
+        }
         false
     }
 
