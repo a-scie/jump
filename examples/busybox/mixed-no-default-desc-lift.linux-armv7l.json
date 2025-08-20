@@ -27,7 +27,7 @@
       },
       "files": [
         {
-          "name": "cpython-3.11.11+20241206-armv7-unknown-linux-gnueabihf-install_only_stripped.tar.gz",
+          "name": "cpython-3.11.13+20250818-armv7-unknown-linux-gnueabihf-install_only_stripped.tar.gz",
           "key": "cpython"
         }
       ]
