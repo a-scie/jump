@@ -1,0 +1,21 @@
+{
+  "scie": {
+    "lift": {
+      "name": "default-only",
+      "boot": {
+        "commands": {
+          "": {
+            "exe": "{cpython}/python/bin/python3.11",
+            "args": ["-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))"]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "cpython-3.11.13+20250818-riscv64-unknown-linux-gnu-install_only_stripped.tar.gz",
+          "key": "cpython"
+        }
+      ]
+    }
+  }
+}
