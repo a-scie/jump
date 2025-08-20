@@ -49,6 +49,8 @@ function calculate_arch() {
     echo aarch64
   elif [[ "${arch}" =~ armv8l|armv7l ]]; then
     echo armv7l
+  elif [[ "${arch}" == "riscv64" ]]; then
+    echo riscv64
   elif [[ "${arch}" == "s390x" ]]; then
     echo s390x
   elif [[ "${arch}" == "ppc64le" ]]; then

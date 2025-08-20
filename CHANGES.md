@@ -1,5 +1,9 @@
 # Release Notes
 
+## 1.8.0
+
+This release adds support for Linux riscv64.
+
 ## 1.7.0
 
 Add support for the `{scie.argv0}` placeholder and plumb `SCIE` and `SCIE_ARGV0` env vars into

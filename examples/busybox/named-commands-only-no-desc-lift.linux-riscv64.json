@@ -1,28 +1,22 @@
 {
   "scie": {
     "lift": {
-      "name": "named-commands-only-with-desc",
+      "name": "named-commands-only-no-desc",
       "boot": {
         "commands": {
           "foo": {
-            "description": "Prints foo.",
             "exe": "{cpython}/python/bin/python3.11",
             "args": ["-c", "print('foo')"]
           },
           "bar": {
             "exe": "{cpython}/python/bin/python3.11",
             "args": ["-c", "print('bar')"]
-          },
-          "runs-baz": {
-            "description": "Runs baz.",
-            "exe": "{cpython}/python/bin/python3.11",
-            "args": ["-c", "print('ran baz')"]
           }
         }
       },
       "files": [
         {
-          "name": "cpython-3.11.13+20250818-ppc64le-unknown-linux-gnu-install_only_stripped.tar.gz",
+          "name": "cpython-3.11.13+20250818-riscv64-unknown-linux-gnu-install_only_stripped.tar.gz",
           "key": "cpython"
         }
       ]

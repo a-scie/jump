@@ -25,7 +25,7 @@ EOF
 ) "${OUTPUT}"
 
 # Set the expected Python version.
-PYTHON_VERSION="3.11.11"
+PYTHON_VERSION="3.11.13"
 
 # Test no named commands error.
 "${SCIE_JUMP}" "default-only-lift.${OS_ARCH}.json"
