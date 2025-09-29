@@ -23,7 +23,7 @@ codegen-units = 1
 env_logger = { version = "0.11", default-features = false }
 log = "0.4"
 logging_timer = "1.1"
-tempfile = "3.22"
+tempfile = "3.23"
 
 [workspace.dependencies.zip]
 version = "3.0"
