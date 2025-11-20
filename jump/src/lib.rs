@@ -21,12 +21,12 @@ mod placeholders;
 mod process;
 mod zip;
 
-use std::collections::HashMap;
 use std::env;
 use std::env::current_exe;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+use indexmap::IndexMap;
 use itertools::Itertools;
 use log::Level;
 use logging_timer::{time, timer};
@@ -200,7 +200,7 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
         }
     }
 
-    let mut custom_env: Option<HashMap<String, String>> = None;
+    let mut ambient_env = env::vars_os().collect::<IndexMap<_, _>>();
     if lift.load_dotenv {
         let _timer = timer!(Level::Debug; "jump::load_dotenv");
         match dotenv::from_filename(".env") {
@@ -212,11 +212,7 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
                         {err}"
                     )
                 })? {
-                    if env::var(name).is_err() {
-                        custom_env
-                            .get_or_insert_default()
-                            .insert(name.into(), value);
-                    }
+                    ambient_env.insert(name.into(), value.into());
                 }
             }
             Err(_) => {
@@ -228,18 +224,16 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
             }
         }
     }
+    ambient_env.insert("SCIE".into(), current_exe.exe.clone().into());
+    ambient_env.insert("SCIE_ARGV0".into(), current_exe.invoked_as.clone().into());
+
     let payload = &data[jump.size..data.len() - lift.size];
     let installer = Installer::new(payload);
-    match context::select_command(&current_exe, &jump, &lift, &installer, custom_env) {
+    match context::select_command(&current_exe, &jump, &lift, &installer, ambient_env) {
         Ok(selected_command) => {
             installer.install(&selected_command.files)?;
             let process = selected_command.process;
             let extra_env: Vec<(OsString, Option<OsString>)> = vec![
-                ("SCIE".into(), Some(current_exe.exe.into_os_string())),
-                (
-                    "SCIE_ARGV0".into(),
-                    Some(current_exe.invoked_as.into_os_string()),
-                ),
                 // Avoid subprocesses that re-execute this SCIE unintentionally getting in an
                 // infinite loop.
                 ("SCIE_BOOT".into(), None),
