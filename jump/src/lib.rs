@@ -212,7 +212,9 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
                         {err}"
                     )
                 })? {
-                    ambient_env.insert(name.into(), value.into());
+                    if env::var(name).is_err() {
+                        ambient_env.insert(name.into(), value.into());
+                    }
                 }
             }
             Err(_) => {
