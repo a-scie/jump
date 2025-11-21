@@ -5,11 +5,11 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd cat chmod cut jq wc
+check_cmd cat chmod cut jq stat
 
 SCIE_JUMP_ALT="scie-jump-${OS_ARCH}"
 chmod +x "${SCIE_JUMP_ALT}"
-EXPECTED_SIZE="$(wc -c "${SCIE_JUMP_ALT}" | cut -d' ' -f1)"
+EXPECTED_SIZE="$(stat -c %s "${SCIE_JUMP_ALT}")"
 
 JAVA="java${EXE_EXT}"
 gc "${PWD}/${JAVA}"
@@ -23,7 +23,7 @@ gc "${PWD}/split"
 SCIE="split" ./"${JAVA}" split -- scie-jump
 SPLIT_SCIE_JUMP="split/scie-jump${EXE_EXT}"
 
-ACTUAL_SIZE="$(wc -c "${SPLIT_SCIE_JUMP}" | cut -d' ' -f1)"
+ACTUAL_SIZE="$(stat -c %s "${SPLIT_SCIE_JUMP}")"
 if [[ "${EXPECTED_SIZE}" != "${ACTUAL_SIZE}" ]]; then
   die "The scie-jump in the ${JAVA} scie tip is ${ACTUAL_SIZE} bytes; expected: ${EXPECTED_SIZE} bytes"
 else
