@@ -8,7 +8,7 @@ use proc_exit::{Code, ExitResult};
 
 mod boot;
 
-use jump::{BootAction, EnvVar, Process};
+use jump::{BootAction, Process};
 
 #[cfg(windows)]
 fn exec(
@@ -35,6 +35,7 @@ fn exec(
     use std::ffi::CString;
     use std::os::unix::ffi::OsStringExt;
 
+    use jump::EnvVar;
     use nix::unistd::execve;
 
     for (name, value) in extra_env {
