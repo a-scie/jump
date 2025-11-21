@@ -24,7 +24,7 @@ SCIE="split" ./"${JAVA}" split -- scie-jump
 SPLIT_SCIE_JUMP="split/scie-jump${EXE_EXT}"
 
 ACTUAL_SIZE="$(wc -c "${SPLIT_SCIE_JUMP}" | cut -d' ' -f1)"
-if (( EXPECTED_SIZE != ACTUAL_SIZE )); then
+if [[ "${EXPECTED_SIZE}" != "${ACTUAL_SIZE}" ]]; then
   die "The scie-jump in the ${JAVA} scie tip is ${ACTUAL_SIZE} bytes; expected: ${EXPECTED_SIZE} bytes"
 else
   echo "Found scie-jump in the ${JAVA} scie tip with the expected size."
@@ -38,7 +38,7 @@ else
 fi
 
 REPORTED_SIZE="$(SCIE="inspect" ./"${JAVA}" | jq -r '.scie.jump.size')"
-if (( EXPECTED_SIZE != REPORTED_SIZE )); then
+if [[ "${EXPECTED_SIZE}" != "${REPORTED_SIZE}" ]]; then
   die "SCIE=inspect ./${JAVA} reported scie-jump size ${REPORTED_SIZE}; expected: ${EXPECTED_SIZE}"
 else
   echo "SCIE=inspect ./${JAVA} reported the correct scie-jump size."
