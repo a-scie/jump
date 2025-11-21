@@ -1,11 +1,11 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{HashMap, HashSet};
-use std::env;
+use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::process::{Child, Command, ExitStatus, Stdio};
 
+use indexmap::IndexMap;
 use logging_timer::time;
 use os_str_bytes::OsStrBytes;
 use sha2::{Digest, Sha256};
@@ -46,16 +46,17 @@ pub struct EnvVars {
 }
 
 impl EnvVars {
-    // Translates this `EnvVars` into a sequence of env var set and env var remove instructions
-    // that, when carried out in order, will place the environment in the requested state.
     pub fn to_env_vars(
         &self,
         ambient_env: impl Iterator<Item = (OsString, OsString)>,
-    ) -> Vec<(OsString, Option<OsString>)> {
+        include_ambient: bool,
+    ) -> Vec<(OsString, OsString)> {
+        let mut env = ambient_env.collect::<IndexMap<_, _>>();
+        let ambient_env_keys = env.keys().map(|k| k.to_owned()).collect::<Vec<_>>();
+
         let mut defaults = vec![];
         let mut replacements = vec![];
         let mut removals: HashSet<OsString> = HashSet::new();
-        let mut env = ambient_env.collect::<HashMap<_, _>>();
         for env_var in &self.vars {
             match env_var {
                 EnvVar::Default((name, val)) => {
@@ -68,7 +69,7 @@ impl EnvVars {
                     removals.insert(name.to_owned());
                 }
                 EnvVar::RemoveMatching(regex) => {
-                    for name in env.keys() {
+                    for name in &ambient_env_keys {
                         if regex.is_match(name.as_os_str().to_raw_bytes().as_ref()) {
                             removals.insert(name.to_owned());
                         }
@@ -76,27 +77,30 @@ impl EnvVars {
                 }
             }
         }
-        let mut env_vars = vec![];
+        if !include_ambient {
+            env.clear();
+        }
         for name in &removals {
-            env_vars.push((name.clone(), None));
+            env.shift_remove(name);
         }
         for (name, default) in defaults {
             let value = if removals.contains(&name) {
                 default
             } else {
-                env.remove(&name).unwrap_or(default)
+                env.shift_remove(&name).unwrap_or(default)
             };
-            env_vars.push((name, Some(value)))
+            env.insert(name, value);
         }
         for (name, value) in replacements {
-            env_vars.push((name, Some(value)))
+            env.insert(name, value);
         }
-        env_vars
+        env.into_iter().collect()
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Process {
+    pub ambient_env: Vec<(OsString, OsString)>,
     pub env: EnvVars,
     pub exe: OsString,
     pub args: Vec<OsString>,
@@ -111,17 +115,22 @@ fn as_bytes(os_string: &OsString) -> Result<Vec<u8>, String> {
 }
 
 impl Process {
+    pub fn to_env_vars(&self, include_ambient: bool) -> Vec<(OsString, OsString)> {
+        self.env.to_env_vars(
+            self.ambient_env.iter().map(|(k, v)| (k.into(), v.into())),
+            include_ambient,
+        )
+    }
+
     #[time("debug", "Process::{}")]
     pub(crate) fn fingerprint(&self) -> Result<String, String> {
         let mut hasher = Sha256::new_with_prefix(as_bytes(&self.exe)?);
         for arg in &self.args {
             hasher.update(as_bytes(arg)?);
         }
-        for (name, value) in self.env.to_env_vars(env::vars_os()) {
-            if let Some(val) = value {
-                hasher.update(as_bytes(&name)?);
-                hasher.update(as_bytes(&val)?);
-            }
+        for (name, value) in self.to_env_vars(false) {
+            hasher.update(as_bytes(&name)?);
+            hasher.update(as_bytes(&value)?);
         }
         Ok(format!("{digest:x}", digest = hasher.finalize()))
     }
@@ -133,12 +142,11 @@ impl Process {
     ) -> Command {
         let mut command = Command::new(&self.exe);
         command.args(&self.args).args(extra_args);
-        for (name, value) in self
-            .env
-            .to_env_vars(env::vars_os())
-            .into_iter()
-            .chain(extra_env)
-        {
+        command.env_clear();
+        for (name, value) in self.to_env_vars(true) {
+            command.env(name, value);
+        }
+        for (name, value) in extra_env {
             match value {
                 Some(val) => {
                     command.env(name, val);
@@ -208,21 +216,36 @@ mod tests {
     #[test]
     fn to_env_vars_empty() {
         assert_eq!(
-            Vec::<(OsString, Option<OsString>)>::new(),
-            EnvVars { vars: vec![] }.to_env_vars([].into_iter())
+            Vec::<(OsString, OsString)>::new(),
+            EnvVars { vars: vec![] }.to_env_vars([].into_iter(), true)
         )
     }
 
     fn assert_to_env_vars(ambient_env: &[(OsString, OsString)]) {
+        let mut expected = ambient_env
+            .iter()
+            .map(|tup| tup.to_owned())
+            .collect::<Vec<_>>();
+        expected.push(("foo".into(), "bar".into()));
         assert_eq!(
-            vec![("foo".into(), Some("bar".into()))],
+            expected,
             EnvVars {
                 vars: vec![
                     EnvVar::Replace(("foo".into(), "bar".into())),
                     EnvVar::RemoveMatching(ComparableRegex::try_from("__DNE__.*").unwrap())
                 ]
             }
-            .to_env_vars(ambient_env.iter().map(|tup| tup.to_owned()))
+            .to_env_vars(ambient_env.iter().map(|tup| tup.to_owned()), true)
+        );
+        assert_eq!(
+            vec![("foo".into(), "bar".into())],
+            EnvVars {
+                vars: vec![
+                    EnvVar::Replace(("foo".into(), "bar".into())),
+                    EnvVar::RemoveMatching(ComparableRegex::try_from("__DNE__.*").unwrap())
+                ]
+            }
+            .to_env_vars(ambient_env.iter().map(|tup| tup.to_owned()), false)
         )
     }
 
@@ -268,14 +291,14 @@ mod tests {
             // N.B.: Our docs guaranty removals are done first, then defaults are set and
             // finally overwrites are processed. This is regardless of the order of the env var
             // entries in the lift manifest JSON document.
-            vec![("baz".into(), None), ("foo".into(), Some("bar".into()))],
+            vec![("foo".into(), "bar".into())],
             EnvVars {
                 vars: vec![
                     EnvVar::Replace(("foo".into(), "bar".into())),
                     EnvVar::RemoveMatching(ComparableRegex::try_from("^baz$").unwrap())
                 ]
             }
-            .to_env_vars([("baz".into(), non_utf8.clone())].into_iter()),
+            .to_env_vars([("baz".into(), non_utf8.clone())].into_iter(), true),
             "Expected removal of an env var with a non-utf8 value to succeed."
         );
 
@@ -286,13 +309,13 @@ mod tests {
         }
         re.push('$');
         assert_eq!(
-            vec![(non_utf8.clone(), None)],
+            Vec::<(OsString, OsString)>::new(),
             EnvVars {
                 vars: vec![EnvVar::RemoveMatching(
                     ComparableRegex::try_from(re.as_str()).unwrap()
                 )]
             }
-            .to_env_vars([(non_utf8.clone(), "baz".into())].into_iter()),
+            .to_env_vars([(non_utf8.clone(), "baz".into())].into_iter(), true),
             "Expected removal of an env var with a non-utf8 name to succeed."
         );
     }

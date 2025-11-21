@@ -238,7 +238,7 @@ impl<'a> Context<'a> {
         jump: &'a Jump,
         lift: &'a Lift,
         installer: &'a Installer,
-        custom_env: Option<HashMap<String, String>>,
+        ambient_env: IndexMap<OsString, OsString>,
     ) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
         for file in &lift.files {
@@ -247,7 +247,7 @@ impl<'a> Context<'a> {
                 files_by_name.insert(key.as_str(), file);
             }
         }
-        let base = if let Ok(base) = env::var("SCIE_BASE") {
+        let base = if let Some(base) = ambient_env.get(OsStr::new("SCIE_BASE")) {
             PathBuf::from(base)
         } else if let Some(base) = &lift.base {
             PathBuf::from(base)
@@ -257,15 +257,6 @@ impl<'a> Context<'a> {
             PathBuf::from("~/.nce")
         };
         let base = expanduser(base.as_path())?;
-        let mut ambient_env = custom_env
-            .map(|c| {
-                c.into_iter()
-                    .map(|(n, v)| (n.into(), v.into()))
-                    .collect::<IndexMap<_, _>>()
-            })
-            .unwrap_or_else(|| env::vars_os().collect::<IndexMap<_, _>>());
-        ambient_env.insert("SCIE".into(), scie.exe.as_os_str().into());
-        ambient_env.insert("SCIE_ARGV0".into(), scie.invoked_as.as_os_str().into());
         let mut context = Context {
             scie,
             lift,
@@ -347,6 +338,11 @@ impl<'a> Context<'a> {
         }
 
         let process = Process {
+            ambient_env: self
+                .ambient_env
+                .iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect::<Vec<_>>(),
             env: EnvVars { vars },
             exe: exe.into(),
             args,
@@ -452,8 +448,8 @@ impl<'a> Context<'a> {
 
     fn select_command(&mut self, scie_name: &str) -> Result<SelectedCmd, String> {
         // Forced command.
-        if let Some(cmd) = env::var_os("SCIE_BOOT") {
-            let name = cmd.into_string().map_err(|value| {
+        if let Some(cmd) = self.ambient_env.get(OsStr::new("SCIE_BOOT")) {
+            let name = cmd.to_owned().into_string().map_err(|value| {
                 format!("Failed to decode environment variable SCIE_BOOT: {value:?}")
             })?;
             if let Some(selected_cmd) = self.select_cmd(&name, false)? {
@@ -677,15 +673,14 @@ pub(crate) fn select_command(
     jump: &Jump,
     lift: &Lift,
     installer: &Installer,
-    custom_env: Option<HashMap<String, String>>,
+    ambient_env: IndexMap<OsString, OsString>,
 ) -> Result<SelectedCmd, String> {
-    let mut context = Context::new(current_exe, jump, lift, installer, custom_env)?;
+    let mut context = Context::new(current_exe, jump, lift, installer, ambient_env)?;
     context.select_command(lift.name.as_str())
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::path::{Path, PathBuf};
 
     use indexmap::IndexMap;
@@ -733,7 +728,7 @@ mod tests {
         let installer = Installer::new(&[]);
         let current_exe = CurrentExe::from_path(Path::new("scie_path"));
         let mut context =
-            Context::new(&current_exe, &jump, &lift, &installer, Some(HashMap::new())).unwrap();
+            Context::new(&current_exe, &jump, &lift, &installer, IndexMap::new()).unwrap();
 
         let mut env = IndexMap::new();
         assert_eq!(
@@ -810,7 +805,7 @@ mod tests {
                 &jump,
                 &invalid_lift,
                 &installer,
-                None
+                IndexMap::new()
             )
             .unwrap_err()
         );
@@ -916,20 +911,20 @@ mod tests {
         let installer = Installer::new(&[]);
         let current_exe = CurrentExe::from_path(Path::new("scie_path"));
         let mut context =
-            Context::new(&current_exe, &jump, &lift, &installer, Some(HashMap::new())).unwrap();
+            Context::new(&current_exe, &jump, &lift, &installer, IndexMap::new()).unwrap();
 
         let cmd = lift.boot.commands.get("").unwrap();
-        let expected_env = process::EnvVars {
-            vars: vec![
-                process::EnvVar::Replace(("SUB_SELECT-v1".into(), "v1/exe".into())),
-                process::EnvVar::Replace(("SUB_SELECT-v2".into(), "v2/binary".into())),
-            ],
-        };
 
         let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
-                env: expected_env.clone(),
+                ambient_env: vec![],
+                env: process::EnvVars {
+                    vars: vec![
+                        process::EnvVar::Replace(("SUB_SELECT-v1".into(), "v1/exe".into())),
+                        process::EnvVar::Replace(("SUB_SELECT-v2".into(), "v2/binary".into())),
+                    ],
+                },
                 exe: PathBuf::from("/tmp/nce")
                     .join("def")
                     .join("dist-v1/v2/binary")
@@ -945,13 +940,19 @@ mod tests {
             &jump,
             &lift,
             &installer,
-            Some([("SELECT".into(), "v1".into())].into()),
+            [("SELECT".into(), "v1".into())].into(),
         )
         .unwrap();
         let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
-                env: expected_env.clone(),
+                ambient_env: vec![("SELECT".into(), "v1".into())],
+                env: process::EnvVars {
+                    vars: vec![
+                        process::EnvVar::Replace(("SUB_SELECT-v1".into(), "v1/exe".into())),
+                        process::EnvVar::Replace(("SUB_SELECT-v2".into(), "v2/binary".into())),
+                    ],
+                },
                 exe: PathBuf::from("/tmp/nce")
                     .join("def")
                     .join("dist-v1/v1/exe")
@@ -967,13 +968,19 @@ mod tests {
             &jump,
             &lift,
             &installer,
-            Some([("SELECT".into(), "v2".into())].into()),
+            [("SELECT".into(), "v2".into())].into(),
         )
         .unwrap();
         let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
-                env: expected_env,
+                ambient_env: vec![("SELECT".into(), "v2".into())],
+                env: process::EnvVars {
+                    vars: vec![
+                        process::EnvVar::Replace(("SUB_SELECT-v1".into(), "v1/exe".into())),
+                        process::EnvVar::Replace(("SUB_SELECT-v2".into(), "v2/binary".into())),
+                    ],
+                },
                 exe: PathBuf::from("/tmp/nce")
                     .join("ghi")
                     .join("dist-v2/v2/binary")
@@ -1044,7 +1051,7 @@ mod tests {
             &jump,
             &lift,
             &installer,
-            Some([("PATH".into(), "/test/path".into())].into()),
+            [("PATH".into(), "/test/path".into())].into(),
         )
         .unwrap();
 
@@ -1054,6 +1061,7 @@ mod tests {
         let reified_path = "c:e:/test/path";
         assert_eq!(
             Process {
+                ambient_env: vec![("PATH".into(), "/test/path".into())],
                 env: process::EnvVars {
                     vars: vec![
                         process::EnvVar::Replace(("A".into(), "c".into())),
@@ -1075,19 +1083,21 @@ mod tests {
             &jump,
             &lift,
             &installer,
-            Some(
-                [
-                    ("D".into(), "d".into()),
-                    ("PATH".into(), "/test/path".into()),
-                ]
-                .into(),
-            ),
+            [
+                ("D".into(), "d".into()),
+                ("PATH".into(), "/test/path".into()),
+            ]
+            .into(),
         )
         .unwrap();
         let process = context.prepare_process(cmd).unwrap();
         let reified_path = "d:e:/test/path";
         assert_eq!(
             Process {
+                ambient_env: vec![
+                    ("D".into(), "d".into()),
+                    ("PATH".into(), "/test/path".into())
+                ],
                 env: process::EnvVars {
                     vars: vec![
                         process::EnvVar::Replace(("A".into(), "d".into())),
@@ -1148,13 +1158,11 @@ mod tests {
             &jump,
             &lift,
             &installer,
-            Some(
-                [
-                    ("SCIE".into(), "replace me".into()),
-                    ("SCIE_ARGV0".into(), "replace me too".into()),
-                ]
-                .into(),
-            ),
+            [
+                ("SCIE".into(), "exe".into()),
+                ("SCIE_ARGV0".into(), "invoked_as".into()),
+            ]
+            .into(),
         )
         .unwrap();
 
@@ -1162,6 +1170,10 @@ mod tests {
         let process = context.prepare_process(cmd).unwrap();
         assert_eq!(
             Process {
+                ambient_env: vec![
+                    ("SCIE".into(), "exe".into()),
+                    ("SCIE_ARGV0".into(), "invoked_as".into())
+                ],
                 env: process::EnvVars { vars: vec![] },
                 exe: "exe".into(),
                 args: vec!["invoked_as".into(), "invoked_as".into(), "exe".into()],

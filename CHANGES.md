@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.8.1
+
+This release fixes a bug in `.env` handling. Previously, when `"load_dotenv" = true` was configured
+in the lift manifest and a `.env` was present, its values were read but only applied to `scie.env`
+substitutions in the lift manifest itself and not propagated in binding or command environments
+inherited by the associated processes.
+
 ## 1.8.0
 
 This release adds support for Linux riscv64.

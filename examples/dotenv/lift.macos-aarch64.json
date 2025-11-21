@@ -1,0 +1,35 @@
+{
+  "scie": {
+    "lift": {
+      "name": "dotenv",
+      "description": "Tests `.env` integration.",
+      "load_dotenv": true,
+      "boot": {
+        "commands": {
+          "": {
+            "exe": "{cpython}/python/bin/python",
+            "args": ["-c", "import os; print(os.environ.get('SLARTIBARTFAST', '{scie.env.ZAPHOD={scie.bindings.set-env:FORD}}'))"]
+          }
+        },
+        "bindings": {
+          "set-env": {
+            "exe": "{cpython}/python/bin/python",
+            "args": [
+              "-c",
+              "import os; fp = open(os.environ['SCIE_BINDING_ENV'], 'w'); fp.write(f'FORD={{os.environ.get(\"ARTHUR\", 42)}'); fp.close()"
+            ]
+          }
+        }
+      },
+      "files": [
+        {
+          "name": "cpython-3.14.0+20251120-aarch64-apple-darwin-install_only_stripped.tar.gz",
+          "key": "cpython"
+        }
+      ]
+    }
+  },
+  "fetch": [
+    "https://github.com/astral-sh/python-build-standalone/releases/download/20251120/cpython-3.14.0+20251120-aarch64-apple-darwin-install_only_stripped.tar.gz"
+  ]
+}
