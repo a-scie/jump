@@ -8,7 +8,7 @@ use proc_exit::{Code, ExitResult};
 
 mod boot;
 
-use jump::{BootAction, Process};
+use jump::{BootAction, EnvVar, Process};
 
 #[cfg(windows)]
 fn exec(
@@ -28,15 +28,26 @@ fn exec(
 
 #[cfg(unix)]
 fn exec(
-    process: Process,
+    mut process: Process,
     argv_skip: usize,
     extra_env: Vec<(OsString, Option<OsString>)>,
 ) -> ExitResult {
-    use std::collections::HashMap;
     use std::ffi::CString;
     use std::os::unix::ffi::OsStringExt;
 
     use nix::unistd::execve;
+
+    for (name, value) in extra_env {
+        match value {
+            Some(val) => {
+                process.env.vars.push(EnvVar::Replace((name, val)));
+            }
+            None => {
+                process.env.vars.push(EnvVar::Remove(name));
+            }
+        }
+    }
+    let env = process.to_env_vars(true);
 
     let c_exe = CString::new(process.exe.into_vec()).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to convert executable to a C string: {e}",))
@@ -56,23 +67,6 @@ fn exec(
             })
             .collect::<Result<Vec<_>, _>>()?,
     );
-
-    let mut env = env::vars_os().collect::<HashMap<_, _>>();
-    for (name, value) in process
-        .env
-        .to_env_vars(env::vars_os())
-        .into_iter()
-        .chain(extra_env)
-    {
-        match value {
-            Some(val) => {
-                env.insert(name, val);
-            }
-            None => {
-                env.remove(&name);
-            }
-        }
-    }
 
     let c_env = env
         .into_iter()
