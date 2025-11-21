@@ -5,7 +5,7 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd cat chmod cut wc
+check_cmd cat chmod cut jq wc
 
 SCIE_JUMP_ALT="scie-jump-${OS_ARCH}"
 chmod +x "${SCIE_JUMP_ALT}"
