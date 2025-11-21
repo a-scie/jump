@@ -7,9 +7,17 @@ trap gc EXIT
 
 check_cmd cat chmod cut jq stat
 
+function size() {
+  if [[ "${OS}" == "macos" ]]; then
+    stat -f %z "$1"
+  else
+    stat -c %s "$1"
+  fi
+}
+
 SCIE_JUMP_ALT="scie-jump-${OS_ARCH}"
 chmod +x "${SCIE_JUMP_ALT}"
-EXPECTED_SIZE="$(stat -c %s "${SCIE_JUMP_ALT}")"
+EXPECTED_SIZE="$(size "${SCIE_JUMP_ALT}")"
 
 JAVA="java${EXE_EXT}"
 gc "${PWD}/${JAVA}"
@@ -23,7 +31,7 @@ gc "${PWD}/split"
 SCIE="split" ./"${JAVA}" split -- scie-jump
 SPLIT_SCIE_JUMP="split/scie-jump${EXE_EXT}"
 
-ACTUAL_SIZE="$(stat -c %s "${SPLIT_SCIE_JUMP}")"
+ACTUAL_SIZE="$(size "${SPLIT_SCIE_JUMP}")"
 if [[ "${EXPECTED_SIZE}" != "${ACTUAL_SIZE}" ]]; then
   die "The scie-jump in the ${JAVA} scie tip is ${ACTUAL_SIZE} bytes; expected: ${EXPECTED_SIZE} bytes"
 else
