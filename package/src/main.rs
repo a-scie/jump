@@ -3,9 +3,10 @@
 
 use std::env;
 use std::fmt::{Display, Formatter};
+use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use clap::Parser;
@@ -21,7 +22,7 @@ const PATHSEP: &str = ";";
 #[cfg(not(windows))]
 const PATHSEP: &str = ":";
 
-fn add_magic(path: &Path) -> ExitResult {
+fn add_magic(path: &Path, version: &str) -> ExitResult {
     let mut binary = std::fs::OpenOptions::new()
         .append(true)
         .open(path)
@@ -31,6 +32,19 @@ fn add_magic(path: &Path) -> ExitResult {
                 path = path.display()
             ))
         })?;
+
+    let version_bytes = version.as_bytes();
+    let version_bytes_len = version_bytes.len() as u8;
+    binary
+        .write_all(version_bytes)
+        .map_err(|e| Code::FAILURE.with_message(format!("Failed to append the version: {e}")))?;
+    binary.write_u8(version_bytes_len).map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to append the version length: {e}"))
+    })?;
+    binary.flush().map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to flush trailer version information: {e}"))
+    })?;
+
     let metadata = binary.metadata().map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to load metadata for {path} to determine its size: {e}",
@@ -51,22 +65,22 @@ fn add_magic(path: &Path) -> ExitResult {
         })
 }
 
-fn execute(command: &mut Command) -> ExitResult {
-    let mut child = command
-        .spawn()
-        .map_err(|e| Code::FAILURE.with_message(format!("{e}")))?;
-    let exit_status = child.wait().map_err(|e| {
+fn execute(command: &mut Command) -> Result<Output, Exit> {
+    let child = command.spawn().map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to spawn command: {command:?}: {e}"))
+    })?;
+    let output = child.wait_with_output().map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to gather exit status of command: {command:?}: {e}"
         ))
     })?;
-    if !exit_status.success() {
+    if !output.status.success() {
         return Err(Code::FAILURE.with_message(format!(
             "Command {command:?} failed with exit code: {code:?}",
-            code = exit_status.code()
+            code = output.status.code()
         )));
     }
-    Ok(())
+    Ok(output)
 }
 
 fn path_as_str(path: &Path) -> Result<&str, Exit> {
@@ -169,7 +183,17 @@ fn main() -> ExitResult {
     let src = output_bin_dir
         .join(BINARY)
         .with_extension(env::consts::EXE_EXTENSION);
-    add_magic(&src)?;
+
+    let version =
+        String::from_utf8(execute(Command::new(&src).arg("-V").stdout(Stdio::piped()))?.stdout)
+            .map_err(|e| {
+                Code::FAILURE.with_message(format!(
+                    "Failed to read version output from {src}: {e}",
+                    src = src.display()
+                ))
+            })?;
+
+    add_magic(&src, version.trim_end())?;
     let mut reader = std::fs::File::open(&src).map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to open {src} for hashing: {e}",

@@ -5,15 +5,15 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd cat chmod
+check_cmd cat chmod cut wc
 
-gc "${PWD}/scie-jump-alt"
-cp "${SCIE_JUMP}" scie-jump-alt
-echo -e "\nHello Trailer!" >> scie-jump-alt
+SCIE_JUMP_ALT="scie-jump-${OS_ARCH}"
+chmod +x "${SCIE_JUMP_ALT}"
+EXPECTED_SIZE="$(wc -c "${SCIE_JUMP_ALT}" | cut -d' ' -f1)"
 
 JAVA="java${EXE_EXT}"
 gc "${PWD}/${JAVA}"
-"${SCIE_JUMP}" -sj scie-jump-alt "${LIFT}"
+"${SCIE_JUMP}" -sj "${SCIE_JUMP_ALT}" "${LIFT}"
 
 sha256 "${JAVA}" > "${JAVA}.sha256"
 gc "${PWD}/${JAVA}.sha256"
@@ -21,21 +21,35 @@ gc "${PWD}/${JAVA}.sha256"
 ./"${JAVA}" "scie-jump boot-pack"
 gc "${PWD}/split"
 SCIE="split" ./"${JAVA}" split -- scie-jump
+SPLIT_SCIE_JUMP="split/scie-jump${EXE_EXT}"
 
-# N.B.: For unknown reasons, macOS tail -1 split/scie-jump* includes garbage; i.e.: more than just
-# the last line. This, though, works.
-trailer="$(cat split/scie-jump* | tail -1)"
-if [[ "Hello Trailer!" != "${trailer}" ]]; then
-  die "
-Expected customised scie-jump-alt with test trailer to be embedded in the ${JAVA} scie tip.
-Found: ${trailer}
-"
+ACTUAL_SIZE="$(wc -c "${SPLIT_SCIE_JUMP}" | cut -d' ' -f1)"
+if (( EXPECTED_SIZE != ACTUAL_SIZE )); then
+  die "The scie-jump in the ${JAVA} scie tip is ${ACTUAL_SIZE} bytes; expected: ${EXPECTED_SIZE} bytes"
 else
-  echo "Found expected trailer: ${trailer}"
+  echo "Found scie-jump in the ${JAVA} scie tip with the expected size."
 fi
 
-SCIE_JUMP_SIZE="$(SCIE="inspect" ./"${JAVA}" | jq -r '.scie.jump.size')"
-SCIE_JUMP_VERSION="$(SCIE="inspect" ./"${JAVA}" | jq -r '.scie.jump.version')"
+ACTUAL_VERSION="$("${SPLIT_SCIE_JUMP}" -V)"
+if [[ "1.8.1" != "${ACTUAL_VERSION}" ]]; then
+  die "The scie-jump in the ${JAVA} scie tip reports version ${ACTUAL_VERSION}; expected: 1.8.1"
+else
+  echo "Found scie-jump in the ${JAVA} scie tip with the expected version."
+fi
+
+REPORTED_SIZE="$(SCIE="inspect" ./"${JAVA}" | jq -r '.scie.jump.size')"
+if (( EXPECTED_SIZE != REPORTED_SIZE )); then
+  die "SCIE=inspect ./${JAVA} reported scie-jump size ${REPORTED_SIZE}; expected: ${EXPECTED_SIZE}"
+else
+  echo "SCIE=inspect ./${JAVA} reported the correct scie-jump size."
+fi
+
+REPORTED_VERSION="$(SCIE="inspect" ./"${JAVA}" | jq -r '.scie.jump.version')"
+if [[ "1.8.1" != "${REPORTED_VERSION}" ]]; then
+  die "SCIE=inspect ./${JAVA} reported scie-jump version ${REPORTED_VERSION}; expected: 1.8.1"
+else
+  echo "SCIE=inspect ./${JAVA} reported the correct scie-jump version."
+fi
 
 # We should be able to assemble an identical scie using cat.
 JDK="$(jq -r '.scie.lift.files[0].name' "${LIFT}")"
@@ -45,14 +59,14 @@ gc "${PWD}/${SCIE_CAT}"
 function scie_cat() {
   local expression="$1"
   cat \
-    scie-jump-alt \
+    "${SCIE_JUMP_ALT}" \
     "${JDK}" \
     cowsay-1.1.0.jar \
     <(echo -en "${NEWLINE}") \
     <(
       jq -c "
-      setpath([\"scie\", \"jump\", \"size\"]; ${SCIE_JUMP_SIZE})
-      | setpath([\"scie\", \"jump\", \"version\"]; \"${SCIE_JUMP_VERSION}\")
+      setpath([\"scie\", \"jump\", \"size\"]; ${ACTUAL_SIZE})
+      | setpath([\"scie\", \"jump\", \"version\"]; \"${ACTUAL_VERSION}\")
       | ${expression}
       " "${LIFT}"
     ) > "${SCIE_CAT}"

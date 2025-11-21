@@ -1,7 +1,6 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::env;
 use std::ffi::OsString;
 
 use proc_exit::{Code, ExitResult};
@@ -17,7 +16,7 @@ fn exec(
     extra_env: Vec<(OsString, Option<OsString>)>,
 ) -> ExitResult {
     let result = process.execute(
-        env::args_os().skip(argv_skip).collect::<Vec<_>>(),
+        std::env::args_os().skip(argv_skip).collect::<Vec<_>>(),
         extra_env,
     );
     match result {
@@ -94,7 +93,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() -> ExitResult {
     env_logger::init();
 
-    let action = jump::prepare_boot(VERSION).map_err(|e| {
+    let action = jump::prepare_boot().map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
     })?;
 
@@ -110,5 +109,9 @@ fn main() -> ExitResult {
         BootAction::Pack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path),
         BootAction::Select(select_boot) => boot::select(select_boot),
         BootAction::Split((jump, lift, scie_path)) => boot::split(jump, lift, scie_path),
+        BootAction::Version => {
+            println!("{VERSION}");
+            Code::SUCCESS.ok()
+        }
     }
 }
