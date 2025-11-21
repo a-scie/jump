@@ -6,9 +6,10 @@ use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::Command;
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use cargo_toml::{Inheritable, Manifest};
 use clap::Parser;
 use jump::{ARCH, EOF_MAGIC};
 use proc_exit::{Code, Exit, ExitResult};
@@ -65,22 +66,22 @@ fn add_magic(path: &Path, version: &str) -> ExitResult {
         })
 }
 
-fn execute(command: &mut Command) -> Result<Output, Exit> {
-    let child = command.spawn().map_err(|e| {
-        Code::FAILURE.with_message(format!("Failed to spawn command: {command:?}: {e}"))
-    })?;
-    let output = child.wait_with_output().map_err(|e| {
+fn execute(command: &mut Command) -> ExitResult {
+    let mut child = command
+        .spawn()
+        .map_err(|e| Code::FAILURE.with_message(format!("{e}")))?;
+    let exit_status = child.wait().map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to gather exit status of command: {command:?}: {e}"
         ))
     })?;
-    if !output.status.success() {
+    if !exit_status.success() {
         return Err(Code::FAILURE.with_message(format!(
             "Command {command:?} failed with exit code: {code:?}",
-            code = output.status.code()
+            code = exit_status.code()
         )));
     }
-    Ok(output)
+    Ok(())
 }
 
 fn path_as_str(path: &Path) -> Result<&str, Exit> {
@@ -179,19 +180,23 @@ fn main() -> ExitResult {
                 [output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
             ),
     )?;
-
     let src = output_bin_dir
         .join(BINARY)
         .with_extension(env::consts::EXE_EXTENSION);
 
-    let version =
-        String::from_utf8(execute(Command::new(&src).arg("-V").stdout(Stdio::piped()))?.stdout)
-            .map_err(|e| {
-                Code::FAILURE.with_message(format!(
-                    "Failed to read version output from {src}: {e}",
-                    src = src.display()
-                ))
-            })?;
+    let scie_jump_manifest_path = workspace_root.join("Cargo.toml");
+    let scie_jump_manifest = Manifest::from_path(&scie_jump_manifest_path)
+        .map_err(|e| Code::FAILURE.with_message(format!("{e}")))?;
+    let version = if let Some(package) = scie_jump_manifest.package
+        && let Inheritable::Set(version) = package.version
+    {
+        version
+    } else {
+        return Err(Code::FAILURE.with_message(format!(
+            "The scie-jump manifest at {manifest} is missing a package version.",
+            manifest = scie_jump_manifest_path.display()
+        )));
+    };
 
     add_magic(&src, version.trim_end())?;
     let mut reader = std::fs::File::open(&src).map_err(|e| {

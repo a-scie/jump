@@ -15,7 +15,7 @@ function size() {
   fi
 }
 
-SCIE_JUMP_ALT="scie-jump-${OS_ARCH}"
+SCIE_JUMP_ALT="scie-jump-${OS_ARCH}${EXE_EXT}"
 chmod +x "${SCIE_JUMP_ALT}"
 EXPECTED_SIZE="$(size "${SCIE_JUMP_ALT}")"
 

@@ -88,8 +88,6 @@ fn exec(
         .map(|_| ())
 }
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 fn main() -> ExitResult {
     env_logger::init();
 
@@ -109,9 +107,5 @@ fn main() -> ExitResult {
         BootAction::Pack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path),
         BootAction::Select(select_boot) => boot::select(select_boot),
         BootAction::Split((jump, lift, scie_path)) => boot::split(jump, lift, scie_path),
-        BootAction::Version => {
-            println!("{VERSION}");
-            Code::SUCCESS.ok()
-        }
     }
 }

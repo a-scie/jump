@@ -104,7 +104,6 @@ pub enum BootAction {
     Pack((Jump, PathBuf)),
     Select(SelectBoot),
     Split((Jump, Lift, PathBuf)),
-    Version,
 }
 
 pub fn config(jump: Jump, mut lift: Lift) -> Config {
@@ -172,18 +171,7 @@ pub fn prepare_boot() -> Result<BootAction, String> {
         return Ok(BootAction::Pack((jump, current_exe.exe)));
     }
 
-    let (jump, lift) = match lift::load_scie(&current_exe.exe, &data) {
-        Ok((jump, lift)) => (jump, lift),
-        Err(err) => {
-            return if let Some(arg) = env::args_os().nth(1)
-                && (arg == "-V" || arg == "--version")
-            {
-                Ok(BootAction::Version)
-            } else {
-                Err(err)
-            };
-        }
-    };
+    let (jump, lift) = lift::load_scie(&current_exe.exe, &data)?;
     trace!(
         "Loaded lift manifest from {current_exe}:\n{lift:#?}",
         current_exe = current_exe.exe.display()
