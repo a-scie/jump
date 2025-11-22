@@ -3,11 +3,13 @@
 
 use std::env;
 use std::fmt::{Display, Formatter};
+use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use cargo_toml::{Inheritable, Manifest};
 use clap::Parser;
 use jump::{ARCH, EOF_MAGIC};
 use proc_exit::{Code, Exit, ExitResult};
@@ -21,7 +23,7 @@ const PATHSEP: &str = ";";
 #[cfg(not(windows))]
 const PATHSEP: &str = ":";
 
-fn add_magic(path: &Path) -> ExitResult {
+fn add_magic(path: &Path, version: &str) -> ExitResult {
     let mut binary = std::fs::OpenOptions::new()
         .append(true)
         .open(path)
@@ -31,6 +33,19 @@ fn add_magic(path: &Path) -> ExitResult {
                 path = path.display()
             ))
         })?;
+
+    let version_bytes = version.as_bytes();
+    let version_bytes_len = version_bytes.len() as u8;
+    binary
+        .write_all(version_bytes)
+        .map_err(|e| Code::FAILURE.with_message(format!("Failed to append the version: {e}")))?;
+    binary.write_u8(version_bytes_len).map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to append the version length: {e}"))
+    })?;
+    binary.flush().map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to flush trailer version information: {e}"))
+    })?;
+
     let metadata = binary.metadata().map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to load metadata for {path} to determine its size: {e}",
@@ -165,11 +180,25 @@ fn main() -> ExitResult {
                 [output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
             ),
     )?;
-
     let src = output_bin_dir
         .join(BINARY)
         .with_extension(env::consts::EXE_EXTENSION);
-    add_magic(&src)?;
+
+    let scie_jump_manifest_path = workspace_root.join("Cargo.toml");
+    let scie_jump_manifest = Manifest::from_path(&scie_jump_manifest_path)
+        .map_err(|e| Code::FAILURE.with_message(format!("{e}")))?;
+    let version = if let Some(package) = scie_jump_manifest.package
+        && let Inheritable::Set(version) = package.version
+    {
+        version
+    } else {
+        return Err(Code::FAILURE.with_message(format!(
+            "The scie-jump manifest at {manifest} is missing a package version.",
+            manifest = scie_jump_manifest_path.display()
+        )));
+    };
+
+    add_magic(&src, version.trim_end())?;
     let mut reader = std::fs::File::open(&src).map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to open {src} for hashing: {e}",

@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
 use jump::{
-    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_lift,
+    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_jump,
+    load_lift,
 };
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
@@ -232,7 +233,9 @@ fn pack(
             source: Source::Scie,
         };
 
-        tote.zip_file.rewind().map_err(|e| format!("{e}"))?;
+        tote.zip_file.rewind().map_err(|e| {
+            format!("Failed to re-wind the sci-tote file to append its contents to the scie: {e}")
+        })?;
         std::io::copy(&mut tote.zip_file, &mut binary).map_err(|e| {
             format!(
                 "Failed to append {tote_file:?} to {binary}: {e}",
@@ -290,21 +293,37 @@ pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
             "-1" | "--single-lift-line" => single_line = true,
             "--no-single-lift-line" => single_line = false,
             "-sj" | "--jump" | "--scie-jump" => {
-                scie_jump_path = PathBuf::from(args.next().ok_or_else(|| {
+                scie_jump_path = std::path::absolute(args.next().ok_or_else(|| {
                     Code::FAILURE.with_message(format!(
                         "The {arg} flag requires an argument pointing to an alternate \
                         scie-jump binary to pack in the scie tip."
                     ))
-                })?);
-                jump.size = scie_jump_path
-                    .metadata()
+                })?)
+                .map_err(|e| {
+                    Code::FAILURE
+                        .with_message(format!("Failed to convert {arg} to an absolute path: {e}"))
+                })?;
+                let data = std::fs::File::open(&scie_jump_path).map_err(|e| {
+                    Code::FAILURE.with_message(format!(
+                        "Failed to open alternate scie-jump at {path} to determine its version \
+                        and size: {e}",
+                        path = scie_jump_path.display()
+                    ))
+                })?;
+                jump = load_jump(data, &scie_jump_path)
                     .map_err(|e| {
                         Code::FAILURE.with_message(format!(
-                            "Failed to determine size of alternate scie-jump {path}: {e}",
+                            "Failed to determine the version and size or the alternate scie-jump \
+                            at {path}: {e}",
                             path = scie_jump_path.display()
                         ))
                     })?
-                    .len() as usize;
+                    .ok_or_else(|| {
+                        Code::FAILURE.with_message(format!(
+                            "The file at {path} does not appear to be a scie-jump binary.",
+                            path = scie_jump_path.display()
+                        ))
+                    })?;
             }
             _ => {
                 let (lift, path) = load_manifest(Path::new(arg.as_str()), &jump)

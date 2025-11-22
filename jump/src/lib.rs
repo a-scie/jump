@@ -24,6 +24,7 @@ mod zip;
 use std::env;
 use std::env::current_exe;
 use std::ffi::OsString;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
@@ -37,7 +38,8 @@ pub use crate::config::Jump;
 pub use crate::context::ARCH;
 use crate::installer::Installer;
 // Exposed for the package crate post-processing of the scie-jump binary.
-pub use crate::jump::EOF_MAGIC;
+pub use crate::jump::EOF_MAGIC_V2 as EOF_MAGIC;
+pub use crate::jump::load as load_jump;
 pub use crate::lift::{File, Lift, ScieBoot, Source, load_lift};
 pub use crate::process::{EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
@@ -50,6 +52,8 @@ pub struct SelectBoot {
 }
 
 pub const BOOT_PACK_HELP: &str = "\
+-V|--version Print the scie-jump version and exit.
+
 (-sj|--jump|--scie-jump [PATH])
 (-1|--single-lift-line|--no-single-lift-line)
 [lift manifest]*
@@ -151,7 +155,7 @@ fn find_current_exe() -> Result<CurrentExe, String> {
 }
 
 #[time("debug", "jump::{}")]
-pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
+pub fn prepare_boot() -> Result<BootAction, String> {
     let current_exe = find_current_exe()?;
     let file = std::fs::File::open(&current_exe.exe).map_err(|e| {
         format!(
@@ -163,8 +167,7 @@ pub fn prepare_boot(scie_jump_version: &str) -> Result<BootAction, String> {
         memmap2::Mmap::map(&file)
             .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.exe.display()))?
     };
-
-    if let Some(jump) = jump::load(scie_jump_version, &data, &current_exe.exe)? {
+    if let Some(jump) = jump::load(Cursor::new(&data), &current_exe.exe)? {
         return Ok(BootAction::Pack((jump, current_exe.exe)));
     }
 

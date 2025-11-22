@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.8.2
+
+This release fixes a bug recording the correct scie-jump version in the lift manifest when using 
+the scie-jump boot pack with a custom scie-jump (`-sj`|`--jump`|`--scie-jump`).
+
 ## 1.8.1
 
 This release fixes a bug in `.env` handling. Previously, when `"load_dotenv" = true` was configured
