@@ -820,7 +820,7 @@ dependencies = [
 
 [[package]]
 name = "scie-jump"
-version = "1.8.2"
+version = "1.8.3"
 dependencies = [
  "env_logger",
  "jump",

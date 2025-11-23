@@ -155,7 +155,7 @@ fn find_current_exe() -> Result<CurrentExe, String> {
 }
 
 #[time("debug", "jump::{}")]
-pub fn prepare_boot() -> Result<BootAction, String> {
+pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, String> {
     let current_exe = find_current_exe()?;
     let file = std::fs::File::open(&current_exe.exe).map_err(|e| {
         format!(
@@ -167,7 +167,11 @@ pub fn prepare_boot() -> Result<BootAction, String> {
         memmap2::Mmap::map(&file)
             .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.exe.display()))?
     };
-    if let Some(jump) = jump::load(Cursor::new(&data), &current_exe.exe)? {
+    if let Some(jump) = jump::load(
+        Cursor::new(&data),
+        &current_exe.exe,
+        current_scie_jump_version,
+    )? {
         return Ok(BootAction::Pack((jump, current_exe.exe)));
     }
 

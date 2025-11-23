@@ -279,7 +279,11 @@ fn print_usage(message: &str) -> ExitResult {
     Err(Code::FAILURE.with_message(message.to_string()))
 }
 
-pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
+pub(crate) fn set(
+    mut jump: Jump,
+    mut scie_jump_path: PathBuf,
+    current_scie_jump_version: &str,
+) -> ExitResult {
     let mut lifts = vec![];
     let mut single_line = true;
     let mut args = env::args().skip(1);
@@ -310,7 +314,7 @@ pub(crate) fn set(mut jump: Jump, mut scie_jump_path: PathBuf) -> ExitResult {
                         path = scie_jump_path.display()
                     ))
                 })?;
-                jump = load_jump(data, &scie_jump_path)
+                jump = load_jump(data, &scie_jump_path, current_scie_jump_version)
                     .map_err(|e| {
                         Code::FAILURE.with_message(format!(
                             "Failed to determine the version and size or the alternate scie-jump \

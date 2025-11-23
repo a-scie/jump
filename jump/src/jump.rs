@@ -7,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 
 use bstr::ByteSlice;
 use byteorder::{LittleEndian, ReadBytesExt};
+use log::warn;
 
 pub const EOF_MAGIC_V1: u32 = 0x534a7219;
 pub const EOF_MAGIC_V2: u32 = 0x4a532520;
@@ -92,7 +93,11 @@ fn query_version(path: &Path) -> Result<String, String> {
     })
 }
 
-pub fn load<D: Read + Seek>(mut data: D, path: &Path) -> Result<Option<Jump>, String> {
+pub fn load<D: Read + Seek>(
+    mut data: D,
+    path: &Path,
+    current_scie_jump_version: &str,
+) -> Result<Option<Jump>, String> {
     data.seek(SeekFrom::End(-4)).map_err(|e| {
         format!(
             "Failed to read scie-jump trailer magic from {path}: {e}",
@@ -102,7 +107,28 @@ pub fn load<D: Read + Seek>(mut data: D, path: &Path) -> Result<Option<Jump>, St
     match data.read_u32::<LittleEndian>() {
         Ok(EOF_MAGIC_V1) => {
             let size = read_size(&mut data, path)?;
-            let version = query_version(path)?;
+            let version = match query_version(path) {
+                Ok(version) => version,
+                Err(err) => {
+                    // N.B.: The query will fail if the scie-jump is for a foreign platform, and we
+                    // fall back to the current scie-jump version in that case. This is buggy, but
+                    // its was also a long-standing bug only fixed by the switch to the EOF_MAGIC_V2
+                    // scheme; so this is strictly an improvement over the old status quo where the
+                    // version, if different in reality, was always incorrect, but now is queried
+                    // correctly if the platform matches and warned about if not.
+                    warn!(
+                        "Failed to determine version of the custom scie-jump at {path}: {err}",
+                        path = path.display()
+                    );
+                    warn!(
+                        "Reporting {current_scie_jump_version} (the version of current scie-jump) \
+                        in its place which is generally misleading but harmless.\n\
+                        You can avoid this problem by using using a custom scie-jump with version \
+                        1.8.2 or newer."
+                    );
+                    current_scie_jump_version.to_string()
+                }
+            };
             Ok(Some(Jump { version, size }))
         }
         Ok(EOF_MAGIC_V2) => {

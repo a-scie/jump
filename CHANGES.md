@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.8.3
+
+This release is a follow-up to 1.8.2 that fixes lookup of custom scie-jump versions when the custom
+scie-jump is for a foreign platform. Since there is no way to look those versions up, the old, buggy
+behavior of recording the current scie-jump version for old, foreign scie-jumps is used. A warning
+is logged in this case now.
+
 ## 1.8.2
 
 This release fixes a bug recording the correct scie-jump version in the lift manifest when using 
