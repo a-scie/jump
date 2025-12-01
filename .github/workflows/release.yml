@@ -57,13 +57,13 @@ jobs:
             name: Linux x86-64 (musl)
             cross-target: x86_64-unknown-linux-musl
             suffix-args: --suffix musl-linux-x86_64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: Linux aarch64  (default)
             cross-target: aarch64-unknown-linux-musl
           - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
             suffix-args: --suffix gnu-linux-aarch64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: Linux aarch64  (musl)
             cross-target: aarch64-unknown-linux-musl
             suffix-args: --suffix musl-linux-aarch64
@@ -108,7 +108,7 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           cargo install cross --locked \
-            --git https://github.com/cross-rs/cross --rev e281947ca900da425e4ecea7483cfde646c8a1ea
+            --git https://github.com/cross-rs/cross --rev 49cd054de9b832dfc11a4895c72b0aef533b5c6a
           cross run -p package --target ${{ matrix.cross-target }} -- ${{ matrix.suffix-args }}
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
         uses: actions/attest-build-provenance@v1
