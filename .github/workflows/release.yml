@@ -52,6 +52,7 @@ jobs:
             cross-target: x86_64-unknown-linux-musl
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
+            cross-target: x86_64-unknown-linux-gnu
             suffix-args: --suffix gnu-linux-x86_64
           - os: ubuntu-24.04
             name: Linux x86-64 (musl)
@@ -62,6 +63,7 @@ jobs:
             cross-target: aarch64-unknown-linux-musl
           - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
+            cross-target: aarch64-unknown-linux-gnu
             suffix-args: --suffix gnu-linux-aarch64
           - os: ubuntu-24.04
             name: Linux aarch64  (musl)
