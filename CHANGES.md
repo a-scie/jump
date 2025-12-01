@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.9.1
+
+This release builds the Linux aarch64 & x86_64 glibc-linked `scie-jump` binaries against glibc 2.31
+(Feb. 2020) for broader compatibility.
+
 ## 1.9.0
 
 This release adds glibc `scie-jump` binaries for Linux aarch64 & x86_64. The default binaries for

@@ -29,14 +29,18 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
+            cross-target: x86_64-unknown-linux-gnu
+            docker-platform: linux/amd64
             suffix-args: --suffix gnu-linux-x86_64
           - os: ubuntu-24.04
             name: Linux x86-64 (musl)
             cross-target: x86_64-unknown-linux-musl
             docker-platform: linux/amd64
             suffix-args: --suffix musl-linux-x86_64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: Linux aarch64 (glibc)
+            cross-target: aarch64-unknown-linux-gnu
+            docker-platform: linux/arm64
             suffix-args: --suffix gnu-linux-aarch64
           - os: ubuntu-24.04
             name: Linux aarch64 (musl)
