@@ -130,6 +130,8 @@ impl Display for SpecifiedPath {
 struct Args {
     #[arg(long, help = "Override the default --target for this platform.")]
     target: Option<String>,
+    #[arg(long, help = "Provide an alternate suffix for the scie-jump binary.")]
+    suffix: Option<String>,
     #[arg(
         help = "The destination directory for the scie-jump binary and checksum file.",
         default_value_t = SpecifiedPath::new("dist")
@@ -211,10 +213,13 @@ fn main() -> ExitResult {
     let digest = hasher.finalize();
 
     let file_name = format!(
-        "{BINARY}-{os}-{arch}{exe}",
-        os = env::consts::OS,
-        arch = ARCH,
-        exe = env::consts::EXE_SUFFIX
+        "{BINARY}-{suffix}",
+        suffix = args.suffix.unwrap_or_else(|| format!(
+            "{os}-{arch}{exe}",
+            os = env::consts::OS,
+            arch = ARCH,
+            exe = env::consts::EXE_SUFFIX
+        ))
     );
     let dst = dest_dir.join(&file_name);
 
