@@ -109,30 +109,37 @@ Usage: $0 [--no-gc] [--no-package] [example]*
 
 Runs all examples by default. List example directory names to run specific ones.
 
+--suffix: The custom suffix of the scie-jump binary to use.
+
 --no-gc: Prevents example artifacts generated during the run from being garbage collected.
          This is useful for experimenting or test development."
 
---no-package: Do not re-build the scie-jump, just use whatever has been packaged to `dist/` already.
+--no-package: Do not re-build the scie-jump, just use whatever has been packaged to \`dist/\` already.
 
 EOF
 }
 
+_SUFFIX=""
 _PACKAGE="1"
 _EXAMPLE_PATHS=()
-for arg in "$@"; do
-  if [[ "${arg}" =~ -h|--help ]]; then
+while [[ -n "${1:-}" ]]; do
+  if [[ "$1" =~ -h|--help ]]; then
     usage
     exit 0
-  elif [[ "${arg}" == "--no-gc" ]]; then
+  elif [[ "$1" == "--suffix" ]]; then
+    shift
+    _SUFFIX="$1"
+  elif [[ "$1" == "--no-gc" ]]; then
     export NO_GC=1
-  elif [[ "${arg}" == "--no-package" ]]; then
+  elif [[ "$1" == "--no-package" ]]; then
     _PACKAGE=""
-  elif [[ -d "${arg}" ]]; then
-    _EXAMPLE_PATHS+=("${arg}")
+  elif [[ -d "$1" ]]; then
+    _EXAMPLE_PATHS+=("$1")
   else
     usage
-    die "ERROR: ${arg} is not a recognized option or an example directory."
+    die "ERROR: $1 is not a recognized option or an example directory."
   fi
+  shift
 done
 
 ARCH="$(calculate_arch "${OS}")"
@@ -148,9 +155,17 @@ if [[ "${OS}" == "windows" ]]; then
 fi
 
 if [[ -n "${_PACKAGE}" ]]; then
-  cargo run -p package -- "${DIST_DIR}"
+  if [[ -z "${_SUFFIX}" ]]; then
+    cargo run -p package -- "${DIST_DIR}"
+  else
+    cargo run -p package -- --suffix "${_SUFFIX}" "${DIST_DIR}"
+  fi
 fi
-SCIE_JUMP_NAME="scie-jump-${OS_ARCH}${EXE_EXT}"
+if [[ -z "${_SUFFIX}" ]]; then
+  _SUFFIX="${OS_ARCH}${EXE_EXT}"
+fi
+
+SCIE_JUMP_NAME="scie-jump-${_SUFFIX}"
 SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
 (
   cd "${DIST_DIR}"

@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.9.0
+
+This release adds glibc `scie-jump` binaries for Linux aarch64 & x86_64. The default binaries for
+these platforms are still the musl libc static binaries, but `-{gnu,musl}-linux-<arch>` binaries
+are now produced to allow explicitly selecting the desired libc implementation.
+
 ## 1.8.3
 
 This release is a follow-up to 1.8.2 that fixes lookup of custom scie-jump versions when the custom

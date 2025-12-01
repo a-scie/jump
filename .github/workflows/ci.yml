@@ -29,14 +29,20 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
+            suffix-args: --suffix gnu-linux-x86_64
           - os: ubuntu-24.04
             name: Linux x86-64 (musl)
             cross-target: x86_64-unknown-linux-musl
             docker-platform: linux/amd64
+            suffix-args: --suffix musl-linux-x86_64
+          - os: ubuntu-24.04-arm
+            name: Linux aarch64 (glibc)
+            suffix-args: --suffix gnu-linux-aarch64
           - os: ubuntu-24.04
             name: Linux aarch64 (musl)
             cross-target: aarch64-unknown-linux-musl
             docker-platform: linux/arm64
+            suffix-args: --suffix musl-linux-aarch64
           - os: ubuntu-24.04
             name: Linux armv7l (musl)
             cross-target: armv7-unknown-linux-musleabihf
@@ -75,7 +81,7 @@ jobs:
         if: matrix.cross-target != ''
         run: |
           cargo install cross --locked \
-            --git https://github.com/cross-rs/cross --rev e281947ca900da425e4ecea7483cfde646c8a1ea
+            --git https://github.com/cross-rs/cross --rev 49cd054de9b832dfc11a4895c72b0aef533b5c6a
       - name: Lint
         if: matrix.cross-target == ''
         run: cargo clippy --locked --all
@@ -90,13 +96,13 @@ jobs:
         run: cross test --all --target ${{ matrix.cross-target }}
       - name: Build & Package
         if: matrix.cross-target == ''
-        run: cargo run -p package
+        run: cargo run -p package -- ${{ matrix.suffix-args }}
       - name: Build & Package
         if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
-        run: cross run -p package --target ${{ matrix.cross-target }}
+        run: cross run -p package --target ${{ matrix.cross-target }} -- ${{ matrix.suffix-args }}
       - name: Integration Tests
         if: matrix.cross-target == ''
-        run: examples/run.sh --no-package
+        run: examples/run.sh --no-package ${{ matrix.suffix-args }}
       - name: Setup QEMU
         if: matrix.cross-target != ''
         run: docker run --privileged --rm tonistiigi/binfmt --install all
@@ -124,7 +130,7 @@ jobs:
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
                   | sh -s -- -y --profile minimal &&
                 . "\$HOME/.cargo/env" &&
-                ./examples/run.sh
+                ./examples/run.sh ${{ matrix.suffix-args }}
               "
       - name: Integration Tests
         if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
@@ -138,5 +144,5 @@ jobs:
                 apt-get update &&
                 apt-get --no-install-recommends install -y git jq curl ca-certificates &&
                 git config --global --add safe.directory /code &&
-                ./examples/run.sh --no-package
+                ./examples/run.sh --no-package ${{ matrix.suffix-args }}
               "
