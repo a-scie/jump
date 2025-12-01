@@ -61,7 +61,7 @@ jobs:
           - os: ubuntu-24.04
             name: Linux aarch64  (default)
             cross-target: aarch64-unknown-linux-musl
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: Linux aarch64 (glibc)
             cross-target: aarch64-unknown-linux-gnu
             suffix-args: --suffix gnu-linux-aarch64
