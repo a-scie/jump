@@ -49,38 +49,48 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: Linux x86-64 (default)
-            cross-target: x86_64-unknown-linux-musl
+            image: quay.io/pypa/musllinux_1_2_x86_64
+            arch: amd64
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
-            cross-target: x86_64-unknown-linux-gnu
+            image: quay.io/pypa/manylinux2014_x86_64
+            arch: amd64
             suffix-args: --suffix gnu-linux-x86_64
           - os: ubuntu-24.04
             name: Linux x86-64 (musl)
-            cross-target: x86_64-unknown-linux-musl
+            image: quay.io/pypa/musllinux_1_2_x86_64
+            arch: amd64
             suffix-args: --suffix musl-linux-x86_64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: Linux aarch64  (default)
-            cross-target: aarch64-unknown-linux-musl
-          - os: ubuntu-24.04
+            image: quay.io/pypa/musllinux_1_2_aarch64
+            arch: arm64
+          - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
-            cross-target: aarch64-unknown-linux-gnu
+            image: quay.io/pypa/manylinux2014_aarch64
+            arch: arm64
             suffix-args: --suffix gnu-linux-aarch64
-          - os: ubuntu-24.04
-            name: Linux aarch64  (musl)
-            cross-target: aarch64-unknown-linux-musl
+          - os: ubuntu-24.04-arm
+            name: Linux aarch64 (musl)
+            image: quay.io/pypa/musllinux_1_2_aarch64
+            arch: arm64
             suffix-args: --suffix musl-linux-aarch64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: Linux armv7l
-            cross-target: armv7-unknown-linux-musleabihf
+            image: quay.io/pypa/manylinux_2_31_armv7l
+            arch: arm/v7
           - os: ubuntu-24.04
             name: Linux riscv64
-            cross-target: riscv64gc-unknown-linux-gnu
+            image: quay.io/pypa/manylinux_2_39_riscv64
+            arch: riscv64
           - os: ubuntu-24.04
             name: Linux s390x
-            cross-target: s390x-unknown-linux-gnu
+            image: quay.io/pypa/manylinux2014_s390x
+            arch: s390x
           - os: ubuntu-24.04
             name: Linux powerpc64le
-            cross-target: powerpc64le-unknown-linux-gnu
+            image: quay.io/pypa/manylinux2014_ppc64le
+            arch: ppc64le
           - os: macos-x86_64
             name: macOS x86-64
           - os: macos-14
@@ -103,15 +113,63 @@ jobs:
       - name: Install rustup on Windows ARM
         if: matrix.os == 'windows-11-arm'
         uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Setup QEMU Emulation
+        if: matrix.image != ''
+        run: docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }}
+      - name: Setup Package
+        if: matrix.image != ''
+        run: |
+          cat <<EOF > ./package.sh
+            #!/bin/sh
+            set -e
+
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+              sh -s -- -y --profile minimal --default-toolchain none
+            . "\$HOME/.cargo/env"
+
+            cargo run -p package -- ${{ matrix.suffix-args }}
+          EOF
+          chmod +x ./package.sh
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: matrix.cross-target == ''
+        if: matrix.image == ''
         run: cargo run -p package -- ${{ matrix.suffix-args }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: matrix.cross-target != ''
+        if: contains(matrix.image, 'musl')
         run: |
-          cargo install cross --locked \
-            --git https://github.com/cross-rs/cross --rev 49cd054de9b832dfc11a4895c72b0aef533b5c6a
-          cross run -p package --target ${{ matrix.cross-target }} -- ${{ matrix.suffix-args }}
+          docker run \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
+              apk add bzip2-static
+
+              ./package.sh
+            '
+      - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
+        if: matrix.arch == 'arm/v7'
+        run: |
+          docker run \
+            --privileged \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
+              # For armv7l, but works for all arches - see:
+              #   https://github.com/rust-lang/cargo/issues/8719#issuecomment-932084513
+              mkdir -p /root/.cargo
+              chmod 777 /root/.cargo
+              mount -t tmpfs none /root/.cargo
+
+              ./package.sh
+            '
+      - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
+        if: matrix.image != '' && matrix.arch != 'arm/v7' && !contains(matrix.image, 'musl')
+        run: |
+          docker run \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} ./package.sh
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
         uses: actions/attest-build-provenance@v1
         with:

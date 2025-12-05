@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.9.2
+
+This release builds the Linux `scie-jump` binaries against the oldest available manylinux images for
+even broader glibc and musl libc compatiility.
+
 ## 1.9.1
 
 This release builds the Linux aarch64 & x86_64 glibc-linked `scie-jump` binaries against glibc 2.31

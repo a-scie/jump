@@ -5,7 +5,7 @@ members = [
 
 [package]
 name = "scie-jump"
-version = "1.9.1"
+version = "1.9.2"
 description = "The self contained interpreted executable launcher."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
@@ -33,7 +33,7 @@ default-features = false
 # always uses 1/1/1980 and gives us reproducible zip creation by default.
 # We also leave out non-standard forms of compression which net a ~40% increase in final binary
 # size as of this commit (~1.4MB -> 2MB).
-features = ["deflate"]
+features = ["deflate-flate2"]
 
 [dependencies]
 env_logger = { workspace = true }
