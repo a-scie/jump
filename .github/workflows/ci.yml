@@ -29,40 +29,40 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
-            cross-target: x86_64-unknown-linux-gnu
-            docker-platform: linux/amd64
+            image: quay.io/pypa/manylinux2014_x86_64
+            arch: amd64
             suffix-args: --suffix gnu-linux-x86_64
           - os: ubuntu-24.04
             name: Linux x86-64 (musl)
-            cross-target: x86_64-unknown-linux-musl
-            docker-platform: linux/amd64
+            image: quay.io/pypa/musllinux_1_2_x86_64
+            arch: amd64
             suffix-args: --suffix musl-linux-x86_64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
-            cross-target: aarch64-unknown-linux-gnu
-            docker-platform: linux/arm64
+            image: quay.io/pypa/manylinux2014_aarch64
+            arch: arm64
             suffix-args: --suffix gnu-linux-aarch64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: Linux aarch64 (musl)
-            cross-target: aarch64-unknown-linux-musl
-            docker-platform: linux/arm64
+            image: quay.io/pypa/musllinux_1_2_aarch64
+            arch: arm64
             suffix-args: --suffix musl-linux-aarch64
-          - os: ubuntu-24.04
-            name: Linux armv7l (musl)
-            cross-target: armv7-unknown-linux-musleabihf
-            docker-platform: linux/arm/v7
+          - os: ubuntu-24.04-arm
+            name: Linux armv7l
+            image: quay.io/pypa/manylinux_2_31_armv7l
+            arch: arm/v7
           - os: ubuntu-24.04
             name: Linux riscv64
-            cross-target: riscv64gc-unknown-linux-gnu
-            docker-platform: linux/riscv64
+            image: quay.io/pypa/manylinux_2_39_riscv64
+            arch: riscv64
           - os: ubuntu-24.04
             name: Linux s390x
-            cross-target: s390x-unknown-linux-gnu
-            docker-platform: linux/s390x
+            image: quay.io/pypa/manylinux2014_s390x
+            arch: s390x
           - os: ubuntu-24.04
             name: Linux powerpc64le
-            cross-target: powerpc64le-unknown-linux-gnu
-            docker-platform: linux/ppc64le
+            image: quay.io/pypa/manylinux2014_ppc64le
+            arch: ppc64le
           - os: macos-x86_64
             name: macOS x86-64
           - os: macos-14
@@ -76,73 +76,42 @@ jobs:
       - name: Install rustup on Windows ARM
         if: matrix.os == 'windows-11-arm'
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Check Formatting
-        if: matrix.cross-target == ''
+      - name: Run Checks
+        if: matrix.image == ''
         run: |
-          rustup toolchain add nightly -c rustfmt
-          cargo +nightly fmt --check --all
-      - name: Install Cross
-        if: matrix.cross-target != ''
+          rustup toolchain add nightly -c rustfmt && \
+          cargo +nightly fmt --check --all && \
+          cargo clippy --locked --all && \
+          cargo test --all && \
+          cargo run -p package
+      - name: Run Checks
+        if: matrix.image != ''
         run: |
-          cargo install cross --locked \
-            --git https://github.com/cross-rs/cross --rev 49cd054de9b832dfc11a4895c72b0aef533b5c6a
-      - name: Lint
-        if: matrix.cross-target == ''
-        run: cargo clippy --locked --all
-      - name: Lint
-        if: matrix.cross-target != ''
-        run: cross clippy --locked --all --target ${{ matrix.cross-target }}
-      - name: Unit Tests
-        if: matrix.cross-target == ''
-        run: cargo test --all
-      - name: Unit Tests
-        if: matrix.cross-target != ''
-        run: cross test --all --target ${{ matrix.cross-target }}
-      - name: Build & Package
-        if: matrix.cross-target == ''
-        run: cargo run -p package -- ${{ matrix.suffix-args }}
-      - name: Build & Package
-        if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
-        run: cross run -p package --target ${{ matrix.cross-target }} -- ${{ matrix.suffix-args }}
-      - name: Integration Tests
-        if: matrix.cross-target == ''
-        run: examples/run.sh --no-package ${{ matrix.suffix-args }}
-      - name: Setup QEMU
-        if: matrix.cross-target != ''
-        run: docker run --privileged --rm tonistiigi/binfmt --install all
-      - name: Integration Tests
-        if: matrix.cross-target != '' && matrix.docker-platform == 'linux/ppc64le'
-        run: |
-          # We run into illegal instruction errors using the scie-jump built via cross; so we avoid
-          # that and add rust to the target image to ensure it builds a compatible scie-jump to
-          # execute in the container.
-          docker run --rm \
+          docker run --privileged --rm tonistiigi/binfmt --install ${{ matrix.arch }}
+          docker run \
+            --rm \
             -v $PWD:/code \
             -w /code \
-            --platform ${{ matrix.docker-platform }} \
-            ubuntu:24.04 \
-              bash -c "
-                apt-get update &&
-                apt-get --no-install-recommends install -y \
-                  ca-certificates \
-                  curl \
-                  gcc \
-                  git \
-                  jq \
-                  libc6-dev &&
-                git config --global --add safe.directory /code &&
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-                  | sh -s -- -y --profile minimal &&
-                . "\$HOME/.cargo/env" &&
-                ./examples/run.sh ${{ matrix.suffix-args }}
-              "
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -c '
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+                sh -s -- -y --profile minimal --default-toolchain none && \
+              . "$HOME/.cargo/env" && \
+              rustup toolchain add nightly -c rustfmt && \
+              cargo +nightly fmt --check --all && \
+              cargo clippy --locked --all && \
+              cargo test --all && \
+              cargo run -p package -- ${{ matrix.suffix-args }}
+            '
       - name: Integration Tests
-        if: matrix.cross-target != '' && matrix.docker-platform != 'linux/ppc64le'
+        if: matrix.image == ''
+        run: examples/run.sh --no-package
+      - name: Integration Tests
+        if: matrix.image != ''
         run: |
           docker run --rm \
             -v $PWD:/code \
             -w /code \
-            --platform ${{ matrix.docker-platform }} \
+            --platform linux/${{ matrix.arch }} \
             ubuntu:24.04 \
               bash -c "
                 apt-get update &&
