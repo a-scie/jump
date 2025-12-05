@@ -128,17 +128,17 @@ jobs:
             --privileged \
             --rm \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
-              ${{ matrix.install }}
-
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-                sh -s -- -y --profile minimal --default-toolchain none
-              . "$HOME/.cargo/env"
-
               # For armv7l, but works for all arches - see:
               #   https://github.com/rust-lang/cargo/issues/8719#issuecomment-932084513
               mkdir -p /root/.cargo
               chmod 777 /root/.cargo
               mount -t tmpfs none /root/.cargo
+
+              ${{ matrix.install }}
+
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+                sh -s -- -y --profile minimal --default-toolchain none
+              . "$HOME/.cargo/env"
 
               cargo run -p package -- ${{ matrix.suffix-args }}
             '
