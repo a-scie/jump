@@ -49,12 +49,10 @@ jobs:
             arch: arm64
             install: apk add bzip2-static
             suffix-args: --suffix musl-linux-aarch64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: Linux armv7l
             image: quay.io/pypa/manylinux_2_31_armv7l
             arch: arm/v7
-            # See: https://github.com/rust-lang/cargo/issues/8719#issuecomment-932084513
-            install: mkdir -p /root/.cargo && chmod 777 /root/.cargo && mount -t tmpfs none /root/.cargo
           - os: ubuntu-24.04
             name: Linux riscv64
             image: quay.io/pypa/manylinux_2_39_riscv64
