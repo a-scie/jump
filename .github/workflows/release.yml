@@ -51,7 +51,6 @@ jobs:
             name: Linux x86-64 (default)
             image: quay.io/pypa/musllinux_1_2_x86_64
             arch: amd64
-            install: apk add bzip2-static
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
             image: quay.io/pypa/manylinux2014_x86_64
@@ -61,13 +60,11 @@ jobs:
             name: Linux x86-64 (musl)
             image: quay.io/pypa/musllinux_1_2_x86_64
             arch: amd64
-            install: apk add bzip2-static
             suffix-args: --suffix musl-linux-x86_64
           - os: ubuntu-24.04-arm
             name: Linux aarch64  (default)
             image: quay.io/pypa/musllinux_1_2_aarch64
             arch: arm64
-            install: apk add bzip2-static
           - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
             image: quay.io/pypa/manylinux2014_aarch64
@@ -77,7 +74,6 @@ jobs:
             name: Linux aarch64 (musl)
             image: quay.io/pypa/musllinux_1_2_aarch64
             arch: arm64
-            install: apk add bzip2-static
             suffix-args: --suffix musl-linux-aarch64
           - os: ubuntu-24.04-arm
             name: Linux armv7l
@@ -117,16 +113,46 @@ jobs:
       - name: Install rustup on Windows ARM
         if: matrix.os == 'windows-11-arm'
         uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Setup QEMU Emulation
+        if: matrix.image != ''
+        run: docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }}
+      - name: Setup Package
+        if: matrix.image != ''
+        run: |
+          cat <<EOF > ./package.sh
+            #!/bin/sh
+            set -e
+
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+              sh -s -- -y --profile minimal --default-toolchain none
+            . "$HOME/.cargo/env"
+
+            cargo run -p package -- ${{ matrix.suffix-args }}
+          EOF
+          chmod +x ./package.sh
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
         if: matrix.image == ''
         run: cargo run -p package -- ${{ matrix.suffix-args }}
       - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
-        if: matrix.image != ''
+        if: contains(matrix.image, 'musl')
         run: |
-          docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }} && \
+          docker run \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
+              apk add bzip2-static
+
+              ./package.sh
+            '
+      - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
+        if: matrix.arch == 'arm/v7'
+        run: |
           docker run \
             --privileged \
             --rm \
+            -v $PWD:/code \
+            -w /code \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
               # For armv7l, but works for all arches - see:
               #   https://github.com/rust-lang/cargo/issues/8719#issuecomment-932084513
@@ -134,14 +160,16 @@ jobs:
               chmod 777 /root/.cargo
               mount -t tmpfs none /root/.cargo
 
-              ${{ matrix.install }}
-
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-                sh -s -- -y --profile minimal --default-toolchain none
-              . "$HOME/.cargo/env"
-
-              cargo run -p package -- ${{ matrix.suffix-args }}
+              ./package.sh
             '
+      - name: Package scie-jump ${{ needs.determine-tag.outputs.release-tag }} binary
+        if: matrix.image != '' && matrix.arch != 'arm/v7' && !contains(matrix.image, 'musl')
+        run: |
+          docker run \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} ./package.sh
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
         uses: actions/attest-build-provenance@v1
         with:

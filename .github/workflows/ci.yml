@@ -36,7 +36,6 @@ jobs:
             name: Linux x86-64 (musl)
             image: quay.io/pypa/musllinux_1_2_x86_64
             arch: amd64
-            install: apk add bzip2-static
             suffix-args: --suffix musl-linux-x86_64
           - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
@@ -47,7 +46,6 @@ jobs:
             name: Linux aarch64 (musl)
             image: quay.io/pypa/musllinux_1_2_aarch64
             arch: arm64
-            install: apk add bzip2-static
             suffix-args: --suffix musl-linux-aarch64
           - os: ubuntu-24.04-arm
             name: Linux armv7l
@@ -78,42 +76,72 @@ jobs:
       - name: Install rustup on Windows ARM
         if: matrix.os == 'windows-11-arm'
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Run Checks
-        if: matrix.image == ''
-        run: |
-          rustup toolchain add nightly -c rustfmt && \
-          cargo +nightly fmt --check --all && \
-          cargo clippy --locked --all && \
-          cargo test --all && \
-          cargo run -p package
-      - name: Run Checks
+      - name: Setup QEMU Emulation
+        if: matrix.image != ''
+        run: docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }}
+      - name: Setup Checks & Package
         if: matrix.image != ''
         run: |
-          docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }}
+          cat <<EOF > ./check-and-package.sh
+            #!/bin/sh
+            set -e
+
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+              sh -s -- -y --profile minimal --default-toolchain none
+            . "$HOME/.cargo/env"
+
+            rustup toolchain add nightly -c rustfmt
+            cargo +nightly fmt --check --all
+            cargo clippy --locked --all
+            cargo test --all
+            cargo run -p package -- ${{ matrix.suffix-args }}
+          EOF
+          chmod +x ./check-and-package.sh
+      - name: Run Checks & Package
+        if: matrix.image == ''
+        run: |
+          rustup toolchain add nightly -c rustfmt
+          cargo +nightly fmt --check --all
+          cargo clippy --locked --all
+          cargo test --all
+          cargo run -p package
+      - name: Run Checks & Package
+        if: contains(matrix.image, 'musl')
+        run: |
+          docker run \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
+              apk add bzip2-static
+
+              ./check-and-package.sh
+            '
+      - name: Run Checks & Package
+        if: matrix.arch == 'arm/v7'
+        run: |
           docker run \
             --privileged \
             --rm \
             -v $PWD:/code \
             -w /code \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
-              # For armv7l, but works for all arches - see:
+              # This workaround is detailed here:
               #   https://github.com/rust-lang/cargo/issues/8719#issuecomment-932084513
               mkdir -p /root/.cargo
               chmod 777 /root/.cargo
               mount -t tmpfs none /root/.cargo
 
-              ${{ matrix.install }}
-
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-                sh -s -- -y --profile minimal --default-toolchain none
-              . "$HOME/.cargo/env"
-
-              rustup toolchain add nightly -c rustfmt
-              cargo +nightly fmt --check --all
-              cargo clippy --locked --all
-              cargo test --all
-              cargo run -p package -- ${{ matrix.suffix-args }}
+              ./check-and-package.sh
             '
+      - name: Run Checks & Package
+        if: matrix.image != '' && matrix.arch != 'arm/v7' && !contains(matrix.image, 'musl')
+        run: |
+          docker run \
+            --rm \
+            -v $PWD:/code \
+            -w /code \
+            --platform linux/${{ matrix.arch }} ${{ matrix.image }} ./check-and-package.sh
       - name: Integration Tests
         if: matrix.image == ''
         run: examples/run.sh --no-package
