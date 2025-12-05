@@ -79,7 +79,7 @@ jobs:
             arch: arm64
             install: apk add bzip2-static
             suffix-args: --suffix musl-linux-aarch64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             name: Linux armv7l
             image: quay.io/pypa/manylinux_2_31_armv7l
             arch: arm/v7
@@ -125,6 +125,7 @@ jobs:
         run: |
           docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }} && \
           docker run \
+            --privileged \
             --rm \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -e -c '
               ${{ matrix.install }}
