@@ -51,6 +51,7 @@ jobs:
             name: Linux x86-64 (default)
             image: quay.io/pypa/musllinux_1_2_x86_64
             arch: amd64
+            install: apk add bzip2-static
           - os: ubuntu-24.04
             name: Linux x86-64 (glibc)
             image: quay.io/pypa/manylinux2014_x86_64
@@ -60,11 +61,13 @@ jobs:
             name: Linux x86-64 (musl)
             image: quay.io/pypa/musllinux_1_2_x86_64
             arch: amd64
+            install: apk add bzip2-static
             suffix-args: --suffix musl-linux-x86_64
           - os: ubuntu-24.04-arm
             name: Linux aarch64  (default)
-            arch: arm64
             image: quay.io/pypa/musllinux_1_2_aarch64
+            arch: arm64
+            install: apk add bzip2-static
           - os: ubuntu-24.04-arm
             name: Linux aarch64 (glibc)
             image: quay.io/pypa/manylinux2014_aarch64
@@ -74,8 +77,9 @@ jobs:
             name: Linux aarch64 (musl)
             image: quay.io/pypa/musllinux_1_2_aarch64
             arch: arm64
+            install: apk add bzip2-static
             suffix-args: --suffix musl-linux-aarch64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             name: Linux armv7l
             image: quay.io/pypa/manylinux_2_31_armv7l
             arch: arm/v7
@@ -123,6 +127,7 @@ jobs:
           docker run \
             --rm \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} sh -c '
+              ${{ matrix.install }}
               git config --global --add safe.directory /code && \
               curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
                 sh -s -- -y --profile minimal --default-toolchain none && \
