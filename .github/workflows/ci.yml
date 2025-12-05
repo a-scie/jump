@@ -88,7 +88,7 @@ jobs:
 
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
               sh -s -- -y --profile minimal --default-toolchain none
-            . "$HOME/.cargo/env"
+            . "\$HOME/.cargo/env"
 
             rustup toolchain add nightly -c rustfmt
             cargo +nightly fmt --check --all
