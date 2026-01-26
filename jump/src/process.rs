@@ -304,7 +304,7 @@ mod tests {
 
         let mut re = String::new();
         re.push('^');
-        for byte in non_utf8.as_os_str().to_raw_bytes().as_ref() {
+        for byte in non_utf8.as_os_str().to_raw_bytes().iter() {
             re.push_str(format!(r"(?-u:\x{:X})", byte).as_str());
         }
         re.push('$');
