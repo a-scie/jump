@@ -131,7 +131,7 @@ impl ScieExe {
     }
 
     #[cfg(windows)]
-    fn create_script(&self) -> (String, Option<&'static str>) {
+    fn create_script(scie_jump: &Path, lift: &Path) -> (String, Option<&'static str>) {
         let script = format!(
             "\
 #!/usr/bin/env pwsh
