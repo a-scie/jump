@@ -131,20 +131,37 @@ impl ScieExe {
     }
 
     #[cfg(windows)]
-    fn create_script(scie_jump: &Path, lift: &Path) -> (String, Option<&'static str>) {
-        let script = format!(
-            "\
+    fn create_script(
+        scie_jump: &Path,
+        name: Option<&str>,
+        lift: &Path,
+    ) -> (String, Option<&'static str>) {
+        let script = if let Some(scie_boot) = name {
+            format!(
+                "\
 #!/usr/bin/env pwsh
 if (-not $env:SCIE_BOOT) {{
-    $env:SCIE_BOOT = (Get-Item $PSCommandPath).BaseName
+    $env:SCIE_BOOT = '{scie_boot}'
 }}
 
 &{scie_jump} --launch={lift} @args
 exit $LASTEXITCODE
 ",
-            scie_jump = scie_jump.display(),
-            lift = lift.display()
-        );
+                scie_jump = scie_jump.display(),
+                lift = lift.display()
+            )
+        } else {
+            format!(
+                "\
+#!/usr/bin/env pwsh
+
+&{scie_jump} --launch={lift} @args
+exit $LASTEXITCODE
+",
+                scie_jump = scie_jump.display(),
+                lift = lift.display()
+            )
+        };
         (script, Some(".ps1"))
     }
 
@@ -154,19 +171,35 @@ exit $LASTEXITCODE
     }
 
     #[cfg(unix)]
-    fn create_script(scie_jump: &Path, lift: &Path) -> (String, Option<&'static str>) {
-        let script = format!(
-            "\
+    fn create_script(
+        scie_jump: &Path,
+        name: Option<&str>,
+        lift: &Path,
+    ) -> (String, Option<&'static str>) {
+        let script = if let Some(scie_boot) = name {
+            format!(
+                "\
 #!/bin/sh -e
 if [ -z \"$SCIE_BOOT\" ]; then
-    export SCIE_BOOT=\"$(basename \"$0\")\"
+    export SCIE_BOOT=\"{scie_boot}\"
 fi
 
 exec {scie_jump} --launch={lift} \"$@\"
 ",
-            scie_jump = scie_jump.display(),
-            lift = lift.display()
-        );
+                scie_jump = scie_jump.display(),
+                lift = lift.display()
+            )
+        } else {
+            format!(
+                "\
+#!/bin/sh -e
+
+exec {scie_jump} --launch={lift} \"$@\"
+",
+                scie_jump = scie_jump.display(),
+                lift = lift.display()
+            )
+        };
         (script, None)
     }
 
@@ -191,7 +224,7 @@ exec {scie_jump} --launch={lift} \"$@\"
         })
     }
 
-    pub fn exe(&mut self, dest: &Path) -> Result<PathBuf, String> {
+    pub fn exe(&mut self, command: &ScieBoot, dest: &Path) -> Result<PathBuf, String> {
         if let Some(lift) = self.lift.as_deref() {
             let tmp = self
                 .tmp
@@ -201,7 +234,15 @@ exec {scie_jump} --launch={lift} \"$@\"
                         lift = lift.display()
                     )
                 })?);
-            let (contents, extension) = Self::create_script(&self.exe, lift);
+            let (contents, extension) = Self::create_script(
+                &self.exe,
+                if command.default {
+                    None
+                } else {
+                    Some(&command.name)
+                },
+                lift,
+            );
             let tmp_file = tmp.as_file_mut();
             tmp_file.write_all(contents.as_bytes()).map_err(|e| {
                 format!(

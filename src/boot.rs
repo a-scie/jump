@@ -160,7 +160,7 @@ fn install_command(
     symlink: bool,
     mut hardlink: bool,
 ) -> Result<bool, Exit> {
-    let exe = scie_exe.exe(dest_dir).map_err(|e| {
+    let exe = scie_exe.exe(command, dest_dir).map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to obtain scie executable for installation: {e}"
         ))

@@ -5,7 +5,7 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd cat chmod cut jq stat
+check_cmd cat chmod cut dirname jq ln stat
 
 function size() {
   if [[ "${OS}" == "macos" ]]; then
@@ -14,6 +14,56 @@ function size() {
     stat -c %s "$1"
   fi
 }
+
+if ! "${SCIE_JUMP}" --launch="${LIFT}" "Unpacked Launch!" | grep "< Unpacked Launch! >"; then
+  die "Execution of the unpacked scie failed."
+else
+  echo "Unpacked execution of ${LIFT} directly with the ${SCIE_JUMP} works."
+fi
+
+gc "${PWD}/lift.json"
+ln -s "${LIFT}" lift.json
+if ! "${SCIE_JUMP}" -x "Unpacked Implicit Manifest Launch!" | grep "< Unpacked Implicit Manifest Launch! >"; then
+  die "Execution of the unpacked scie failed."
+else
+  echo "Unpacked execution of the implicit ${PWD}/lift.json with the ${SCIE_JUMP} works."
+fi
+
+(
+  abs_lift_path="${PWD}/${LIFT}"
+  cd "$(dirname "${SCIE_JUMP}")"
+  if ! "${SCIE_JUMP}" --launch="${abs_lift_path}" "Unpacked PWD different Launch!" | grep "< Unpacked PWD different Launch! >"; then
+    die "Execution of the unpacked scie failed."
+  else
+    echo "Unpacked execution of ${abs_lift_path} directly with the ${SCIE_JUMP} works from ${PWD}."
+  fi
+)
+
+SCIE=help "${SCIE_JUMP}" -x || die "SCIE=help for an unpacked scie failed."
+SCIE=list "${SCIE_JUMP}" -x || die "SCIE=list for an unpacked scie failed."
+SCIE=inspect "${SCIE_JUMP}" -x || die "SCIE=inspect for an unpacked scie failed."
+
+install_dir="${PWD}/install"
+gc "${install_dir}"
+mkdir "${install_dir}"
+SCIE=install "${SCIE_JUMP}" -x "${install_dir}" || die "SCIE=install for an unpacked scie failed."
+
+shim_script="${install_dir}/java"
+if [[ "${OS}" == "windows" ]]; then
+  shim_script="${install_dir}.ps1"
+fi
+if [[ -f "${shim_script}" ]]; then
+  echo "The expected shim script at ${shim_script} was generated with contents:"
+  cat "${shim_script}"
+else
+  die "The expected shim script at ${shim_script} was not generated."
+fi
+
+if ! "${shim_script}" "Shim Launch!!" | grep "< Shim Launch!! >"; then
+  die "Execution of unpacked scie installed shim script failed."
+else
+  echo "Execution of unpacked scie shim script at ${install_dir}/java succeeded:"
+fi
 
 SCIE_JUMP_ALT="scie-jump-${OS_ARCH}${EXE_EXT}"
 chmod +x "${SCIE_JUMP_ALT}"
