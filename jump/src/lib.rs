@@ -162,7 +162,7 @@ exit $LASTEXITCODE
                 lift = lift.display()
             )
         };
-        (script, Some(".ps1"))
+        (script, Some("ps1"))
     }
 
     #[cfg(windows)]
