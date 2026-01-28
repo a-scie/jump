@@ -43,13 +43,17 @@ SCIE=help "${SCIE_JUMP}" -x || die "SCIE=help for an unpacked scie failed."
 SCIE=list "${SCIE_JUMP}" -x || die "SCIE=list for an unpacked scie failed."
 SCIE=inspect "${SCIE_JUMP}" -x || die "SCIE=inspect for an unpacked scie failed."
 
-install_dir="${PWD}/install"
+if [[ "${OS}" == "windows" ]]; then
+  install_dir="${PWD}\install"
+else
+  install_dir="${PWD}/install"
+fi
 gc "${install_dir}"
-mkdir "${install_dir}"
+mkdir -v "${install_dir}"
 SCIE=install "${SCIE_JUMP}" -x "${install_dir}" || die "SCIE=install for an unpacked scie failed."
 
 if [[ "${OS}" == "windows" ]]; then
-  shim_script="${install_dir}/java.ps1"
+  shim_script="${install_dir}\java.ps1"
 else
   shim_script="${install_dir}/java"
 fi
