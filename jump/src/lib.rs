@@ -66,7 +66,7 @@ default the lift manifest is appended to the tail of the scie as a
 single line JSON document, but can be made a multi-line
 pretty-printed JSON document by passing --no-single-lift-line.
 
--x|--execute|--execute=[lift manifest]
+-x|--launch|--launch=[lift manifest]
 [arg]*
 
 Execute the given lift manifest. If no manifest is given, looks for
@@ -139,7 +139,7 @@ if (-not $env:SCIE_BOOT) {
     $env:SCIE_BOOT = (Get-Item $PSCommandPath).BaseName
 }
 
-&{scie_jump} --execute={lift} @args
+&{scie_jump} --launch={lift} @args
 exit $LASTEXITCODE
 ",
             scie_jump = scie_jump.display(),
@@ -162,7 +162,7 @@ if [ -z \"$SCIE_BOOT\" ]; then
     export SCIE_BOOT=\"$(basename \"$0\")\"
 fi
 
-exec {scie_jump} --execute={lift} \"$@\"
+exec {scie_jump} --launch={lift} \"$@\"
 ",
             scie_jump = scie_jump.display(),
             lift = lift.display()
@@ -223,7 +223,7 @@ exec {scie_jump} --execute={lift} \"$@\"
     pub fn cmdline(&self) -> String {
         if let Some(lift) = self.lift.as_deref() {
             format!(
-                "{scie_jump} --execute={lift}",
+                "{scie_jump} --launch={lift}",
                 scie_jump = self.exe.display(),
                 lift = lift.display()
             )
@@ -311,10 +311,10 @@ pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, Strin
         current_scie_jump_version,
     )? {
         if let Some(arg) = env::args().nth(1)
-            && (arg == "-x" || arg == "--execute" || arg.starts_with("--execute="))
+            && (arg == "-x" || arg == "--launch" || arg.starts_with("--launch="))
         {
-            let lift_path = Path::new(if arg.len() > "--execute=".len() {
-                &arg["--execute=".len()..]
+            let lift_path = Path::new(if arg.len() > "--launch=".len() {
+                &arg["--launch=".len()..]
             } else {
                 "lift.json"
             });

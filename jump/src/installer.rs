@@ -188,6 +188,7 @@ impl Directory {
             )
         })
     }
+
     fn unpack_file(&self, file: &File, dst: &Path) -> Result<(), String> {
         unpack_file(file, || self.byte_source(file), dst)
     }
