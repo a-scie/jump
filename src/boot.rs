@@ -5,9 +5,9 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use jump::config::Fmt;
-use jump::{Jump, Lift, ScieBoot, SelectBoot};
+use jump::{Jump, Lift, ScieBoot, ScieExe, SelectBoot};
 use log::warn;
-use proc_exit::{Code, ExitResult};
+use proc_exit::{Code, Exit, ExitResult};
 
 mod pack;
 mod split;
@@ -153,10 +153,72 @@ fn symlink_file(src: &Path, dst: &Path) -> ExitResult {
     })
 }
 
-pub(crate) fn install(scie: PathBuf, commands: Vec<ScieBoot>) -> ExitResult {
+fn install_command(
+    command: &ScieBoot,
+    scie_exe: &mut ScieExe,
+    dest_dir: &Path,
+    symlink: bool,
+    mut hardlink: bool,
+) -> Result<bool, Exit> {
+    let exe = scie_exe.exe(dest_dir).map_err(|e| {
+        Code::FAILURE.with_message(format!(
+            "Failed to obtain scie executable for installation: {e}"
+        ))
+    })?;
+    let mut dest = dest_dir.join(command.name.as_str());
+    if scie_exe.is_scie() {
+        dest = dest.with_extension(env::consts::EXE_EXTENSION)
+    } else if let Some(extension) = exe.extension() {
+        dest = dest.with_extension(extension);
+    }
+    if dest == exe {
+        return Ok(hardlink);
+    }
+
+    if symlink {
+        symlink_file(&exe, &dest)?;
+        return Ok(hardlink);
+    }
+
+    if hardlink {
+        if let Err(e) = std::fs::hard_link(&exe, &dest) {
+            hardlink = false;
+            warn!(
+                "Failed to hard link {src} to {dst}, switching to copy instead: \
+                {e}",
+                src = exe.display(),
+                dst = dest.display()
+            );
+        } else {
+            return Ok(hardlink);
+        }
+    }
+    std::fs::copy(&exe, &dest).map_err(|e| {
+        Code::FAILURE.with_message(format!(
+            "Failed to copy {src} to {dst}: {e}",
+            src = exe.display(),
+            dst = dest.display()
+        ))
+    })?;
+    Ok(hardlink)
+}
+
+pub(crate) fn install(
+    mut scie_exe: ScieExe,
+    commands: Vec<ScieBoot>,
+    argv_skip: usize,
+) -> ExitResult {
+    if commands.is_empty() {
+        return Err(Code::FAILURE.with_message(format!(
+            "The {scie} scie is malformed - it has no boot commands.\n\
+                \n\
+                You might begin debugging by inspecting the output of `SCIE=inspect {scie}`.",
+            scie = scie_exe.cmdline()
+        )));
+    }
     let mut symlink = false;
     let mut dest_dirs = vec![];
-    for arg in env::args().skip(1) {
+    for arg in env::args().skip(argv_skip) {
         match arg.as_str() {
             "-s" | "--symlink" => symlink = true,
             path => dest_dirs.push(PathBuf::from(path)),
@@ -176,36 +238,12 @@ pub(crate) fn install(scie: PathBuf, commands: Vec<ScieBoot>) -> ExitResult {
                 dest_dir = dest_dir.display()
             ))
         })?;
-        let mut hardlink = true;
-        for command in &commands {
-            let dest = dest_dir
-                .join(command.name.as_str())
-                .with_extension(env::consts::EXE_EXTENSION);
-            if dest != scie {
-                if symlink {
-                    symlink_file(&scie, &dest)?;
-                } else {
-                    if hardlink {
-                        if let Err(e) = std::fs::hard_link(&scie, &dest) {
-                            hardlink = false;
-                            warn!(
-                                "Failed to hard link {src} to {dst}, switching to copy instead: \
-                                {e}",
-                                src = scie.display(),
-                                dst = dest.display()
-                            );
-                        } else {
-                            continue;
-                        }
-                    }
-                    std::fs::copy(&scie, &dest).map_err(|e| {
-                        Code::FAILURE.with_message(format!(
-                            "Failed to copy {src} to {dst}: {e}",
-                            src = scie.display(),
-                            dst = dest.display()
-                        ))
-                    })?;
-                }
+        if let Some(default_command) = commands.iter().find(|cmd| cmd.default) {
+            install_command(default_command, &mut scie_exe, &dest_dir, symlink, true)?;
+        } else {
+            let mut hardlink = true;
+            for command in &commands {
+                hardlink = install_command(command, &mut scie_exe, &dest_dir, symlink, hardlink)?;
             }
         }
     }

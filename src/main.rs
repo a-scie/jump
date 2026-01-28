@@ -98,16 +98,19 @@ fn main() -> ExitResult {
     })?;
 
     match action {
-        BootAction::Execute((process, argv1_consumed, extra_env)) => {
-            let argv_skip = if argv1_consumed { 2 } else { 1 };
-            exec(process, argv_skip, extra_env)
-        }
+        BootAction::Execute((process, argv_skip, extra_env)) => exec(process, argv_skip, extra_env),
         BootAction::Help((message, exit_code)) => boot::help(message, exit_code),
         BootAction::Inspect((jump, lift)) => boot::inspect(jump, lift),
-        BootAction::Install((scie, commands)) => boot::install(scie, commands),
+        BootAction::Install((scie_exe, commands, argv_skip)) => {
+            boot::install(scie_exe, commands, argv_skip)
+        }
         BootAction::List(commands) => boot::list(commands),
-        BootAction::Pack((jump, scie_jump_path)) => boot::pack(jump, scie_jump_path, VERSION),
+        BootAction::Pack((jump, scie_jump_path, argv_skip)) => {
+            boot::pack(jump, scie_jump_path, VERSION, argv_skip)
+        }
         BootAction::Select(select_boot) => boot::select(select_boot),
-        BootAction::Split((jump, lift, scie_path)) => boot::split(jump, lift, scie_path),
+        BootAction::Split((jump, lift, scie_path, argv_skip)) => {
+            boot::split(jump, lift, scie_path, argv_skip)
+        }
     }
 }
