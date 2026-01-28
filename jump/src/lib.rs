@@ -135,9 +135,9 @@ impl ScieExe {
         let script = format!(
             "\
 #!/usr/bin/env pwsh
-if (-not $env:SCIE_BOOT) {
+if (-not $env:SCIE_BOOT) {{
     $env:SCIE_BOOT = (Get-Item $PSCommandPath).BaseName
-}
+}}
 
 &{scie_jump} --launch={lift} @args
 exit $LASTEXITCODE
