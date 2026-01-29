@@ -5,6 +5,8 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Debug, Formatter};
+use std::fs::Permissions;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::Child;
 
@@ -75,14 +77,14 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
 
 #[derive(Clone, Debug)]
 struct LiftManifest {
-    path: PathBuf,
+    dst: PathBuf,
     jump: Jump,
     lift: Lift,
 }
 
 impl LiftManifest {
     fn install(&self) -> Result<(), String> {
-        atomic_path(&self.path, Target::File, |path| {
+        atomic_path(&self.dst, Target::File, |path| {
             config(self.jump.clone(), self.lift.clone()).serialize(
                 &mut std::fs::OpenOptions::new()
                     .write(true)
@@ -91,7 +93,7 @@ impl LiftManifest {
                     .map_err(|e| {
                         format!(
                             "Failed top open lift manifest at {path} for writing: {e}",
-                            path = self.path.display()
+                            path = self.dst.display()
                         )
                     })?,
                 Fmt::new().trailing_newline(true).pretty(true),
@@ -101,8 +103,66 @@ impl LiftManifest {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ScieJump {
+    dst: PathBuf,
+    src: PathBuf,
+    size: usize,
+}
+
+impl ScieJump {
+    #[cfg(windows)]
+    fn executable_permissions() -> Option<Permissions> {
+        None
+    }
+
+    #[cfg(unix)]
+    fn executable_permissions() -> Option<Permissions> {
+        use std::os::unix::fs::PermissionsExt;
+        Some(Permissions::from_mode(0o755))
+    }
+
+    fn install(&self) -> Result<(), String> {
+        atomic_path(&self.dst, Target::File, |path| {
+            let src = std::fs::File::open(&self.src).map_err(|e| {
+                format!(
+                    "Failed top open scie-jump at {path} for reading: {e}",
+                    path = self.src.display()
+                )
+            })?;
+            let mut dst = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .map_err(|e| {
+                    format!(
+                        "Failed top open scie-jump at {path} for writing: {e}",
+                        path = self.dst.display()
+                    )
+                })?;
+            if let Some(permissions) = Self::executable_permissions() {
+                dst.set_permissions(permissions).map_err(|e| {
+                    format!(
+                        "Failed to set executable permissions on {dst}: {e}",
+                        dst = self.dst.display()
+                    )
+                })?;
+            }
+            std::io::copy(&mut src.take(self.size as u64), &mut dst).map_err(|e| {
+                format!(
+                    "Failed to copy the scie-jump from {src} to {dst}: {e}",
+                    src = self.src.display(),
+                    dst = self.dst.display()
+                )
+            })
+        })?;
+        Ok(())
+    }
+}
+
 pub(crate) struct LoadProcess {
     lift_manifest: Option<LiftManifest>,
+    scie_jump: Option<ScieJump>,
     process: Process,
 }
 
@@ -110,6 +170,9 @@ impl LoadProcess {
     pub(crate) fn spawn_stdout(&self, args: &[&str]) -> Result<Child, String> {
         if let Some(ref lift_manifest) = self.lift_manifest {
             lift_manifest.install()?;
+        }
+        if let Some(ref scie_jump) = self.scie_jump {
+            scie_jump.install()?;
         }
         self.process.spawn_stdout(args)
     }
@@ -226,6 +289,9 @@ pub(crate) struct Context<'a> {
     lift_manifest: LiftManifest,
     lift_manifest_dependants: HashSet<Process>,
     lift_manifest_installed: bool,
+    scie_jump: ScieJump,
+    scie_jump_dependants: HashSet<Process>,
+    scie_jump_installed: bool,
     bound: HashMap<String, Binding>,
     installed: HashSet<File>,
     ambient_env: IndexMap<OsString, OsString>,
@@ -265,12 +331,19 @@ impl<'a> Context<'a> {
             files_by_name,
             replacements: HashSet::new(),
             lift_manifest: LiftManifest {
-                path: PathBuf::new(), // N.B.: We replace this empty value below.
+                dst: PathBuf::new(), // N.B.: We replace this empty value below.
                 jump: jump.clone(),
                 lift: lift.clone(),
             },
             lift_manifest_dependants: HashSet::new(),
             lift_manifest_installed: false,
+            scie_jump: ScieJump {
+                dst: PathBuf::new(), // N.B.: We replace this empty value below.
+                src: scie.exe.clone(),
+                size: jump.size,
+            },
+            scie_jump_dependants: HashSet::new(),
+            scie_jump_installed: false,
             bound: HashMap::new(),
             installed: HashSet::new(),
             ambient_env,
@@ -278,7 +351,7 @@ impl<'a> Context<'a> {
 
         // Now patch up the base and the lift path (which is derived from it) with any placeholder
         // resolving that may be required.
-        let (parsed_base, needs_lift_manifest) = context.reify_string(
+        let (parsed_base, needs_lift_manifest, needs_scie_jump) = context.reify_string(
             None,
             &context
                 .base
@@ -289,37 +362,47 @@ impl<'a> Context<'a> {
                     format!("Failed to interpret the scie.lift.base as a utf-8 string: {e:?}")
                 })?,
         )?;
-        if needs_lift_manifest {
+        if needs_lift_manifest || needs_scie_jump {
             return Err(format!(
-                "The scie.lift.base cannot use the placeholder {{scie.lift}} since that \
-                placeholder is calculated from the resolved location of the scie.lift.base, \
-                given: {base}",
+                "The scie.lift.base cannot use the placeholders {{scie.jump}} or {{scie.lift}} \
+                since those placeholders are calculated from the resolved location of the \
+                scie.lift.base, given: {base}",
                 base = context.base.display()
             ));
         }
         context.base = PathBuf::from(parsed_base);
-        context.lift_manifest.path = context.base.join(&lift.hash).join("lift.json");
+        context.lift_manifest.dst = context.base.join(&lift.hash).join("lift.json");
+        context.scie_jump.dst = context
+            .base
+            .join("scie-jumps")
+            .join(&jump.version)
+            .join("scie-jump");
         Ok(context)
     }
 
     fn prepare_process(&mut self, cmd: &'a Cmd) -> Result<Process, String> {
         let mut env = prepare_env(cmd, &self.ambient_env)?;
         let mut needs_lift_manifest = false;
-        let (exe, needs_manifest) = self.reify_string(Some(&env), &cmd.exe)?;
+        let mut needs_scie_jump = false;
+        let (exe, needs_manifest, needs_jump) = self.reify_string(Some(&env), &cmd.exe)?;
         needs_lift_manifest |= needs_manifest;
+        needs_scie_jump |= needs_jump;
 
         let mut args = vec![];
         for arg in &cmd.args {
-            let (reified_arg, needs_manifest) = self.reify_string(Some(&env), arg)?;
+            let (reified_arg, needs_manifest, needs_jump) = self.reify_string(Some(&env), arg)?;
             needs_lift_manifest |= needs_manifest;
+            needs_scie_jump |= needs_jump;
             args.push(reified_arg.into());
         }
         let mut vars = vec![];
         for (key, value) in cmd.env.iter() {
             let final_value = match value {
                 Some(val) => {
-                    let (reified_value, needs_manifest) = self.reify_string(Some(&env), val)?;
+                    let (reified_value, needs_manifest, needs_jump) =
+                        self.reify_string(Some(&env), val)?;
                     needs_lift_manifest |= needs_manifest;
+                    needs_scie_jump |= needs_jump;
                     match key {
                         config::EnvVar::Default(name) => {
                             if !env.contains_key(name) {
@@ -350,6 +433,9 @@ impl<'a> Context<'a> {
         if needs_lift_manifest {
             self.lift_manifest_dependants.insert(process.clone());
         }
+        if needs_scie_jump {
+            self.scie_jump_dependants.insert(process.clone());
+        }
         Ok(process)
     }
 
@@ -370,6 +456,7 @@ impl<'a> Context<'a> {
                         .get(binding_name)
                         .ok_or_else(|| format!("No boot binding named {binding_name}."))?,
                 )?;
+
                 let lift_manifest = if !self.lift_manifest_installed
                     && self.lift_manifest_dependants.contains(&file_source_process)
                 {
@@ -377,9 +464,19 @@ impl<'a> Context<'a> {
                 } else {
                     None
                 };
+
+                let scie_jump = if !self.scie_jump_installed
+                    && self.scie_jump_dependants.contains(&file_source_process)
+                {
+                    Some(self.scie_jump.clone())
+                } else {
+                    None
+                };
+
                 load_entries.push(FileEntry::LoadAndInstall((
                     LoadProcess {
                         lift_manifest,
+                        scie_jump,
                         process: file_source_process,
                     },
                     file.clone(),
@@ -437,6 +534,7 @@ impl<'a> Context<'a> {
         if let Some(cmd) = self.lift.boot.commands.get(name) {
             let (process, files) = self.prepare(cmd)?;
             self.maybe_install_lift_manifest(&process)?;
+            self.maybe_install_scie_jump(&process)?;
             return Ok(Some(SelectedCmd {
                 process,
                 files,
@@ -500,15 +598,25 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
+    fn maybe_install_scie_jump(&mut self, process: &Process) -> Result<(), String> {
+        if !self.scie_jump_installed && self.scie_jump_dependants.contains(process) {
+            self.scie_jump.install()?;
+            self.scie_jump_installed = true;
+        }
+        Ok(())
+    }
+
     fn parse_env(
         &mut self,
         cmd_env: Option<&IndexMap<String, String>>,
         env_var: &str,
-    ) -> Result<(ParsedEnv, bool), String> {
-        let (parsed_env, needs_lift_manifest) = self.reify_string(cmd_env, env_var)?;
+    ) -> Result<(ParsedEnv, bool, bool), String> {
+        let (parsed_env, needs_lift_manifest, needs_scie_jump) =
+            self.reify_string(cmd_env, env_var)?;
         Ok((
             parse_scie_env_placeholder(&parsed_env)?,
             needs_lift_manifest,
+            needs_scie_jump,
         ))
     }
 
@@ -534,6 +642,7 @@ impl<'a> Context<'a> {
             };
             let binding_env = boot_binding.execute(|| {
                 self.maybe_install_lift_manifest(&boot_binding.process)?;
+                self.maybe_install_scie_jump(&boot_binding.process)?;
                 install(self.file_source, files.as_slice())
             })?;
             self.bound.insert(name.to_string(), boot_binding);
@@ -561,9 +670,10 @@ impl<'a> Context<'a> {
         &mut self,
         cmd_env: Option<&IndexMap<String, String>>,
         value: &str,
-    ) -> Result<(String, bool), String> {
+    ) -> Result<(String, bool, bool), String> {
         let mut reified = String::with_capacity(value.len());
         let mut lift_manifest_required = false;
+        let mut scie_jump_required = false;
 
         let parsed = placeholders::parse(value)?;
         for item in &parsed.items {
@@ -571,8 +681,10 @@ impl<'a> Context<'a> {
                 Item::LeftBrace => reified.push('{'),
                 Item::Text(text) => reified.push_str(text),
                 Item::Placeholder(Placeholder::FileHash(name)) => {
-                    let (parsed_name, needs_manifest) = self.reify_string(cmd_env, name)?;
+                    let (parsed_name, needs_manifest, needs_jump) =
+                        self.reify_string(cmd_env, name)?;
                     lift_manifest_required |= needs_manifest;
+                    scie_jump_required |= needs_jump;
                     let file = self
                         .files_by_name
                         .get(parsed_name.as_str())
@@ -582,8 +694,10 @@ impl<'a> Context<'a> {
                     reified.push_str(&file.hash);
                 }
                 Item::Placeholder(Placeholder::FileName(name)) => {
-                    let (parsed_name, needs_manifest) = self.reify_string(cmd_env, name)?;
+                    let (parsed_name, needs_manifest, needs_jump) =
+                        self.reify_string(cmd_env, name)?;
                     lift_manifest_required |= needs_manifest;
+                    scie_jump_required |= needs_jump;
                     let file = self
                         .files_by_name
                         .get(parsed_name.as_str())
@@ -595,8 +709,10 @@ impl<'a> Context<'a> {
                     self.replacements.insert(file);
                 }
                 Item::Placeholder(Placeholder::Env(env_var)) => {
-                    let (parsed_env, needs_manifest) = self.parse_env(cmd_env, env_var)?;
+                    let (parsed_env, needs_manifest, needs_jump) =
+                        self.parse_env(cmd_env, env_var)?;
                     lift_manifest_required |= needs_manifest;
+                    scie_jump_required |= needs_jump;
                     let value = if let Some(val) = cmd_env
                         .and_then(|e| e.get(&parsed_env.name))
                         .map(String::to_owned)
@@ -605,8 +721,10 @@ impl<'a> Context<'a> {
                                 .get(&OsString::from(&parsed_env.name))
                                 .and_then(|val| val.clone().into_string().ok())
                         }) {
-                        let (parsed_value, needs_manifest) = self.reify_string(cmd_env, &val)?;
+                        let (parsed_value, needs_manifest, needs_jump) =
+                            self.reify_string(cmd_env, &val)?;
                         lift_manifest_required |= needs_manifest;
+                        scie_jump_required |= needs_jump;
                         parsed_value
                     } else {
                         parsed_env.default.unwrap_or_default()
@@ -614,8 +732,10 @@ impl<'a> Context<'a> {
                     reified.push_str(&value)
                 }
                 Item::Placeholder(Placeholder::UserCacheDir(fallback)) => {
-                    let (parsed_fallback, needs_manifest) = self.reify_string(cmd_env, fallback)?;
+                    let (parsed_fallback, needs_manifest, needs_jump) =
+                        self.reify_string(cmd_env, fallback)?;
                     lift_manifest_required |= needs_manifest;
+                    scie_jump_required |= needs_jump;
                     reified.push_str(if let Some(user_cache_dir) = dirs::cache_dir() {
                         user_cache_dir.into_os_string().into_string().map_err(|e| {
                             format!("Could not interpret the user cache directory as a utf-8 string: {e:?}")
@@ -645,8 +765,10 @@ impl<'a> Context<'a> {
                     env: env_var,
                 })) => {
                     let binding_env = self.bind(binding)?;
-                    let (parsed_env, needs_manifest) = self.parse_env(cmd_env, env_var)?;
+                    let (parsed_env, needs_manifest, needs_jump) =
+                        self.parse_env(cmd_env, env_var)?;
                     lift_manifest_required |= needs_manifest;
+                    scie_jump_required |= needs_jump;
                     let value = binding_env
                         .get(&parsed_env.name)
                         .map(String::to_owned)
@@ -654,9 +776,13 @@ impl<'a> Context<'a> {
                         .unwrap_or_default();
                     reified.push_str(&value)
                 }
+                Item::Placeholder(Placeholder::ScieJump) => {
+                    scie_jump_required = true;
+                    reified.push_str(path_to_str(&self.scie_jump.dst)?);
+                }
                 Item::Placeholder(Placeholder::ScieLift) => {
                     lift_manifest_required = true;
-                    reified.push_str(path_to_str(&self.lift_manifest.path)?);
+                    reified.push_str(path_to_str(&self.lift_manifest.dst)?);
                 }
                 Item::Placeholder(Placeholder::SciePlatform) => reified
                     .push_str(format!("{os}-{arch}", os = env::consts::OS, arch = ARCH).as_str()),
@@ -664,7 +790,7 @@ impl<'a> Context<'a> {
                 Item::Placeholder(Placeholder::SciePlatformOs) => reified.push_str(env::consts::OS),
             }
         }
-        Ok((reified, lift_manifest_required))
+        Ok((reified, lift_manifest_required, scie_jump_required))
     }
 }
 
@@ -732,7 +858,7 @@ mod tests {
 
         let mut env = IndexMap::new();
         assert_eq!(
-            ("".to_string(), false),
+            ("".to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__}")
                 .unwrap()
@@ -740,7 +866,7 @@ mod tests {
 
         env.clear();
         assert_eq!(
-            ("default".to_string(), false),
+            ("default".to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__=default}")
                 .unwrap()
@@ -749,7 +875,7 @@ mod tests {
         env.clear();
         env.insert("__DNE__".to_owned(), "foo".to_owned());
         assert_eq!(
-            ("foo".to_string(), false),
+            ("foo".to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__=default}")
                 .unwrap()
@@ -757,7 +883,7 @@ mod tests {
 
         env.clear();
         assert_eq!(
-            ("scie_path".to_string(), false),
+            ("scie_path".to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__={scie}}")
                 .unwrap()
@@ -774,6 +900,7 @@ mod tests {
                     .into_os_string()
                     .into_string()
                     .unwrap(),
+                false,
                 false
             ),
             context.reify_string(Some(&env), "{scie.base}").unwrap()
@@ -786,18 +913,35 @@ mod tests {
                     .to_str()
                     .unwrap()
                     .to_string(),
-                true
+                true,
+                false
             ),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__={scie.lift}}")
+                .unwrap()
+        );
+        assert_eq!(
+            (
+                expected_scie_base
+                    .join("scie-jumps")
+                    .join("0.1.0")
+                    .join("scie-jump")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                false,
+                true
+            ),
+            context
+                .reify_string(Some(&env), "{scie.env.__DNE__={scie.jump}}")
                 .unwrap()
         );
 
         let mut invalid_lift = lift.clone();
         invalid_lift.base = Some("{scie.lift}/circular".to_string());
         assert_eq!(
-            "The scie.lift.base cannot use the placeholder {scie.lift} since that placeholder is \
-            calculated from the resolved location of the scie.lift.base, given: \
+            "The scie.lift.base cannot use the placeholders {scie.jump} or {scie.lift} since those \
+            placeholders are calculated from the resolved location of the scie.lift.base, given: \
             {scie.lift}/circular"
                 .to_string(),
             Context::new(
@@ -819,6 +963,7 @@ mod tests {
                     .to_str()
                     .unwrap()
                     .to_string(),
+                false,
                 false
             ),
             context
@@ -828,7 +973,7 @@ mod tests {
 
         env.clear();
         assert_eq!(
-            ("42".to_string(), false),
+            ("42".to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()
@@ -837,7 +982,7 @@ mod tests {
         env.clear();
         env.insert("__DNE2__".to_owned(), "bar".to_owned());
         assert_eq!(
-            ("bar".to_string(), false),
+            ("bar".to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__={scie.env.__DNE2__=42}}")
                 .unwrap()

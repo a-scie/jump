@@ -21,6 +21,7 @@ pub(crate) enum Placeholder<'a> {
     ScieBindings,
     ScieBindingCmd(&'a str),
     ScieBindingEnv(ScieBindingEnv<'a>),
+    ScieJump,
     ScieLift,
     SciePlatform,
     SciePlatformArch,
@@ -129,6 +130,7 @@ pub(crate) fn parse(text: &str) -> Result<Parsed<'_>, String> {
                             }
                         }
                     }
+                    ["scie", "jump"] => items.push(Item::Placeholder(Placeholder::ScieJump)),
                     ["scie", "lift"] => items.push(Item::Placeholder(Placeholder::ScieLift)),
                     ["scie", "platform"] => {
                         items.push(Item::Placeholder(Placeholder::SciePlatform))

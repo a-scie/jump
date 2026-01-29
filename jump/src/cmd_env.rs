@@ -94,6 +94,7 @@ impl<'a> EnvParser<'a> {
                 Item::Placeholder(Placeholder::ScieBindingEnv(ScieBindingEnv { binding, env })) => {
                     reified.push_str(&format!("{{scie.bindings.{binding}:{env}}}"))
                 }
+                Item::Placeholder(Placeholder::ScieJump) => reified.push_str("{scie.jump}"),
                 Item::Placeholder(Placeholder::ScieLift) => reified.push_str("{scie.lift}"),
                 Item::Placeholder(Placeholder::SciePlatform) => reified.push_str("{scie.platform}"),
                 Item::Placeholder(Placeholder::SciePlatformArch) => {

@@ -30,6 +30,12 @@
               "=JAVA_HOME": "{jdk}/jdk-19.0.1.jdk/Contents/Home",
               "=PATH": "{jdk}/jdk-19.0.1.jdk/Contents/Home/bin:{scie.env.PATH}"
             }
+          },
+          "unpacked": {
+            "exe": "{scie.jump}",
+            "args": [
+              "--launch={scie.lift}"
+            ]
           }
         }
       }

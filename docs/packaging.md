@@ -141,8 +141,8 @@ Expanding rules:
   double quotes.
 
 A scie "lift" can also establish a custom `nce` cache directory via the "base" string field. Any
-placeholders  present in the custom value will be expanded save for the `{scie.lift}` placeholder
-which will lead to a scie jump boot error.
+placeholders  present in the custom value will be expanded save for the `{scie.jump}` and
+`{scie.lift}` placeholders which will lead to a scie jump boot error.
 
 For files, you can supply a "size" and sha256 "hash". Without these the boot-pack will calculate
 them, but you may want to set them in advance as a security precaution. The `scie-jump` will refuse
@@ -375,8 +375,9 @@ Runtime external control variables:
   that defines named commands. One way to discover these is via invoking `SCIE=list <scie path>`.
 + `SCIE_BASE`: This can be used to override the default scie base of `~/.cache/nce` on Linux,
    `~/Library/Caches/nce` on Mac and `~\AppData\Local\nce` on Windows. Any placeholders save for
-   `{scie.lift}` will be expanded. If the `{scie.lift}` placeholder is encountered expanding the
-   `SCIE_BASE` value, a runtime error will abort the scie jump boot.
+   `{scie.jump}` and `{scie.lift}` will be expanded. If either the `{scie.jump}` or `{scie.lift}`
+   placeholders are encountered expanding the `SCIE_BASE` value, a runtime error will abort the
+   scie jump boot.
 
 Runtime read-only variables:
 
@@ -407,6 +408,10 @@ Further placeholders you can use in command "exe", "args" and "env" values inclu
   Using `{{env.var.FILE_NAME}}` doesn't work since `{{` is treated as an escape that produces a
   literal `{{`; so you can use `{scie.file.{env.var.FILE_NAME}}` instead for these cases.
 + `{scie.file:hash.<name>}`: The sha256 hash of the given file name.
++ `{scie.jump}`: This expands to the path of the scie-jump executable used to launch the scie. When
+  running from a scie, the scie-jump is extracted to disk from the scie tip when you use this
+  placeholder. When launched by a bare scie-jump, that scie-jump is copied into the scie base when
+  you use this placeholder.
 + `{scie.lift}`: This expands to the path to the lift manifest, which is extracted to disk when you
   use this placeholder. This can be used to read custom metadata stored in the lift manifest.
 + `{scie.platform}`: The `<OS>-<ARCH>` value for the current platform where `<OS>` is one of
