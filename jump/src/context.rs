@@ -15,7 +15,7 @@ use logging_timer::time;
 use crate::atomic::{Target, atomic_path};
 use crate::cmd_env::{ParsedEnv, parse_scie_env_placeholder, prepare_env};
 use crate::config::{Cmd, Fmt};
-use crate::installer::Installer;
+use crate::installer::{FileSource, install};
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
 use crate::process::{EnvVar, Process};
@@ -220,7 +220,7 @@ pub(crate) struct Context<'a> {
     scie: &'a CurrentExe,
     lift: &'a Lift,
     base: PathBuf,
-    installer: &'a Installer<'a>,
+    file_source: &'a FileSource<'a>,
     files_by_name: HashMap<&'a str, &'a File>,
     replacements: HashSet<&'a File>,
     lift_manifest: LiftManifest,
@@ -237,7 +237,7 @@ impl<'a> Context<'a> {
         scie: &'a CurrentExe,
         jump: &'a Jump,
         lift: &'a Lift,
-        installer: &'a Installer,
+        file_source: &'a FileSource,
         ambient_env: IndexMap<OsString, OsString>,
     ) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
@@ -261,7 +261,7 @@ impl<'a> Context<'a> {
             scie,
             lift,
             base,
-            installer,
+            file_source,
             files_by_name,
             replacements: HashSet::new(),
             lift_manifest: LiftManifest {
@@ -534,7 +534,7 @@ impl<'a> Context<'a> {
             };
             let binding_env = boot_binding.execute(|| {
                 self.maybe_install_lift_manifest(&boot_binding.process)?;
-                self.installer.install(files.as_slice())
+                install(self.file_source, files.as_slice())
             })?;
             self.bound.insert(name.to_string(), boot_binding);
             for file_entry in files {
@@ -672,10 +672,10 @@ pub(crate) fn select_command(
     current_exe: &CurrentExe,
     jump: &Jump,
     lift: &Lift,
-    installer: &Installer,
+    file_source: &FileSource,
     ambient_env: IndexMap<OsString, OsString>,
 ) -> Result<SelectedCmd, String> {
-    let mut context = Context::new(current_exe, jump, lift, installer, ambient_env)?;
+    let mut context = Context::new(current_exe, jump, lift, file_source, ambient_env)?;
     context.select_command(lift.name.as_str())
 }
 
@@ -687,7 +687,7 @@ mod tests {
 
     use super::Context;
     use crate::config::{ArchiveType, Boot, Cmd, Compression, FileType};
-    use crate::installer::Installer;
+    use crate::installer::{FileSource, Scie};
     use crate::{CurrentExe, File, Jump, Lift, Process, Source, config, process};
 
     #[test]
@@ -725,10 +725,10 @@ mod tests {
             }],
             other: None,
         };
-        let installer = Installer::new(&[]);
+        let file_source = FileSource::Scie(Scie::new(&[]));
         let current_exe = CurrentExe::from_path(Path::new("scie_path"));
         let mut context =
-            Context::new(&current_exe, &jump, &lift, &installer, IndexMap::new()).unwrap();
+            Context::new(&current_exe, &jump, &lift, &file_source, IndexMap::new()).unwrap();
 
         let mut env = IndexMap::new();
         assert_eq!(
@@ -804,7 +804,7 @@ mod tests {
                 &CurrentExe::from_path(Path::new("scie_path")),
                 &jump,
                 &invalid_lift,
-                &installer,
+                &file_source,
                 IndexMap::new()
             )
             .unwrap_err()
@@ -908,10 +908,10 @@ mod tests {
             ],
             other: None,
         };
-        let installer = Installer::new(&[]);
+        let file_source = FileSource::Scie(Scie::new(&[]));
         let current_exe = CurrentExe::from_path(Path::new("scie_path"));
         let mut context =
-            Context::new(&current_exe, &jump, &lift, &installer, IndexMap::new()).unwrap();
+            Context::new(&current_exe, &jump, &lift, &file_source, IndexMap::new()).unwrap();
 
         let cmd = lift.boot.commands.get("").unwrap();
 
@@ -939,7 +939,7 @@ mod tests {
             &current_exe,
             &jump,
             &lift,
-            &installer,
+            &file_source,
             [("SELECT".into(), "v1".into())].into(),
         )
         .unwrap();
@@ -967,7 +967,7 @@ mod tests {
             &current_exe,
             &jump,
             &lift,
-            &installer,
+            &file_source,
             [("SELECT".into(), "v2".into())].into(),
         )
         .unwrap();
@@ -1044,13 +1044,13 @@ mod tests {
             files: vec![],
             other: None,
         };
-        let installer = Installer::new(&[]);
+        let file_source = FileSource::Scie(Scie::new(&[]));
         let current_exe = CurrentExe::from_path(Path::new("scie_path"));
         let mut context = Context::new(
             &current_exe,
             &jump,
             &lift,
-            &installer,
+            &file_source,
             [("PATH".into(), "/test/path".into())].into(),
         )
         .unwrap();
@@ -1082,7 +1082,7 @@ mod tests {
             &current_exe,
             &jump,
             &lift,
-            &installer,
+            &file_source,
             [
                 ("D".into(), "d".into()),
                 ("PATH".into(), "/test/path".into()),
@@ -1148,7 +1148,7 @@ mod tests {
             files: vec![],
             other: None,
         };
-        let installer = Installer::new(&[]);
+        let file_source = FileSource::Scie(Scie::new(&[]));
         let current_exe = CurrentExe {
             exe: "exe".into(),
             invoked_as: "invoked_as".into(),
@@ -1157,7 +1157,7 @@ mod tests {
             &current_exe,
             &jump,
             &lift,
-            &installer,
+            &file_source,
             [
                 ("SCIE".into(), "exe".into()),
                 ("SCIE_ARGV0".into(), "invoked_as".into()),

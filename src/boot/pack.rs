@@ -283,10 +283,11 @@ pub(crate) fn set(
     mut jump: Jump,
     mut scie_jump_path: PathBuf,
     current_scie_jump_version: &str,
+    argv_skip: usize,
 ) -> ExitResult {
     let mut lifts = vec![];
     let mut single_line = true;
-    let mut args = env::args().skip(1);
+    let mut args = env::args().skip(argv_skip);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-h" | "--help" => return print_help(),

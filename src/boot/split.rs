@@ -100,12 +100,17 @@ impl ChosenFiles {
     }
 }
 
-pub(crate) fn split(jump: Jump, mut lift: Lift, scie_path: PathBuf) -> ExitResult {
+pub(crate) fn split(
+    jump: Jump,
+    mut lift: Lift,
+    scie_path: PathBuf,
+    argv_skip: usize,
+) -> ExitResult {
     let mut extra_args_seen = false;
     let mut dry_run = false;
     let mut chosen_files = ChosenFiles::new();
     let mut custom_base: Option<PathBuf> = None;
-    for arg in env::args().skip(1) {
+    for arg in env::args().skip(argv_skip) {
         match arg.as_str() {
             "-n" | "--dry-run" if !extra_args_seen => dry_run = true,
             "--" => extra_args_seen = true,
