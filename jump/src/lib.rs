@@ -23,7 +23,7 @@ mod zip;
 
 use std::env;
 use std::env::current_exe;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 
@@ -162,7 +162,7 @@ exit $LASTEXITCODE
                 lift = lift.display()
             )
         };
-        (script, Some("ps1"))
+        (script, Some(".ps1"))
     }
 
     #[cfg(windows)]
@@ -226,14 +226,6 @@ exec {scie_jump} --launch={lift} \"$@\"
 
     pub fn exe(&mut self, command: &ScieBoot, dest: &Path) -> Result<PathBuf, String> {
         if let Some(lift) = self.lift.as_deref() {
-            let tmp = self
-                .tmp
-                .insert(tempfile::NamedTempFile::new_in(dest).map_err(|e| {
-                    format!(
-                        "Failed to create temporary file to write scie shim for {lift} to: {e}",
-                        lift = lift.display()
-                    )
-                })?);
             let (contents, extension) = Self::create_script(
                 &self.exe,
                 if command.default {
@@ -243,6 +235,16 @@ exec {scie_jump} --launch={lift} \"$@\"
                 },
                 lift,
             );
+            let mut tmp_builder = tempfile::Builder::new();
+            if let Some(ext) = extension {
+                tmp_builder.suffix(ext);
+            }
+            let tmp = self.tmp.insert(tmp_builder.tempfile_in(dest).map_err(|e| {
+                format!(
+                    "Failed to create temporary file to write scie shim for {lift} to: {e}",
+                    lift = lift.display()
+                )
+            })?);
             let tmp_file = tmp.as_file_mut();
             tmp_file.write_all(contents.as_bytes()).map_err(|e| {
                 format!(
@@ -251,11 +253,7 @@ exec {scie_jump} --launch={lift} \"$@\"
                 )
             })?;
             Self::mark_executable(tmp_file, lift)?;
-            if let Some(ext) = extension {
-                Ok(tmp.path().with_extension(OsStr::new(ext)))
-            } else {
-                Ok(tmp.path().to_path_buf())
-            }
+            Ok(tmp.path().to_path_buf())
         } else {
             Ok(self.exe.clone())
         }
