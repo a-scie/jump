@@ -21,6 +21,12 @@ else
   echo "Unpacked execution of ${LIFT} directly with the ${SCIE_JUMP} works."
 fi
 
+if ! SCIE_BOOT=unpacked "${SCIE_JUMP}" --launch="${LIFT}" "A scie.jump placeholder launch!!!" | grep "< A scie.jump placeholder launch!!! >"; then
+  die "Execution of the unpacked scie failed."
+else
+  echo "Unpacked execution of an alternate scie boot command in ${LIFT} directly with the ${SCIE_JUMP} works."
+fi
+
 gc "${PWD}/lift.json"
 ln -s "${LIFT}" lift.json
 if ! "${SCIE_JUMP}" -x "Unpacked Implicit Manifest Launch!" | grep "< Unpacked Implicit Manifest Launch! >"; then
@@ -62,8 +68,19 @@ fi
 if ! "${shim_script}" "Shim Launch!!" | grep "< Shim Launch!! >"; then
   die "Execution of unpacked scie installed shim script failed."
 else
-  echo "Execution of unpacked scie shim script at ${install_dir}/java succeeded:"
+  echo "Execution of unpacked scie shim script at ${shim_script} succeeded."
 fi
+
+JAVA="java${EXE_EXT}"
+gc "${PWD}/${JAVA}"
+"${SCIE_JUMP}" "${LIFT}"
+
+if ! SCIE_BOOT=unpacked ./"${JAVA}" "A scie tip scie.jump placeholder launch!!!" | grep "/ A scie tip scie.jump placeholder "; then
+  die "Execution of the unpacked scie failed."
+else
+  echo "Execution of an alternate scie boot command in ${LIFT} with a {scie.jump} placeholder works."
+fi
+rm "${PWD}/${JAVA}"
 
 SCIE_JUMP_ALT="scie-jump-${OS_ARCH}${EXE_EXT}"
 chmod +x "${SCIE_JUMP_ALT}"

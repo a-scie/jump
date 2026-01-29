@@ -30,11 +30,16 @@
               "=JAVA_HOME": "{jdk}/jdk-19.0.1",
               "=PATH": "{jdk}/jdk-19.0.1/bin:{scie.env.PATH}"
             }
+          },
+          "unpacked": {
+            "exe": "{scie.jump}",
+            "args": [
+              "--launch={scie.lift}"
+            ]
           }
         }
       }
-    },
-    "jump": null
+    }
   },
   "fetch": [
     "https://download.java.net/java/GA/jdk19.0.1/afdd2e245b014143b62ccb916125e3ce/10/GPL/openjdk-19.0.1_windows-x64_bin.zip",

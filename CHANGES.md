@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.10.0
+
+This release brings support for executing scies before packing them using a bare `scie-jump`
+binary; to do so, invoke: `scie-jump --launch=<Path to lift manifest> ...`. Additionally, support
+for a new `{scie.jump}` placeholder is added, allowing scie commands and bindings to invoke the
+scie-jump binary their scie was built with directly.
+
 ## 1.9.2
 
 This release builds the Linux `scie-jump` binaries against the oldest available manylinux images for
