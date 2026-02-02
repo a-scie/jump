@@ -5,7 +5,6 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
-use bstr::ByteSlice;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::warn;
 
@@ -14,7 +13,7 @@ pub const EOF_MAGIC_V2: u32 = 0x4a532520;
 
 use crate::config::Jump;
 
-fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String> {
+fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<u32, String> {
     let size = data
         .seek(SeekFrom::End(-8))
         .and_then(|_| data.read_u32::<LittleEndian>())
@@ -23,7 +22,7 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String>
                 "Failed to read scie-jump size from {path}: {e}",
                 path = path.display()
             )
-        })? as u64;
+        })?;
     let actual_size = std::fs::File::open(path)
         .and_then(|file| file.metadata())
         .map_err(|e| {
@@ -33,7 +32,7 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String>
             )
         })?
         .len();
-    if actual_size != size {
+    if actual_size != u64::from(size) {
         return Err(format!(
             "The scie-jump launcher at {path} has size {actual_size} but the expected \
                 size is {expected_size}.",
@@ -41,7 +40,7 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String>
             expected_size = size
         ));
     }
-    Ok(size as usize)
+    Ok(size)
 }
 
 fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<String, String> {
@@ -85,7 +84,7 @@ fn query_version(path: &Path) -> Result<String, String> {
                 path = path.display()
             )
         })?;
-    String::from_utf8(output.stdout.trim_end().to_vec()).map_err(|e| {
+    String::from_utf8(output.stdout.trim_ascii_end().to_vec()).map_err(|e| {
         format!(
             "Failed to read scie-jump version as a utf8 string from `{path} -V` output: {e}",
             path = path.display()
@@ -93,11 +92,13 @@ fn query_version(path: &Path) -> Result<String, String> {
     })
 }
 
-pub fn load<D: Read + Seek>(
-    mut data: D,
-    path: &Path,
-    current_scie_jump_version: &str,
-) -> Result<Option<Jump>, String> {
+pub fn load(path: &Path, current_scie_jump_version: &str) -> Result<Option<Jump>, String> {
+    let mut data = std::fs::File::open(path).map_err(|e| {
+        format!(
+            "Failed to open scie-jump at {path} for reading: {e}",
+            path = path.display(),
+        )
+    })?;
     data.seek(SeekFrom::End(-4)).map_err(|e| {
         format!(
             "Failed to read scie-jump trailer magic from {path}: {e}",

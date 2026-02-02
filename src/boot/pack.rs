@@ -308,14 +308,7 @@ pub(crate) fn set(
                     Code::FAILURE
                         .with_message(format!("Failed to convert {arg} to an absolute path: {e}"))
                 })?;
-                let data = std::fs::File::open(&scie_jump_path).map_err(|e| {
-                    Code::FAILURE.with_message(format!(
-                        "Failed to open alternate scie-jump at {path} to determine its version \
-                        and size: {e}",
-                        path = scie_jump_path.display()
-                    ))
-                })?;
-                jump = load_jump(data, &scie_jump_path, current_scie_jump_version)
+                jump = load_jump(&scie_jump_path, current_scie_jump_version)
                     .map_err(|e| {
                         Code::FAILURE.with_message(format!(
                             "Failed to determine the version and size or the alternate scie-jump \

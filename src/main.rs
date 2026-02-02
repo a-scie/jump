@@ -58,9 +58,9 @@ fn exec(
         process
             .args
             .into_iter()
-            .chain(std::env::args().skip(argv_skip).map(OsString::from))
+            .chain(std::env::args_os().skip(argv_skip))
             .map(|arg| {
-                CString::new(arg.into_vec()).map_err(|e| {
+                CString::new(arg.as_encoded_bytes()).map_err(|e| {
                     Code::FAILURE
                         .with_message(format!("Failed to convert argument to a C string: {e}",))
                 })
@@ -73,7 +73,7 @@ fn exec(
         .map(|(mut name, value)| {
             name.push("=");
             name.push(value);
-            CString::new(name.into_vec()).map_err(|e| {
+            CString::new(name.as_encoded_bytes()).map_err(|e| {
                 Code::FAILURE.with_message(format!("Failed to convert env var to a C string: {e}"))
             })
         })

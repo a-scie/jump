@@ -123,7 +123,7 @@ pub struct File {
     pub key: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<usize>,
+    pub size: Option<u64>,
     #[serde(default)]
     pub hash: Option<String>,
     #[serde(default, rename = "type")]
@@ -216,7 +216,7 @@ pub struct Cmd {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Jump {
-    pub size: usize,
+    pub size: u32,
     #[serde(default)]
     pub version: String,
 }

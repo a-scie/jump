@@ -68,17 +68,37 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
         })?)?;
         if entry.path().is_dir() {
             debug!("Adding dir entry {entry}", entry = rel_path.display());
-            zip.add_directory(entry_name, options)
-                .map_err(|e| format!("{e}"))?;
+            zip.add_directory(&entry_name, options).map_err(|e| {
+                format!(
+                    "Failed to add directory {entry_name} to zip at {path}: {e}",
+                    path = zip_path.display()
+                )
+            })?;
         } else {
-            zip.start_file(entry_name, options)
-                .map_err(|e| format!("{e}"))?;
+            zip.start_file(&entry_name, options).map_err(|e| {
+                format!(
+                    "Failed to open file for writing {entry_name} into zip at {path}: {e}",
+                    path = zip_path.display()
+                )
+            })?;
             if entry.path_is_symlink() {
                 debug!("Resolved symlink {entry}", entry = rel_path.display());
             };
             debug!("Adding file entry {entry}", entry = rel_path.display());
-            let mut file = std::fs::File::open(entry.path()).map_err(|e| format!("{e}"))?;
-            std::io::copy(&mut file, &mut zip).map_err(|e| format!("{e}"))?;
+            let mut file = std::fs::File::open(entry.path()).map_err(|e| {
+                format!(
+                    "Failed to open file for reading {entry_path} into zip at {path}: {e}",
+                    entry_path = entry.path().display(),
+                    path = zip_path.display()
+                )
+            })?;
+            std::io::copy(&mut file, &mut zip).map_err(|e| {
+                format!(
+                    "Failed to write {entry_path} into zip at {path}: {e}",
+                    entry_path = entry.path().display(),
+                    path = zip_path.display()
+                )
+            })?;
         }
     }
     zip.finish().map_err(|e| {

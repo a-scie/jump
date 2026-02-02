@@ -3,7 +3,7 @@
 
 use std::fmt::Debug;
 use std::fs::{OpenOptions, Permissions};
-use std::io::{Cursor, Read, Seek};
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use logging_timer::time;
@@ -12,7 +12,8 @@ use zip::ZipArchive;
 use crate::atomic::{Target, atomic_path};
 use crate::config::{ArchiveType, Compression, FileType};
 use crate::context::FileEntry;
-use crate::{File, fingerprint};
+use crate::io::WindowedReader;
+use crate::{File, Jump, fingerprint};
 
 fn check_hash<R: Read + Seek>(
     file_type: &str,
@@ -164,9 +165,9 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) enum FileSource<'a> {
+pub(crate) enum FileSource {
     Directory(Directory),
-    Scie(Scie<'a>),
+    Scie(Scie),
 }
 
 #[derive(Debug)]
@@ -206,32 +207,38 @@ impl Directory {
 }
 
 #[derive(Debug)]
-pub(crate) struct Scie<'a> {
-    payload: &'a [u8],
+pub(crate) struct Scie {
+    payload: std::fs::File,
+    start: u32,
 }
 
-impl<'a> Scie<'a> {
-    pub(crate) fn new(payload: &'a [u8]) -> Self {
-        Self { payload }
+impl Scie {
+    pub(crate) fn new(exe: &Path, jump: &Jump) -> Result<Self, String> {
+        let payload = std::fs::File::open(exe)
+            .map_err(|e| format!("Failed to open scie {exe}: {e}", exe = exe.display()))?;
+
+        Ok(Self {
+            payload,
+            start: jump.size,
+        })
     }
 
-    fn bytes(&self, offset: usize, file: &File) -> &[u8] {
-        &self.payload[offset..(offset + file.size)]
+    fn byte_source(&mut self, offset: u64, file: &File) -> Result<impl Read + Seek, String> {
+        WindowedReader::new(&mut self.payload, u64::from(self.start) + offset, file.size)
     }
 
-    fn unpack_file(&self, offset: usize, file: &File, dst: &Path) -> Result<(), String> {
-        let bytes = &self.bytes(offset, file);
-        unpack_file(file, || Ok(Cursor::new(bytes)), dst)
+    fn unpack_file(&mut self, offset: u64, file: &File, dst: &Path) -> Result<(), String> {
+        unpack_file(file, || self.byte_source(offset, file), dst)
     }
 
     fn unpack_scie_tote(
-        &self,
-        offset: usize,
+        &mut self,
+        offset: u64,
         tote_file: &File,
         entries: &[(File, PathBuf)],
     ) -> Result<(), String> {
-        let bytes = &self.bytes(offset, tote_file);
-        let mut scie_tote = ZipArchive::new(Cursor::new(bytes))
+        let bytes = self.byte_source(offset, tote_file)?;
+        let mut scie_tote = ZipArchive::new(bytes)
             .map_err(|e| format!("Failed to load scie-tote {tote_file:?}: {e}"))?;
         unpack_scie_tote(&mut scie_tote, entries)
     }
@@ -274,7 +281,7 @@ fn unpack_scie_tote<R: Read + Seek>(
     Ok(())
 }
 
-pub(crate) fn install(file_source: &FileSource, files: &[FileEntry]) -> Result<(), String> {
+pub(crate) fn install(file_source: &mut FileSource, files: &[FileEntry]) -> Result<(), String> {
     let mut scie_tote = vec![];
     let mut location = 0;
     for file_entry in files {

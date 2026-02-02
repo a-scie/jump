@@ -12,7 +12,7 @@ pub fn digest(data: &[u8]) -> String {
     format!("{digest:x}", digest = Sha256::digest(data))
 }
 
-pub fn digest_file(path: &Path) -> Result<(usize, String), String> {
+pub fn digest_file(path: &Path) -> Result<(u64, String), String> {
     let file = std::fs::File::open(path).map_err(|e| {
         format!(
             "Failed to open {path} for digesting: {e}",
@@ -23,17 +23,10 @@ pub fn digest_file(path: &Path) -> Result<(usize, String), String> {
 }
 
 #[time("debug", "fingerprint::{}")]
-pub fn digest_reader<R: Read>(mut reader: R) -> Result<(usize, String), String> {
+pub fn digest_reader<R: Read>(mut reader: R) -> Result<(u64, String), String> {
     let mut hasher = Sha256::new();
     let copied_size = std::io::copy(&mut reader, &mut hasher)
         .map_err(|e| format!("Failed to digest stream: {e}"))?;
-    let file_size = usize::try_from(copied_size).map_err(|e| {
-        format!(
-            "Read {copied_size} bytes from stream which was more than can fit in a usize which \
-            is {usize_bits} bits on this platform: {e}",
-            usize_bits = usize::BITS
-        )
-    })?;
     let hash = format!("{digest:x}", digest = hasher.finalize());
-    Ok((file_size, hash))
+    Ok((copied_size, hash))
 }

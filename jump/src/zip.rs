@@ -15,7 +15,7 @@ const EOCD_SIGNATURE: (&u8, &u8, &u8, &u8) = (&0x06, &0x05, &0x4b, &0x50);
 const EOCD_MIN_SIZE: usize = 22;
 const EOCD_MAX_SIZE: usize = EOCD_MIN_SIZE + u16::MAX as usize;
 
-pub(crate) fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String> {
+fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usize, String> {
     #[allow(clippy::too_many_arguments)]
     let eocd_struct = structure!("<4sHHHHIIH");
     debug_assert!(EOCD_MIN_SIZE == eocd_struct.size());
@@ -57,7 +57,7 @@ pub(crate) fn end_of_zip(data: &[u8], maximum_trailer_size: usize) -> Result<usi
     Ok(eocd_end + (zip_comment_size as usize))
 }
 
-pub fn check_is_zip(path: &Path) -> Result<(), String> {
+pub fn find_end_of_zip(path: &Path) -> Result<(u64, u64), String> {
     let mut file = std::fs::File::open(path).map_err(|e| {
         format!(
             "Failed to open zip {zip} for reading: {e}",
@@ -74,7 +74,7 @@ pub fn check_is_zip(path: &Path) -> Result<(), String> {
         })?
         .len();
     let seek = min(EOCD_MAX_SIZE, file_size as usize);
-    file.seek(SeekFrom::End(-(seek as i64))).map_err(|e| {
+    let pos = file.seek(SeekFrom::End(-(seek as i64))).map_err(|e| {
         format!(
             "Failed to reset stream pointer for {file_size} byte file {path} to position \
                 {seek} from the end: {e}",
@@ -89,5 +89,9 @@ pub fn check_is_zip(path: &Path) -> Result<(), String> {
             path = path.display()
         )
     })?;
-    end_of_zip(&buffer, 0).map(|_| ())
+    end_of_zip(&buffer, 0).map(|end_of_zip| (pos + end_of_zip as u64, file_size))
+}
+
+pub fn check_is_zip(path: &Path) -> Result<(), String> {
+    find_end_of_zip(path).map(|_| ())
 }

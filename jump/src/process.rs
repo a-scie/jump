@@ -106,14 +106,6 @@ pub struct Process {
     pub args: Vec<OsString>,
 }
 
-fn as_bytes(os_string: &OsString) -> Result<Vec<u8>, String> {
-    let string = os_string
-        .clone()
-        .into_string()
-        .map_err(|e| format!("Failed to encode as UTF-8 string: {e:?}"))?;
-    Ok(string.into_bytes())
-}
-
 impl Process {
     pub fn to_env_vars(&self, include_ambient: bool) -> Vec<(OsString, OsString)> {
         self.env.to_env_vars(
@@ -124,13 +116,13 @@ impl Process {
 
     #[time("debug", "Process::{}")]
     pub(crate) fn fingerprint(&self) -> Result<String, String> {
-        let mut hasher = Sha256::new_with_prefix(as_bytes(&self.exe)?);
+        let mut hasher = Sha256::new_with_prefix(self.exe.as_encoded_bytes());
         for arg in &self.args {
-            hasher.update(as_bytes(arg)?);
+            hasher.update(arg.as_encoded_bytes());
         }
         for (name, value) in self.to_env_vars(false) {
-            hasher.update(as_bytes(&name)?);
-            hasher.update(as_bytes(&value)?);
+            hasher.update(name.as_encoded_bytes());
+            hasher.update(value.as_encoded_bytes());
         }
         Ok(format!("{digest:x}", digest = hasher.finalize()))
     }

@@ -1,9 +1,9 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use bstr::ByteSlice;
 use logging_timer::time;
 
 use crate::config::{ArchiveType, Boot, Config, FileType, Jump, Other};
@@ -19,7 +19,7 @@ pub enum Source {
 pub struct File {
     pub name: String,
     pub key: Option<String>,
-    pub size: usize,
+    pub size: u64,
     pub hash: String,
     pub file_type: FileType,
     pub executable: Option<bool>,
@@ -114,12 +114,9 @@ fn determine_file_type(path: &Path) -> Result<FileType, String> {
     if path.is_file()
         && let Some(basename) = path.file_name()
     {
-        let name = <[u8]>::from_os_str(basename)
-            .ok_or_else(|| format!("Failed to decode {basename:?} as a utf-8 path name"))?
+        let name = basename
             .to_str()
-            .map_err(|e| {
-                format!("Failed to interpret file name {basename:?} as a utf-8 string: {e}")
-            })?;
+            .ok_or_else(|| format!("Failed to decode {basename:?} as a utf-8 path name"))?;
         let ext = match name.rsplitn(3, '.').collect::<Vec<_>>()[..] {
             [_, "tar", stem] => name.trim_start_matches(stem).trim_start_matches('.'),
             [ext, ..] => ext,
@@ -227,9 +224,28 @@ fn assemble(
 }
 
 #[time("debug", "lift::{}")]
-pub(crate) fn load_scie(scie_path: &Path, scie_data: &[u8]) -> Result<(Jump, Lift), String> {
-    let end_of_zip = crate::zip::end_of_zip(scie_data, Config::MAXIMUM_CONFIG_SIZE)?;
-    let result = load(scie_path, &scie_data[end_of_zip..], false).map_err(|e| {
+pub(crate) fn load_scie(scie_path: &Path) -> Result<(Jump, Lift), String> {
+    let (end_of_zip, scie_len) = crate::zip::find_end_of_zip(scie_path)?;
+    let mut scie_data = std::fs::File::open(scie_path).map_err(|e| {
+        format!(
+            "Failed to open scie at {path} for reading: {e}",
+            path = scie_path.display(),
+        )
+    })?;
+    scie_data.seek(SeekFrom::Start(end_of_zip)).map_err(|e| {
+        format!(
+            "Failed to seek to end of zip trailer of scie at {path} to read its lift manifest: {e}",
+            path = scie_path.display()
+        )
+    })?;
+    let mut lift_data = Vec::with_capacity((scie_len - end_of_zip) as usize);
+    scie_data.read_to_end(&mut lift_data).map_err(|e| {
+        format!(
+            "Failed to read lift manifest of scie at {path}: {e}",
+            path = scie_path.display()
+        )
+    })?;
+    let result = load(scie_path, &lift_data, false).map_err(|e| {
         format!(
             "The scie at {scie_path} has missing information in its lift manifest: {e}",
             scie_path = scie_path.display()

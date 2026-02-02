@@ -10,7 +10,6 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::Child;
 
-use bstr::ByteSlice;
 use indexmap::IndexMap;
 use logging_timer::time;
 
@@ -40,14 +39,15 @@ pub const ARCH: &str = "armv7l";
 pub const ARCH: &str = env::consts::ARCH;
 
 fn expanduser(path: &Path) -> Result<PathBuf, String> {
-    if !<[u8]>::from_path(path)
+    if !path
+        .to_str()
         .ok_or_else(|| {
             format!(
                 "Failed to decode the path {} as utf-8 bytes",
                 path.display()
             )
         })?
-        .contains(&b'~')
+        .contains('~')
     {
         return Ok(path.to_path_buf());
     }
@@ -69,10 +69,8 @@ fn expanduser(path: &Path) -> Result<PathBuf, String> {
 }
 
 fn path_to_str(path: &Path) -> Result<&str, String> {
-    <[u8]>::from_path(path)
-        .ok_or_else(|| format!("Failed to decode {} as a utf-8 path name", path.display()))?
-        .to_str()
-        .map_err(|e| format!("{e}"))
+    path.to_str()
+        .ok_or_else(|| format!("Failed to decode {} as a utf-8 path name", path.display()))
 }
 
 #[derive(Clone, Debug)]
@@ -107,7 +105,7 @@ impl LiftManifest {
 struct ScieJump {
     dst: PathBuf,
     src: PathBuf,
-    size: usize,
+    size: u32,
 }
 
 impl ScieJump {
@@ -194,7 +192,7 @@ impl Debug for LoadProcess {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum FileEntry {
-    Skip(usize),
+    Skip(u64),
     Install((File, PathBuf)),
     LoadAndInstall((LoadProcess, File, PathBuf)),
     ScieTote((File, Vec<(File, PathBuf)>)),
@@ -278,12 +276,12 @@ pub(crate) struct SelectedCmd {
     pub(crate) argv1_consumed: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Context<'a> {
     scie: &'a CurrentExe,
     lift: &'a Lift,
     base: PathBuf,
-    file_source: &'a FileSource<'a>,
+    file_source: &'a mut FileSource,
     files_by_name: HashMap<&'a str, &'a File>,
     replacements: HashSet<&'a File>,
     lift_manifest: LiftManifest,
@@ -303,7 +301,7 @@ impl<'a> Context<'a> {
         scie: &'a CurrentExe,
         jump: &'a Jump,
         lift: &'a Lift,
-        file_source: &'a FileSource,
+        file_source: &'a mut FileSource,
         ambient_env: IndexMap<OsString, OsString>,
     ) -> Result<Self, String> {
         let mut files_by_name = HashMap::new();
@@ -798,7 +796,7 @@ pub(crate) fn select_command(
     current_exe: &CurrentExe,
     jump: &Jump,
     lift: &Lift,
-    file_source: &FileSource,
+    file_source: &mut FileSource,
     ambient_env: IndexMap<OsString, OsString>,
 ) -> Result<SelectedCmd, String> {
     let mut context = Context::new(current_exe, jump, lift, file_source, ambient_env)?;
@@ -851,10 +849,22 @@ mod tests {
             }],
             other: None,
         };
-        let file_source = FileSource::Scie(Scie::new(&[]));
-        let current_exe = CurrentExe::from_path(Path::new("scie_path"));
-        let mut context =
-            Context::new(&current_exe, &jump, &lift, &file_source, IndexMap::new()).unwrap();
+
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
+        let current_exe = CurrentExe::from_path(scie.path());
+        let mut file_source = FileSource::Scie(Scie::new(&current_exe.exe, &jump).unwrap());
+        let mut context = Context::new(
+            &current_exe,
+            &jump,
+            &lift,
+            &mut file_source,
+            IndexMap::new(),
+        )
+        .unwrap();
 
         let mut env = IndexMap::new();
         assert_eq!(
@@ -883,7 +893,7 @@ mod tests {
 
         env.clear();
         assert_eq!(
-            ("scie_path".to_string(), false, false),
+            (scie.path().to_str().unwrap().to_string(), false, false),
             context
                 .reify_string(Some(&env), "{scie.env.__DNE__={scie}}")
                 .unwrap()
@@ -939,6 +949,7 @@ mod tests {
 
         let mut invalid_lift = lift.clone();
         invalid_lift.base = Some("{scie.lift}/circular".to_string());
+        let mut file_source = FileSource::Scie(Scie::new(&current_exe.exe, &jump).unwrap());
         assert_eq!(
             "The scie.lift.base cannot use the placeholders {scie.jump} or {scie.lift} since those \
             placeholders are calculated from the resolved location of the scie.lift.base, given: \
@@ -948,7 +959,7 @@ mod tests {
                 &CurrentExe::from_path(Path::new("scie_path")),
                 &jump,
                 &invalid_lift,
-                &file_source,
+                &mut file_source,
                 IndexMap::new()
             )
             .unwrap_err()
@@ -1053,10 +1064,22 @@ mod tests {
             ],
             other: None,
         };
-        let file_source = FileSource::Scie(Scie::new(&[]));
-        let current_exe = CurrentExe::from_path(Path::new("scie_path"));
-        let mut context =
-            Context::new(&current_exe, &jump, &lift, &file_source, IndexMap::new()).unwrap();
+
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
+        let current_exe = CurrentExe::from_path(scie.path());
+        let mut file_source = FileSource::Scie(Scie::new(&current_exe.exe, &jump).unwrap());
+        let mut context = Context::new(
+            &current_exe,
+            &jump,
+            &lift,
+            &mut file_source,
+            IndexMap::new(),
+        )
+        .unwrap();
 
         let cmd = lift.boot.commands.get("").unwrap();
 
@@ -1079,12 +1102,17 @@ mod tests {
             process
         );
 
-        let current_exe = CurrentExe::from_path(Path::new("scie_path"));
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
+        let current_exe = CurrentExe::from_path(scie.path());
         context = Context::new(
             &current_exe,
             &jump,
             &lift,
-            &file_source,
+            &mut file_source,
             [("SELECT".into(), "v1".into())].into(),
         )
         .unwrap();
@@ -1107,12 +1135,17 @@ mod tests {
             process
         );
 
-        let current_exe = CurrentExe::from_path(Path::new("scie_path"));
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
+        let current_exe = CurrentExe::from_path(scie.path());
         context = Context::new(
             &current_exe,
             &jump,
             &lift,
-            &file_source,
+            &mut file_source,
             [("SELECT".into(), "v2".into())].into(),
         )
         .unwrap();
@@ -1189,13 +1222,19 @@ mod tests {
             files: vec![],
             other: None,
         };
-        let file_source = FileSource::Scie(Scie::new(&[]));
-        let current_exe = CurrentExe::from_path(Path::new("scie_path"));
+
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
+        let current_exe = CurrentExe::from_path(scie.path());
+        let mut file_source = FileSource::Scie(Scie::new(&current_exe.exe, &jump).unwrap());
         let mut context = Context::new(
             &current_exe,
             &jump,
             &lift,
-            &file_source,
+            &mut file_source,
             [("PATH".into(), "/test/path".into())].into(),
         )
         .unwrap();
@@ -1222,12 +1261,17 @@ mod tests {
             process
         );
 
-        let current_exe = CurrentExe::from_path(Path::new("scie_path"));
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
+        let current_exe = CurrentExe::from_path(scie.path());
         context = Context::new(
             &current_exe,
             &jump,
             &lift,
-            &file_source,
+            &mut file_source,
             [
                 ("D".into(), "d".into()),
                 ("PATH".into(), "/test/path".into()),
@@ -1293,18 +1337,24 @@ mod tests {
             files: vec![],
             other: None,
         };
-        let file_source = FileSource::Scie(Scie::new(&[]));
+
+        let scie = tempfile::Builder::new()
+            .prefix("scie.")
+            .suffix(".exe")
+            .tempfile()
+            .unwrap();
         let current_exe = CurrentExe {
-            exe: "exe".into(),
+            exe: scie.path().to_path_buf(),
             invoked_as: "invoked_as".into(),
         };
+        let mut file_source = FileSource::Scie(Scie::new(&current_exe.exe, &jump).unwrap());
         let mut context = Context::new(
             &current_exe,
             &jump,
             &lift,
-            &file_source,
+            &mut file_source,
             [
-                ("SCIE".into(), "exe".into()),
+                ("SCIE".into(), scie.path().into()),
                 ("SCIE_ARGV0".into(), "invoked_as".into()),
             ]
             .into(),
@@ -1316,12 +1366,12 @@ mod tests {
         assert_eq!(
             Process {
                 ambient_env: vec![
-                    ("SCIE".into(), "exe".into()),
+                    ("SCIE".into(), scie.path().into()),
                     ("SCIE_ARGV0".into(), "invoked_as".into())
                 ],
                 env: process::EnvVars { vars: vec![] },
-                exe: "exe".into(),
-                args: vec!["invoked_as".into(), "invoked_as".into(), "exe".into()],
+                exe: scie.path().into(),
+                args: vec!["invoked_as".into(), "invoked_as".into(), scie.path().into()],
             },
             process
         );
