@@ -7,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::warn;
+use semver::Version;
 
 pub const EOF_MAGIC_V1: u32 = 0x534a7219;
 pub const EOF_MAGIC_V2: u32 = 0x4a532520;
@@ -43,7 +44,19 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<u32, String> {
     Ok(size)
 }
 
-fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<String, String> {
+fn as_version(version: &[u8]) -> Result<Version, String> {
+    // String::from_utf8(output.stdout.trim_ascii_end().to_vec()).map_err(|e| {
+    //         format!(
+    //             "Failed to read scie-jump version as a utf8 string from `{path} -V` output: {e}",
+    //             path = path.display()
+    //         )
+    //     })
+    // TODO: XXX
+    let version_str = str::from_utf8(version).map_err(|e| format!("{e}"))?;
+    Version::parse(version_str).map_err(|e| format!("{e}"))
+}
+
+fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<Version, String> {
     let version_size = data
         .seek(SeekFrom::End(-9))
         .and_then(|_| data.read_u8())
@@ -62,17 +75,10 @@ fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<String, Str
                 path = path.display()
             )
         })?;
-    str::from_utf8(&version[0..(version_size as usize)])
-        .map(String::from)
-        .map_err(|e| {
-            format!(
-                "Failed to read scie-jump version as a utf8 string from {path}: {e}",
-                path = path.display()
-            )
-        })
+    as_version(&version[0..(version_size as usize)])
 }
 
-fn query_version(path: &Path) -> Result<String, String> {
+fn query_version(path: &Path) -> Result<Version, String> {
     let output = Command::new(path)
         .arg("-V")
         .stdout(Stdio::piped())
@@ -84,15 +90,10 @@ fn query_version(path: &Path) -> Result<String, String> {
                 path = path.display()
             )
         })?;
-    String::from_utf8(output.stdout.trim_ascii_end().to_vec()).map_err(|e| {
-        format!(
-            "Failed to read scie-jump version as a utf8 string from `{path} -V` output: {e}",
-            path = path.display()
-        )
-    })
+    as_version(output.stdout.trim_ascii_end())
 }
 
-pub fn load(path: &Path, current_scie_jump_version: &str) -> Result<Option<Jump>, String> {
+pub fn load(path: &Path, current_scie_jump_version: &Version) -> Result<Option<Jump>, String> {
     let mut data = std::fs::File::open(path).map_err(|e| {
         format!(
             "Failed to open scie-jump at {path} for reading: {e}",
@@ -127,7 +128,7 @@ pub fn load(path: &Path, current_scie_jump_version: &str) -> Result<Option<Jump>
                         You can avoid this problem by using using a custom scie-jump with version \
                         1.8.2 or newer."
                     );
-                    current_scie_jump_version.to_string()
+                    current_scie_jump_version.clone()
                 }
             };
             Ok(Some(Jump { version, size }))

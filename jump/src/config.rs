@@ -5,6 +5,7 @@ use std::fmt::Formatter;
 use std::io::Write;
 
 use indexmap::IndexMap;
+use semver::Version;
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -217,8 +218,7 @@ pub struct Cmd {
 #[serde(deny_unknown_fields)]
 pub struct Jump {
     pub size: u32,
-    #[serde(default)]
-    pub version: String,
+    pub version: Version,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -358,6 +358,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
+    use semver::Version;
 
     use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift};
     use crate::config::FileType;
@@ -368,7 +369,7 @@ mod tests {
             "{}",
             serde_json::to_string_pretty(&Config::new(
                 Jump {
-                    version: "0.1.0".to_string(),
+                    version: Version::new(0, 1, 0),
                     size: 37,
                 },
                 Lift {

@@ -12,6 +12,7 @@ use jump::{
 };
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
+use semver::Version;
 use zip::{CompressionMethod, ZipWriter};
 
 #[time("debug", "pack::{}")]
@@ -282,7 +283,7 @@ fn print_usage(message: &str) -> ExitResult {
 pub(crate) fn set(
     mut jump: Jump,
     mut scie_jump_path: PathBuf,
-    current_scie_jump_version: &str,
+    current_scie_jump_version: &Version,
     argv_skip: usize,
 ) -> ExitResult {
     let mut lifts = vec![];

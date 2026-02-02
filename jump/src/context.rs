@@ -373,7 +373,7 @@ impl<'a> Context<'a> {
         context.scie_jump.dst = context
             .base
             .join("scie-jumps")
-            .join(&jump.version)
+            .join(jump.version.to_string())
             .join("scie-jump");
         Ok(context)
     }
@@ -808,6 +808,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use indexmap::IndexMap;
+    use semver::Version;
 
     use super::Context;
     use crate::config::{ArchiveType, Boot, Cmd, Compression, FileType};
@@ -818,7 +819,7 @@ mod tests {
     fn env() {
         let jump = Jump {
             size: 42,
-            version: "0.1.0".to_string(),
+            version: Version::new(0, 1, 0),
         };
         let lift = Lift {
             name: "test".to_string(),
@@ -1004,7 +1005,7 @@ mod tests {
     fn prepare_process_use_cmd_env() {
         let jump = Jump {
             size: 42,
-            version: "0.1.0".to_string(),
+            version: Version::new(0, 1, 0),
         };
         let lift = Lift {
             name: "test".to_string(),
@@ -1173,7 +1174,7 @@ mod tests {
     fn prepare_process_use_cmd_env_recursive() {
         let jump = Jump {
             size: 42,
-            version: "0.1.0".to_string(),
+            version: Version::new(0, 1, 0),
         };
         let lift = Lift {
             name: "test".to_string(),
@@ -1307,7 +1308,7 @@ mod tests {
     fn prepare_process_use_scie_and_scie_argv0() {
         let jump = Jump {
             size: 42,
-            version: "0.1.0".into(),
+            version: Version::new(0, 1, 0),
         };
         let lift = Lift {
             name: "test".into(),

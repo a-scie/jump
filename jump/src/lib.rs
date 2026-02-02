@@ -32,6 +32,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use log::Level;
 use logging_timer::{time, timer};
+use semver::Version;
 
 pub use crate::archive::create_options;
 use crate::config::Config;
@@ -333,7 +334,7 @@ fn find_current_exe() -> Result<CurrentExe, String> {
 }
 
 #[time("debug", "jump::{}")]
-pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, String> {
+pub fn prepare_boot(current_scie_jump_version: &Version) -> Result<BootAction, String> {
     let current_exe = find_current_exe()?;
     let (jump, lift, mut file_source, scie_exe, argv_skip) = if let Some(jump) =
         jump::load(&current_exe.exe, current_scie_jump_version)?
