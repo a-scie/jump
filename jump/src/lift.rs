@@ -268,14 +268,14 @@ pub(crate) fn load_scie(scie_path: &Path) -> Result<(Jump, Lift), String> {
 }
 
 #[time("debug", "lift::{}")]
-pub fn load_lift(manifest_path: &Path) -> Result<(Option<Jump>, Lift), String> {
+pub fn load_lift(manifest_path: &Path, reconstitute: bool) -> Result<(Option<Jump>, Lift), String> {
     let data = std::fs::read(manifest_path).map_err(|e| {
         format!(
             "Failed to open lift manifest at {manifest}: {e}",
             manifest = manifest_path.display()
         )
     })?;
-    load(manifest_path, &data, true)
+    load(manifest_path, &data, reconstitute)
 }
 
 fn load(

@@ -56,3 +56,6 @@ sha256 cowsay.js* > split/cowsay.js.sha256
 cd split && ./scie-jump
 sha256 --check cowsay.js.sha256
 sha256 cowsay.js* ../cowsay.js*
+
+# Verify an unpacked scie that includes a directory can be executed.
+./scie-jump -x -w "Even the unpacked ones!!"

@@ -28,7 +28,7 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
             path = path.display()
         ));
     }
-    let (maybe_jump, lift) = load_lift(&manifest_path)?;
+    let (maybe_jump, lift) = load_lift(&manifest_path, true)?;
     if let Some(ref configured_jump) = maybe_jump
         && jump != configured_jump
     {
