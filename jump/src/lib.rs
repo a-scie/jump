@@ -347,7 +347,7 @@ pub fn prepare_boot(current_scie_jump_version: &Version) -> Result<BootAction, S
             } else {
                 "lift.json"
             });
-            let (configured_jump, lift) = load_lift(lift_path)?;
+            let (configured_jump, lift) = load_lift(lift_path, false)?;
             if let Some(expected_jump) = configured_jump
                 && jump != expected_jump
             {

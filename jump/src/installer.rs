@@ -181,7 +181,11 @@ impl Directory {
     }
 
     fn byte_source(&self, file: &File) -> Result<impl Read + Seek, String> {
-        std::fs::File::open(self.directory.join(&file.name)).map_err(|e| {
+        let mut src = self.directory.join(&file.name);
+        if file.file_type == FileType::Directory {
+            src = src.with_extension("zip")
+        }
+        std::fs::File::open(src).map_err(|e| {
             format!(
                 "Failed to open {name} in {directory}: {e}",
                 name = file.name,

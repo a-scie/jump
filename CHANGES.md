@@ -1,5 +1,15 @@
 # Release Notes
 
+## 1.11.0
+
+This release brings support for specifying the `scie.jump.hash` in the lift manifest. This new
+field is populated automatically by the scie-jump boot pack and is used to validate scie-jumps
+extracted for the `{scie.jump}` placeholder as well as for scie-jumps used to `--launch` a lift
+manifest directly.
+
+This release also fixes a bug running a bare scie-jump `--launch` against an unpacked scie that
+contains files of directory type.
+
 ## 1.10.0
 
 This release brings support for executing scies before packing them using a bare `scie-jump`
