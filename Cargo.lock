@@ -88,17 +88,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bstr"
-version = "1.11.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "531a9155a481e2ee699d4f98f43c0ca4ff8ee1bfd55c31e9e98fb29d2b176fe0"
-dependencies = [
- "memchr",
- "regex-automata",
- "serde",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -451,7 +440,6 @@ dependencies = [
 name = "jump"
 version = "0.14.0"
 dependencies = [
- "bstr",
  "byteorder",
  "bzip2",
  "ctor",
@@ -464,9 +452,9 @@ dependencies = [
  "itertools",
  "log",
  "logging_timer",
- "memmap2",
  "os_str_bytes",
  "regex",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
@@ -560,15 +548,6 @@ name = "memchr"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
-
-[[package]]
-name = "memmap2"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd3f7eed9d3848f8b98834af67102b720745c4ec028fcd0aa0239277e7de374f"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "minimal-lexical"
@@ -771,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "scie-jump"
-version = "1.10.0"
+version = "1.11.0"
 dependencies = [
  "env_logger",
  "jump",
@@ -779,8 +758,19 @@ dependencies = [
  "logging_timer",
  "nix",
  "proc-exit",
+ "semver",
  "tempfile",
  "zip",
+]
+
+[[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+dependencies = [
+ "serde",
+ "serde_core",
 ]
 
 [[package]]

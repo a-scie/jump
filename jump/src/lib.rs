@@ -15,6 +15,7 @@ pub mod config;
 mod context;
 pub mod fingerprint;
 mod installer;
+pub mod io;
 mod jump;
 mod lift;
 mod placeholders;
@@ -24,13 +25,14 @@ mod zip;
 use std::env;
 use std::env::current_exe;
 use std::ffi::OsString;
-use std::io::{Cursor, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
 use log::Level;
 use logging_timer::{time, timer};
+use semver::Version;
 
 pub use crate::archive::create_options;
 use crate::config::Config;
@@ -39,7 +41,7 @@ pub use crate::context::ARCH;
 use crate::installer::{Directory, FileSource, Scie, install};
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC_V2 as EOF_MAGIC;
-pub use crate::jump::load as load_jump;
+pub use crate::jump::{hash_jump, load as load_jump};
 pub use crate::lift::{File, Lift, ScieBoot, Source, load_lift};
 pub use crate::process::{EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;
@@ -332,23 +334,11 @@ fn find_current_exe() -> Result<CurrentExe, String> {
 }
 
 #[time("debug", "jump::{}")]
-pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, String> {
+pub fn prepare_boot(current_scie_jump_version: &Version) -> Result<BootAction, String> {
     let current_exe = find_current_exe()?;
-    let file = std::fs::File::open(&current_exe.exe).map_err(|e| {
-        format!(
-            "Failed to open current exe at {exe} for reading: {e}",
-            exe = current_exe.exe.display(),
-        )
-    })?;
-    let data = unsafe {
-        memmap2::Mmap::map(&file)
-            .map_err(|e| format!("Failed to mmap {exe}: {e}", exe = current_exe.exe.display()))?
-    };
-    let (jump, lift, file_source, scie_exe, argv_skip) = if let Some(jump) = jump::load(
-        Cursor::new(&data),
-        &current_exe.exe,
-        current_scie_jump_version,
-    )? {
+    let (jump, lift, mut file_source, scie_exe, argv_skip) = if let Some(jump) =
+        jump::load(&current_exe.exe, current_scie_jump_version)?
+    {
         if let Some(arg) = env::args().nth(1)
             && (arg == "-x" || arg == "--launch" || arg.starts_with("--launch="))
         {
@@ -365,12 +355,10 @@ pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, Strin
                     "The current scie jump {jump:?} is not the configured scie jump {expected_jump:?}."
                 ));
             }
-            let directory = Directory::new(
-                lift_path
-                    .parent()
-                    .map(Path::to_path_buf)
-                    .unwrap_or(env::current_dir().map_err(|e| format!("{e}"))?),
-            );
+            let directory =
+                Directory::new(lift_path.parent().map(Path::to_path_buf).unwrap_or(
+                    env::current_dir().map_err(|e| format!("Failed to query CWD: {e}"))?,
+                ));
             (
                 jump,
                 lift,
@@ -382,16 +370,16 @@ pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, Strin
             return Ok(BootAction::Pack((jump, current_exe.exe.clone(), 1)));
         }
     } else {
-        let (jump, lift) = lift::load_scie(&current_exe.exe, &data)?;
+        let (jump, lift) = lift::load_scie(&current_exe.exe)?;
         trace!(
             "Loaded lift manifest from {current_exe}:\n{lift:#?}",
             current_exe = current_exe.exe.display()
         );
-        let payload = &data[jump.size..data.len() - lift.size];
+        let scie = Scie::new(&current_exe.exe, &jump)?;
         (
             jump,
             lift,
-            FileSource::Scie(Scie::new(payload)),
+            FileSource::Scie(scie),
             ScieExe::scie(current_exe.exe.clone()),
             1,
         )
@@ -464,9 +452,9 @@ pub fn prepare_boot(current_scie_jump_version: &str) -> Result<BootAction, Strin
     ambient_env.insert("SCIE".into(), current_exe.exe.clone().into());
     ambient_env.insert("SCIE_ARGV0".into(), current_exe.invoked_as.clone().into());
 
-    match context::select_command(&current_exe, &jump, &lift, &file_source, ambient_env) {
+    match context::select_command(&current_exe, &jump, &lift, &mut file_source, ambient_env) {
         Ok(selected_command) => {
-            install(&file_source, &selected_command.files)?;
+            install(&mut file_source, &selected_command.files)?;
             let process = selected_command.process;
             let extra_env: Vec<(OsString, Option<OsString>)> = vec![
                 // Avoid subprocesses that re-execute this SCIE unintentionally getting in an

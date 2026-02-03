@@ -1,20 +1,66 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
-use bstr::ByteSlice;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::warn;
+use semver::Version;
+
+use crate::config::Jump;
+use crate::fingerprint;
 
 pub const EOF_MAGIC_V1: u32 = 0x534a7219;
 pub const EOF_MAGIC_V2: u32 = 0x4a532520;
 
-use crate::config::Jump;
+const SCIE_JUMP_VERSION_INTRODUCING_HASH: Version = Version::new(1, 11, 0);
 
-fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String> {
+pub fn hash_jump(jump: &Jump, path: &Path) -> Result<Option<String>, String> {
+    let data = File::open(path).map_err(|e| {
+        format!(
+            "Failed to open {path} to hash scie-jump contents: {e}",
+            path = path.display()
+        )
+    })?;
+    hash(
+        jump.size,
+        &jump.version,
+        &mut data.take(u64::from(jump.size)),
+        path,
+    )
+}
+
+fn hash<D: Read + Seek>(
+    size: u32,
+    version: &Version,
+    data: &mut D,
+    path: &Path,
+) -> Result<Option<String>, String> {
+    if version >= &SCIE_JUMP_VERSION_INTRODUCING_HASH {
+        data.rewind().map_err(|e| {
+            format!(
+                "Failed to rewind open scie-jump file {path} to hash it: {e}",
+                path = path.display()
+            )
+        })?;
+        let (amount_read, hash) = fingerprint::digest_reader(data)?;
+        if amount_read != u64::from(size) {
+            return Err(format!(
+                "The bare scie-jump at {path} claims its size is {size} bytes, but hashed \
+                        {amount_read} bytes.",
+                path = path.display()
+            ));
+        }
+        Ok(Some(hash))
+    } else {
+        Ok(None)
+    }
+}
+
+fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<u32, String> {
     let size = data
         .seek(SeekFrom::End(-8))
         .and_then(|_| data.read_u32::<LittleEndian>())
@@ -23,7 +69,7 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String>
                 "Failed to read scie-jump size from {path}: {e}",
                 path = path.display()
             )
-        })? as u64;
+        })?;
     let actual_size = std::fs::File::open(path)
         .and_then(|file| file.metadata())
         .map_err(|e| {
@@ -33,7 +79,7 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String>
             )
         })?
         .len();
-    if actual_size != size {
+    if actual_size != u64::from(size) {
         return Err(format!(
             "The scie-jump launcher at {path} has size {actual_size} but the expected \
                 size is {expected_size}.",
@@ -41,10 +87,25 @@ fn read_size<D: Read + Seek>(data: &mut D, path: &Path) -> Result<usize, String>
             expected_size = size
         ));
     }
-    Ok(size as usize)
+    Ok(size)
 }
 
-fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<String, String> {
+fn as_version(version: &[u8], path: &Path) -> Result<Version, String> {
+    let version_str = str::from_utf8(version).map_err(|e| {
+        format!(
+            "Failed to convert scie-jump version of {path} to a utf8 string: {e}",
+            path = path.display()
+        )
+    })?;
+    Version::parse(version_str).map_err(|e| {
+        format!(
+            "Failed to parse scie-jump version {version_str} from {path}: {e}",
+            path = path.display()
+        )
+    })
+}
+
+fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<Version, String> {
     let version_size = data
         .seek(SeekFrom::End(-9))
         .and_then(|_| data.read_u8())
@@ -55,25 +116,18 @@ fn read_version<D: Read + Seek>(data: &mut D, path: &Path) -> Result<String, Str
             )
         })?;
     let mut version = [0; 255];
-    data.seek(SeekFrom::End(-9 - (version_size as i64)))
-        .and_then(|_| data.read_exact(&mut version[0..(version_size as usize)]))
+    data.seek(SeekFrom::End(-9 - (i64::from(version_size))))
+        .and_then(|_| data.read_exact(&mut version[0..usize::from(version_size)]))
         .map_err(|e| {
             format!(
                 "Failed to read scie-jump version from {path}: {e}",
                 path = path.display()
             )
         })?;
-    str::from_utf8(&version[0..(version_size as usize)])
-        .map(String::from)
-        .map_err(|e| {
-            format!(
-                "Failed to read scie-jump version as a utf8 string from {path}: {e}",
-                path = path.display()
-            )
-        })
+    as_version(&version[0..usize::from(version_size)], path)
 }
 
-fn query_version(path: &Path) -> Result<String, String> {
+fn query_version(path: &Path) -> Result<Version, String> {
     let output = Command::new(path)
         .arg("-V")
         .stdout(Stdio::piped())
@@ -85,19 +139,16 @@ fn query_version(path: &Path) -> Result<String, String> {
                 path = path.display()
             )
         })?;
-    String::from_utf8(output.stdout.trim_end().to_vec()).map_err(|e| {
-        format!(
-            "Failed to read scie-jump version as a utf8 string from `{path} -V` output: {e}",
-            path = path.display()
-        )
-    })
+    as_version(output.stdout.trim_ascii_end(), path)
 }
 
-pub fn load<D: Read + Seek>(
-    mut data: D,
-    path: &Path,
-    current_scie_jump_version: &str,
-) -> Result<Option<Jump>, String> {
+pub fn load(path: &Path, current_scie_jump_version: &Version) -> Result<Option<Jump>, String> {
+    let mut data = std::fs::File::open(path).map_err(|e| {
+        format!(
+            "Failed to open scie-jump at {path} for reading: {e}",
+            path = path.display(),
+        )
+    })?;
     data.seek(SeekFrom::End(-4)).map_err(|e| {
         format!(
             "Failed to read scie-jump trailer magic from {path}: {e}",
@@ -126,15 +177,24 @@ pub fn load<D: Read + Seek>(
                         You can avoid this problem by using using a custom scie-jump with version \
                         1.8.2 or newer."
                     );
-                    current_scie_jump_version.to_string()
+                    current_scie_jump_version.clone()
                 }
             };
-            Ok(Some(Jump { version, size }))
+            Ok(Some(Jump {
+                version,
+                size,
+                hash: None,
+            }))
         }
         Ok(EOF_MAGIC_V2) => {
             let size = read_size(&mut data, path)?;
             let version = read_version(&mut data, path)?;
-            Ok(Some(Jump { version, size }))
+            let hash = hash(size, &version, &mut data, path)?;
+            Ok(Some(Jump {
+                version,
+                size,
+                hash,
+            }))
         }
         _ => Ok(None),
     }

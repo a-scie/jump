@@ -5,6 +5,7 @@ use std::fmt::Formatter;
 use std::io::Write;
 
 use indexmap::IndexMap;
+use semver::Version;
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -123,7 +124,7 @@ pub struct File {
     pub key: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<usize>,
+    pub size: Option<u64>,
     #[serde(default)]
     pub hash: Option<String>,
     #[serde(default, rename = "type")]
@@ -216,9 +217,21 @@ pub struct Cmd {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Jump {
-    pub size: usize,
+    pub size: u32,
+    pub version: Version,
     #[serde(default)]
-    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+}
+
+impl Jump {
+    pub fn with_hash(&self, hash: String) -> Self {
+        Self {
+            size: self.size,
+            version: self.version.clone(),
+            hash: Some(hash),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -358,6 +371,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
+    use semver::Version;
 
     use super::{ArchiveType, Boot, Cmd, Compression, Config, EnvVar, File, Jump, Lift};
     use crate::config::FileType;
@@ -368,8 +382,9 @@ mod tests {
             "{}",
             serde_json::to_string_pretty(&Config::new(
                 Jump {
-                    version: "0.1.0".to_string(),
+                    version: Version::new(0, 1, 0),
                     size: 37,
+                    hash: None,
                 },
                 Lift {
                     base: None,

@@ -67,9 +67,9 @@ fn add_magic(path: &Path, version: &str) -> ExitResult {
 }
 
 fn execute(command: &mut Command) -> ExitResult {
-    let mut child = command
-        .spawn()
-        .map_err(|e| Code::FAILURE.with_message(format!("{e}")))?;
+    let mut child = command.spawn().map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to spawn command {command:?}: {e}"))
+    })?;
     let exit_status = child.wait().map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to gather exit status of command: {command:?}: {e}"
@@ -187,8 +187,12 @@ fn main() -> ExitResult {
         .with_extension(env::consts::EXE_EXTENSION);
 
     let scie_jump_manifest_path = workspace_root.join("Cargo.toml");
-    let scie_jump_manifest = Manifest::from_path(&scie_jump_manifest_path)
-        .map_err(|e| Code::FAILURE.with_message(format!("{e}")))?;
+    let scie_jump_manifest = Manifest::from_path(&scie_jump_manifest_path).map_err(|e| {
+        Code::FAILURE.with_message(format!(
+            "Failed to read manifest at {path}: {e}",
+            path = scie_jump_manifest_path.display()
+        ))
+    })?;
     let version = if let Some(package) = scie_jump_manifest.package
         && let Inheritable::Set(version) = package.version
     {

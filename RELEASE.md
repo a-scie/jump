@@ -4,10 +4,10 @@
 
 ### Version Bump and Changelog
 
-1. Bump the version in at least [`Cargo.toml`](Cargo.toml) and possibly other crates if they were
-   modified.
-2. Run `cargo run -p package` to update [`Cargo.lock`](Cargo.lock) with the new version and as a 
-   sanity check on the state of the project.
+1. Bump the version in at least [`Cargo.toml`](Cargo.toml) and `src/main.rs` and possibly other
+   crates if they were modified.
+2. Run `cargo test --all && cargo run -p package` to update [`Cargo.lock`](Cargo.lock) with the new
+   version and as a sanity check on the state of the project.
 3. Update [`CHANGES.md`](CHANGES.md) with any changes that are likely to be useful to consumers.
 4. Open a PR with these changes and land it on https://github.com/a-scie/jump main.
 

@@ -6,9 +6,10 @@ use std::fmt::Debug;
 use std::fs::Permissions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::{cmp, env, io};
+use std::{env, io};
 
 use jump::config::{FileType, Fmt};
+use jump::io::WindowedReader;
 use jump::{File, Jump, Lift, Source};
 use proc_exit::{Code, Exit, ExitResult};
 use zip::ZipArchive;
@@ -179,7 +180,7 @@ pub(crate) fn split(
             let mut src = scie
                 .try_clone()
                 .map_err(|e| Code::FAILURE.with_message(format!("Failed to dup scie handle: {e}")))?
-                .take(jump.size as u64);
+                .take(u64::from(jump.size));
             std::io::copy(&mut src, &mut dst).map_err(|e| {
                 Code::FAILURE.with_message(format!("Failed to extract scie-jump: {e}"))
             })?;
@@ -188,7 +189,7 @@ pub(crate) fn split(
 
     let mut have_scie_tote = false;
     let scie_tote_index = lift.files.len() - 1;
-    let mut offset = jump.size;
+    let mut offset = u64::from(jump.size);
     for (index, file) in lift.files.iter().enumerate() {
         if file.source != Source::Scie {
             continue;
@@ -197,7 +198,7 @@ pub(crate) fn split(
         } else if (file.file_type == FileType::Directory && chosen_files.selected(file).is_some())
             || (index == scie_tote_index && have_scie_tote)
         {
-            let mut zip_archive = open_embedded_zip(&mut scie, offset as u64, file)?;
+            let mut zip_archive = open_embedded_zip(&mut scie, offset, file)?;
             if chosen_files.is_empty()
                 || (file.file_type == FileType::Directory && chosen_files.selected(file).is_some())
             {
@@ -267,7 +268,7 @@ pub(crate) fn split(
             }
         } else if chosen_files.selected(file).is_some() {
             if dry_run && file.file_type == FileType::Directory {
-                let zip_archive = open_embedded_zip(&mut scie, offset as u64, file)?;
+                let zip_archive = open_embedded_zip(&mut scie, offset, file)?;
                 print_directory_entry(&base, &zip_archive, file);
             } else if dry_run {
                 print!(
@@ -281,13 +282,12 @@ pub(crate) fn split(
                 }
                 println!();
             } else {
-                let file_size = file.size as u64;
                 let mut reader = scie
                     .try_clone()
                     .map_err(|e| {
                         Code::FAILURE.with_message(format!("Failed to dup scie handle: {e}"))
                     })?
-                    .take(file_size);
+                    .take(file.size);
                 extract_to(&base, file, &mut reader)?;
             }
         }
@@ -297,9 +297,11 @@ pub(crate) fn split(
     if chosen_files.contains("lift.json") {
         if have_scie_tote {
             let scie_tote = lift.files.remove(scie_tote_index);
-            let start = scie.seek(SeekFrom::Start(jump.size as u64)).map_err(|e| {
-                Code::FAILURE.with_message(format!("Failed to seek to scie-tote: {e}"))
-            })?;
+            let start = scie
+                .seek(SeekFrom::Start(u64::from(jump.size)))
+                .map_err(|e| {
+                    Code::FAILURE.with_message(format!("Failed to seek to scie-tote: {e}"))
+                })?;
             let mut zip_archive = open_embedded_zip(&mut scie, start, &scie_tote)?;
             for file in lift.files.iter_mut() {
                 if file.size == 0 && file.source == Source::Scie {
@@ -311,7 +313,7 @@ pub(crate) fn split(
                                 file = file.name
                             ))
                         })?
-                        .size() as usize;
+                        .size();
                 }
             }
         }
@@ -414,63 +416,14 @@ fn mark_executable(file: &mut std::fs::File) -> Result<(), Exit> {
     }
 }
 
-struct EmbeddedZipReader<'a, S> {
-    scie: &'a mut S,
-    start: u64,
-    length: u64,
-    offset: u64,
-}
-
-impl<'a, S> EmbeddedZipReader<'a, S> {
-    pub fn new(scie: &'a mut S, start: u64, length: u64) -> Self {
-        Self {
-            scie,
-            start,
-            length,
-            offset: 0,
-        }
-    }
-}
-
-impl<R: Read + Debug> Read for EmbeddedZipReader<'_, R> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let written = self.scie.take(self.length - self.offset).read(buf)?;
-        self.offset += written as u64;
-        Ok(written)
-    }
-}
-
-impl<S: Seek + Debug> Seek for EmbeddedZipReader<'_, S> {
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        let offset = match pos {
-            SeekFrom::Start(offset) => Some(offset),
-            SeekFrom::End(offset) => self.length.checked_add_signed(offset),
-            SeekFrom::Current(offset) => self.offset.checked_add_signed(offset),
-        };
-        match offset {
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid seek to a negative or overflowing position",
-            )),
-            Some(offset) => {
-                let clamped_offset = cmp::min(self.length, offset);
-                let new_inner_offset = self
-                    .scie
-                    .seek(SeekFrom::Start(self.start + clamped_offset))?;
-                self.offset = new_inner_offset - self.start;
-                Ok(self.offset)
-            }
-        }
-    }
-}
-
 fn open_embedded_zip<'a, S: Seek + Read + Debug>(
     scie: &'a mut S,
     start: u64,
     file: &File,
-) -> Result<ZipArchive<EmbeddedZipReader<'a, S>>, Exit> {
-    let length = file.size as u64;
-    ZipArchive::new(EmbeddedZipReader::<'a, S>::new(scie, start, length)).map_err(|e| {
+) -> Result<ZipArchive<WindowedReader<'a, S>>, Exit> {
+    let zip_reader =
+        WindowedReader::new(scie, start, file.size).map_err(|e| Code::FAILURE.with_message(e))?;
+    ZipArchive::new(zip_reader).map_err(|e| {
         Code::FAILURE.with_message(format!("Failed to open {file} zip: {e}", file = file.name))
     })
 }
