@@ -165,6 +165,10 @@ if [[ -z "${_SUFFIX}" ]]; then
   _SUFFIX="${OS_ARCH}${EXE_EXT}"
 fi
 
+SCIE_BASE="$(mktemp -d)"
+gc "${SCIE_BASE}"
+log "Using SCIE_BASE=${SCIE_BASE}"
+
 SCIE_JUMP_NAME="scie-jump-${_SUFFIX}"
 SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
 (
@@ -172,7 +176,7 @@ SCIE_JUMP="${DIST_DIR}/${SCIE_JUMP_NAME}"
   sha256 --check "${SCIE_JUMP_NAME}.sha256"
 )
 
-export ARCH EXE_EXT LIFT NEWLINE OS OS_ARCH SCIE_JUMP
+export ARCH EXE_EXT LIFT NEWLINE OS OS_ARCH SCIE_BASE SCIE_JUMP
 
 if (( "${#_EXAMPLE_PATHS[@]}" == 0 )); then
   for path in *; do
