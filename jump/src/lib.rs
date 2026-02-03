@@ -41,7 +41,7 @@ pub use crate::context::ARCH;
 use crate::installer::{Directory, FileSource, Scie, install};
 // Exposed for the package crate post-processing of the scie-jump binary.
 pub use crate::jump::EOF_MAGIC_V2 as EOF_MAGIC;
-pub use crate::jump::load as load_jump;
+pub use crate::jump::{hash_jump, load as load_jump};
 pub use crate::lift::{File, Lift, ScieBoot, Source, load_lift};
 pub use crate::process::{EnvVar, EnvVars, Process};
 pub use crate::zip::check_is_zip;

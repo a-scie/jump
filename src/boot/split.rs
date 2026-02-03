@@ -180,7 +180,7 @@ pub(crate) fn split(
             let mut src = scie
                 .try_clone()
                 .map_err(|e| Code::FAILURE.with_message(format!("Failed to dup scie handle: {e}")))?
-                .take(jump.size as u64);
+                .take(u64::from(jump.size));
             std::io::copy(&mut src, &mut dst).map_err(|e| {
                 Code::FAILURE.with_message(format!("Failed to extract scie-jump: {e}"))
             })?;
@@ -297,9 +297,11 @@ pub(crate) fn split(
     if chosen_files.contains("lift.json") {
         if have_scie_tote {
             let scie_tote = lift.files.remove(scie_tote_index);
-            let start = scie.seek(SeekFrom::Start(jump.size as u64)).map_err(|e| {
-                Code::FAILURE.with_message(format!("Failed to seek to scie-tote: {e}"))
-            })?;
+            let start = scie
+                .seek(SeekFrom::Start(u64::from(jump.size)))
+                .map_err(|e| {
+                    Code::FAILURE.with_message(format!("Failed to seek to scie-tote: {e}"))
+                })?;
             let mut zip_archive = open_embedded_zip(&mut scie, start, &scie_tote)?;
             for file in lift.files.iter_mut() {
                 if file.size == 0 && file.source == Source::Scie {

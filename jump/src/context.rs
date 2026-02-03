@@ -146,7 +146,7 @@ impl ScieJump {
                     )
                 })?;
             }
-            std::io::copy(&mut src.take(self.size as u64), &mut dst).map_err(|e| {
+            std::io::copy(&mut src.take(u64::from(self.size)), &mut dst).map_err(|e| {
                 format!(
                     "Failed to copy the scie-jump from {src} to {dst}: {e}",
                     src = self.src.display(),
@@ -370,11 +370,15 @@ impl<'a> Context<'a> {
         }
         context.base = PathBuf::from(parsed_base);
         context.lift_manifest.dst = context.base.join(&lift.hash).join("lift.json");
-        context.scie_jump.dst = context
-            .base
-            .join("scie-jumps")
-            .join(jump.version.to_string())
-            .join("scie-jump");
+
+        let mut scie_jump_dst = context.base.join("scie-jumps");
+        if let Some(hash) = jump.hash.as_deref() {
+            scie_jump_dst = scie_jump_dst.join(hash)
+        } else {
+            scie_jump_dst = scie_jump_dst.join(jump.version.to_string())
+        };
+        context.scie_jump.dst = scie_jump_dst.join("scie-jump");
+
         Ok(context)
     }
 
@@ -820,6 +824,7 @@ mod tests {
         let jump = Jump {
             size: 42,
             version: Version::new(0, 1, 0),
+            hash: None,
         };
         let lift = Lift {
             name: "test".to_string(),
@@ -1006,6 +1011,7 @@ mod tests {
         let jump = Jump {
             size: 42,
             version: Version::new(0, 1, 0),
+            hash: None,
         };
         let lift = Lift {
             name: "test".to_string(),
@@ -1175,6 +1181,7 @@ mod tests {
         let jump = Jump {
             size: 42,
             version: Version::new(0, 1, 0),
+            hash: None,
         };
         let lift = Lift {
             name: "test".to_string(),
@@ -1309,6 +1316,7 @@ mod tests {
         let jump = Jump {
             size: 42,
             version: Version::new(0, 1, 0),
+            hash: None,
         };
         let lift = Lift {
             name: "test".into(),

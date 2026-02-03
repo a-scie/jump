@@ -219,6 +219,19 @@ pub struct Cmd {
 pub struct Jump {
     pub size: u32,
     pub version: Version,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+}
+
+impl Jump {
+    pub fn with_hash(&self, hash: String) -> Self {
+        Self {
+            size: self.size,
+            version: self.version.clone(),
+            hash: Some(hash),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -371,6 +384,7 @@ mod tests {
                 Jump {
                     version: Version::new(0, 1, 0),
                     size: 37,
+                    hash: None,
                 },
                 Lift {
                     base: None,

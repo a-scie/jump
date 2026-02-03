@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
 use jump::{
-    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_jump,
-    load_lift,
+    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, hash_jump,
+    load_jump, load_lift,
 };
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
@@ -141,7 +141,7 @@ fn pack(
                 binary = binary_path.display()
             )
         })?
-        .take(jump.size as u64);
+        .take(u64::from(jump.size));
     std::io::copy(&mut scie_jump, &mut binary).map_err(|e| {
         format!(
             "Failed to write first {scie_jump_size} bytes of the scie-jump binary {path} to \
@@ -245,7 +245,12 @@ fn pack(
         })?;
         lift.files.push(tote_file);
     }
-    let config = jump::config(jump.clone(), lift);
+    let jump = if let Some(hash) = hash_jump(jump, scie_jump_path)? {
+        jump.with_hash(hash)
+    } else {
+        jump.clone()
+    };
+    let config = jump::config(jump, lift);
     // We configure the lift manifest format to allow for easiest inspection via standard tools.
     // In the single line case in particular, this configuration allows for inspection via
     // `tail -1 scie` or `tail -1 scie | jq .` on systems with these common tools.

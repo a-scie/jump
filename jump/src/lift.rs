@@ -238,7 +238,14 @@ pub(crate) fn load_scie(scie_path: &Path) -> Result<(Jump, Lift), String> {
             path = scie_path.display()
         )
     })?;
-    let mut lift_data = Vec::with_capacity((scie_len - end_of_zip) as usize);
+    let lift_data_len = usize::try_from(scie_len - end_of_zip).map_err(|e| {
+        format!(
+            "The lift manifest embedded in the tail of the scie at {path} is larger than a pointer \
+            on this platform: {e}",
+            path = scie_path.display()
+        )
+    })?;
+    let mut lift_data = Vec::with_capacity(lift_data_len);
     scie_data.read_to_end(&mut lift_data).map_err(|e| {
         format!(
             "Failed to read lift manifest of scie at {path}: {e}",
