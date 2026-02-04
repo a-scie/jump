@@ -59,3 +59,20 @@ sha256 cowsay.js* ../cowsay.js*
 
 # Verify an unpacked scie that includes a directory can be executed.
 ./scie-jump -x -w "Even the unpacked ones!!"
+
+# Even with an empty cache and no directory zip.
+cd .. && rm -rf split
+SCIE="split" ./cowsay.js split
+cd split
+
+SCIE_BASE="$(mktemp -d)"
+gc "${SCIE_BASE}"
+export SCIE_BASE
+
+if [[ ! -d "node_modules" ]]; then
+  die "Expected the scie split to contain a node_modules directory."
+fi
+if [[ -f "node_modules.zip" ]]; then
+  die "Expected the scie split to not contain a zip of the node_modules directory."
+fi
+./scie-jump -x -y "Even the unpacked ones with an empty cache!!!"
