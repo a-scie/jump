@@ -89,7 +89,7 @@ fn exec(
         .map(|_| ())
 }
 
-const VERSION: Version = Version::new(1, 11, 0);
+const VERSION: Version = Version::new(1, 11, 1);
 
 fn main() -> ExitResult {
     env_logger::init();

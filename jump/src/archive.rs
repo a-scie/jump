@@ -26,7 +26,8 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
     let mut zip = zip::ZipWriter::new(
         std::fs::OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
+            .truncate(true)
             .open(&zip_path)
             .map_err(|e| {
                 format!(
@@ -36,7 +37,11 @@ fn create_zip(dir: &Path) -> Result<PathBuf, String> {
                 )
             })?,
     );
-    for entry in WalkDir::new(dir).contents_first(false).follow_links(true) {
+    for entry in WalkDir::new(dir)
+        .contents_first(false)
+        .follow_links(true)
+        .sort_by_file_name()
+    {
         let entry = entry.map_err(|e| {
             format!(
                 "Walk failed while trying to create a zip of {dir}: {e}",

@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.11.1
+
+This release further fixes running a bare scie-jump `--launch` against an unpacked scie that
+contains files of directory type when tose directories are not already cached in the `SCIE_BASE`.
+
 ## 1.11.0
 
 This release brings support for specifying the `scie.jump.hash` in the lift manifest. This new

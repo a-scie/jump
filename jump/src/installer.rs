@@ -7,6 +7,7 @@ use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
 use logging_timer::time;
+use walkdir::WalkDir;
 use zip::ZipArchive;
 
 use crate::atomic::{Target, atomic_path};
@@ -98,6 +99,38 @@ where
     })
 }
 
+fn unpack_directory(directory: &Path, dst: &Path) -> Result<(), String> {
+    atomic_path(dst, Target::Directory, |work_dir| {
+        for entry in WalkDir::new(directory)
+            .contents_first(false)
+            .follow_links(true)
+        {
+            let entry = entry.map_err(|e| {
+                format!(
+                    "Walk failed while trying to cache directory {dir}: {e}",
+                    dir = directory.display()
+                )
+            })?;
+            if entry.path() == directory {
+                continue;
+            }
+            let dst_path = work_dir.join(
+                entry
+                    .path()
+                    .strip_prefix(directory)
+                    .map_err(|e| format!("XXX: {e}"))?,
+            );
+            if entry.path().is_dir() {
+                std::fs::create_dir(dst_path).map_err(|e| format!("XXX: {e}"))?;
+            } else {
+                std::fs::copy(entry.path(), dst_path).map_err(|e| format!("XXX: {e}"))?;
+            }
+        }
+        Ok::<(), String>(())
+    })?;
+    Ok(())
+}
+
 #[cfg(windows)]
 fn executable_permissions() -> Option<Permissions> {
     None
@@ -180,11 +213,8 @@ impl Directory {
         Self { directory }
     }
 
-    fn byte_source(&self, file: &File) -> Result<impl Read + Seek, String> {
-        let mut src = self.directory.join(&file.name);
-        if file.file_type == FileType::Directory {
-            src = src.with_extension("zip")
-        }
+    fn byte_source(&self, file: &File, src: Option<PathBuf>) -> Result<impl Read + Seek, String> {
+        let src = src.unwrap_or_else(|| self.directory.join(&file.name));
         std::fs::File::open(src).map_err(|e| {
             format!(
                 "Failed to open {name} in {directory}: {e}",
@@ -195,7 +225,16 @@ impl Directory {
     }
 
     fn unpack_file(&self, file: &File, dst: &Path) -> Result<(), String> {
-        unpack_file(file, || self.byte_source(file), dst)
+        let src = if file.file_type == FileType::Directory {
+            let src = self.directory.join(&file.name);
+            if src.is_dir() {
+                return unpack_directory(&src, dst);
+            }
+            Some(src.with_extension("zip"))
+        } else {
+            None
+        };
+        unpack_file(file, || self.byte_source(file, src), dst)
     }
 
     fn unpack_scie_tote(
@@ -203,7 +242,7 @@ impl Directory {
         tote_file: &File,
         entries: &[(File, PathBuf)],
     ) -> Result<(), String> {
-        let byte_source = self.byte_source(tote_file)?;
+        let byte_source = self.byte_source(tote_file, None)?;
         let mut scie_tote = ZipArchive::new(byte_source)
             .map_err(|e| format!("Failed to load scie-tote {tote_file:?}: {e}"))?;
         unpack_scie_tote(&mut scie_tote, entries)
