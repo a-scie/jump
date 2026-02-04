@@ -99,6 +99,7 @@ where
     })
 }
 
+#[time("debug", "installer::{}")]
 fn unpack_directory(directory: &Path, dst: &Path) -> Result<(), String> {
     atomic_path(dst, Target::Directory, |work_dir| {
         for entry in WalkDir::new(directory)
@@ -114,16 +115,29 @@ fn unpack_directory(directory: &Path, dst: &Path) -> Result<(), String> {
             if entry.path() == directory {
                 continue;
             }
-            let dst_path = work_dir.join(
-                entry
-                    .path()
-                    .strip_prefix(directory)
-                    .map_err(|e| format!("XXX: {e}"))?,
-            );
+            let dst_path = work_dir.join(entry.path().strip_prefix(directory).map_err(|e| {
+                format!(
+                    "Failed to relativize {src} against {root}: {e}",
+                    src = entry.path().display(),
+                    root = directory.display()
+                )
+            })?);
             if entry.path().is_dir() {
-                std::fs::create_dir(dst_path).map_err(|e| format!("XXX: {e}"))?;
+                std::fs::create_dir(&dst_path).map_err(|e| {
+                    format!(
+                        "Failed to create {dst} for unpacking {src} to: {e}",
+                        dst = dst_path.display(),
+                        src = entry.path().display()
+                    )
+                })?;
             } else {
-                std::fs::copy(entry.path(), dst_path).map_err(|e| format!("XXX: {e}"))?;
+                std::fs::copy(entry.path(), &dst_path).map_err(|e| {
+                    format!(
+                        "Failed to unpack {src} to {dst}: {e}",
+                        src = entry.path().display(),
+                        dst = dst_path.display()
+                    )
+                })?;
             }
         }
         Ok::<(), String>(())
