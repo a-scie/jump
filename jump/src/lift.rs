@@ -7,7 +7,7 @@ use std::path::Path;
 use logging_timer::time;
 
 use crate::config::{ArchiveType, Boot, Config, FileType, Jump, Other};
-use crate::{archive, fingerprint};
+use crate::{archive, fingerprint, hash_jump};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Source {
@@ -54,8 +54,6 @@ pub struct Lift {
     pub description: Option<String>,
     pub base: Option<String>,
     pub(crate) load_dotenv: bool,
-    pub size: usize,
-    pub hash: String,
     pub boot: Boot,
     pub files: Vec<File>,
     pub(crate) other: Option<Other>,
@@ -268,14 +266,64 @@ pub(crate) fn load_scie(scie_path: &Path) -> Result<(Jump, Lift), String> {
 }
 
 #[time("debug", "lift::{}")]
-pub fn load_lift(manifest_path: &Path, reconstitute: bool) -> Result<(Option<Jump>, Lift), String> {
+pub fn load_lift(
+    manifest_path: &Path,
+    reconstitute: bool,
+    jump: &Jump,
+    scie_jump_path: &Path,
+) -> Result<(Jump, Lift), String> {
+    let mut jump_hash: Option<String> = None;
     let data = std::fs::read(manifest_path).map_err(|e| {
         format!(
             "Failed to open lift manifest at {manifest}: {e}",
             manifest = manifest_path.display()
         )
     })?;
-    load(manifest_path, &data, reconstitute)
+    let (configured_jump, lift) = load(manifest_path, &data, reconstitute)?;
+    if let Some(expected_jump) = configured_jump.as_ref() {
+        if jump.size != expected_jump.size {
+            return Err(format!(
+                "The lift manifest {manifest} specifies a scie-jump binary of {expected_size} \
+                bytes but the current scie-jump at {scie_jump_path} is {actual_size} bytes.",
+                manifest = manifest_path.display(),
+                expected_size = expected_jump.size,
+                scie_jump_path = scie_jump_path.display(),
+                actual_size = jump.size
+            ));
+        }
+        if jump.version != expected_jump.version {
+            return Err(format!(
+                "The lift manifest {manifest} specifies scie-jump version {expected_version} \
+                bytes but the current scie-jump at {scie_jump_path} is version {actual_version}.",
+                manifest = manifest_path.display(),
+                expected_version = expected_jump.version,
+                scie_jump_path = scie_jump_path.display(),
+                actual_version = jump.version
+            ));
+        }
+        if let Some(expected_hash) = &expected_jump.hash {
+            jump_hash = hash_jump(jump, scie_jump_path)?;
+            if let Some(actual_hash) = jump_hash.as_deref()
+                && actual_hash != expected_hash
+            {
+                return Err(format!(
+                    "The lift manifest {manifest} specifies a scie-jump with hash {expected_hash} \
+                    but the current scie-jump at {scie_jump_path} has hash {actual_hash}.",
+                    manifest = manifest_path.display(),
+                    scie_jump_path = scie_jump_path.display(),
+                ));
+            }
+        }
+    }
+    if jump_hash.is_none() {
+        jump_hash = hash_jump(jump, scie_jump_path)?;
+    }
+    let jump = if let Some(hash) = jump_hash {
+        jump.with_hash(hash)
+    } else {
+        jump.clone()
+    };
+    Ok((jump, lift))
 }
 
 fn load(
@@ -284,17 +332,21 @@ fn load(
     reconstitute: bool,
 ) -> Result<(Option<Jump>, Lift), String> {
     let config = Config::parse(data)?;
-    let manifest_absolute_path = manifest_path.canonicalize().map_err(|e| {
-        format!(
-            "Failed to resolve an absolute path for the lift manifest {manifest}: {e}",
-            manifest = manifest_path.display()
-        )
-    })?;
-    let resolve_base = manifest_absolute_path
-        .parent()
-        .unwrap_or_else(|| Path::new(""));
+
     let lift = config.scie.lift;
-    let files = assemble(resolve_base, lift.files, reconstitute)?;
+    let files = {
+        let manifest_absolute_path = manifest_path.canonicalize().map_err(|e| {
+            format!(
+                "Failed to resolve an absolute path for the lift manifest {manifest}: {e}",
+                manifest = manifest_path.display()
+            )
+        })?;
+        let resolve_base = manifest_absolute_path
+            .parent()
+            .unwrap_or_else(|| Path::new(""));
+        assemble(resolve_base, lift.files, reconstitute)?
+    };
+
     Ok((
         config.scie.jump,
         Lift {
@@ -303,8 +355,6 @@ fn load(
             base: lift.base,
             load_dotenv: lift.load_dotenv.unwrap_or(false),
             boot: lift.boot,
-            size: data.len(),
-            hash: fingerprint::digest(data),
             files,
             other: config.other,
         },

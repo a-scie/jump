@@ -19,41 +19,20 @@ pub const EOF_MAGIC_V2: u32 = 0x4a532520;
 const SCIE_JUMP_VERSION_INTRODUCING_HASH: Version = Version::new(1, 11, 0);
 
 pub fn hash_jump(jump: &Jump, path: &Path) -> Result<Option<String>, String> {
-    let data = File::open(path).map_err(|e| {
+    let mut data = File::open(path).map_err(|e| {
         format!(
             "Failed to open {path} to hash scie-jump contents: {e}",
             path = path.display()
         )
     })?;
-    hash(
-        jump.size,
-        &jump.version,
-        &mut data.take(u64::from(jump.size)),
-        path,
-    )
-}
-
-fn hash<D: Read + Seek>(
-    size: u32,
-    version: &Version,
-    data: &mut D,
-    path: &Path,
-) -> Result<Option<String>, String> {
-    if version >= &SCIE_JUMP_VERSION_INTRODUCING_HASH {
+    if jump.version >= SCIE_JUMP_VERSION_INTRODUCING_HASH {
         data.rewind().map_err(|e| {
             format!(
                 "Failed to rewind open scie-jump file {path} to hash it: {e}",
                 path = path.display()
             )
         })?;
-        let (amount_read, hash) = fingerprint::digest_reader(data)?;
-        if amount_read != u64::from(size) {
-            return Err(format!(
-                "The bare scie-jump at {path} claims its size is {size} bytes, but hashed \
-                        {amount_read} bytes.",
-                path = path.display()
-            ));
-        }
+        let (_, hash) = fingerprint::digest_reader(data.take(u64::from(jump.size)))?;
         Ok(Some(hash))
     } else {
         Ok(None)
@@ -180,21 +159,12 @@ pub fn load(path: &Path, current_scie_jump_version: &Version) -> Result<Option<J
                     current_scie_jump_version.clone()
                 }
             };
-            Ok(Some(Jump {
-                version,
-                size,
-                hash: None,
-            }))
+            Ok(Some(Jump::new(size, version)))
         }
         Ok(EOF_MAGIC_V2) => {
             let size = read_size(&mut data, path)?;
             let version = read_version(&mut data, path)?;
-            let hash = hash(size, &version, &mut data, path)?;
-            Ok(Some(Jump {
-                version,
-                size,
-                hash,
-            }))
+            Ok(Some(Jump::new(size, version)))
         }
         _ => Ok(None),
     }

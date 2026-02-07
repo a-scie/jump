@@ -5,6 +5,8 @@
 source "${COMMON}"
 trap gc EXIT
 
+check_cmd diff
+
 "${SCIE_JUMP}" "${LIFT}"
 gc "${PWD}/coursier"
 
@@ -15,8 +17,11 @@ test "3more" = "$(
 )"
 
 # Verify byte-wise identical pack -> split -> pack round tripping.
-SCIE="split" ./coursier split
 gc "${PWD}/split"
+SCIE="split" ./coursier split
+
+# Verify stable lift manifest contents across materializations.
+diff -u <(SCIE=inspect ./coursier) split/lift.json
 
 sha256 coursier* > split/coursier.sha256
 cd split && ./scie-jump

@@ -5,7 +5,7 @@
 source "${COMMON}"
 trap gc EXIT
 
-check_cmd cat chmod cut dirname jq ln stat
+check_cmd basename cat chmod cut dirname find jq ln stat
 
 function size() {
   if [[ "${OS}" == "macos" ]]; then
@@ -15,16 +15,48 @@ function size() {
   fi
 }
 
+SCIE_BASE="$(mktemp -d)"
+gc "${SCIE_BASE}"
+export SCIE_BASE
+
 if ! "${SCIE_JUMP}" --launch="${LIFT}" "Unpacked Launch!" | grep "< Unpacked Launch! >"; then
   die "Execution of the unpacked scie failed."
 else
   echo "Unpacked execution of ${LIFT} directly with the ${SCIE_JUMP} works."
+fi
+if [[ -n "$(find "${SCIE_BASE}" -name lift.json)" ]]; then
+  die "Execution of the unpacked scie default entrypoint should not have unpacked a lift manifest."
 fi
 
 if ! SCIE_BOOT=unpacked "${SCIE_JUMP}" --launch="${LIFT}" "A scie.jump placeholder launch!!!" | grep "< A scie.jump placeholder launch!!! >"; then
   die "Execution of the unpacked scie failed."
 else
   echo "Unpacked execution of an alternate scie boot command in ${LIFT} directly with the ${SCIE_JUMP} works."
+fi
+unpacked_manifest="$(find "${SCIE_BASE}" -name lift.json)"
+if [[ -z "${unpacked_manifest}" ]]; then
+  die "Execution of the unpacked scie unpacked entrypoint should have unpacked a lift manifest."
+fi
+
+JAVA="java${EXE_EXT}"
+gc "${PWD}/${JAVA}"
+"${SCIE_JUMP}" "${LIFT}"
+SCIE_BOOT=unpacked ./"${JAVA}" "Comparing extracted lift manifests between launch styles."
+rm "${JAVA}"
+unpacked_manifests="$(find "${SCIE_BASE}" -name lift.json)"
+if [[ "${unpacked_manifest}" != "${unpacked_manifests}" ]]; then
+  die "Expected a single unpacked manifest at ${unpacked_manifest} but found: ${unpacked_manifests}"
+else
+  echo "A single manifest was extracted across launch styles at ${unpacked_manifest}."
+fi
+expected_hash="$(basename "$(dirname "${unpacked_manifest}")")"
+actual_hash="$(sha256 "${unpacked_manifest}" | cut -d' ' -f1)"
+if [[ "${expected_hash}" != "${actual_hash}" ]]; then
+  die "Expected ${unpacked_manifest} to have a hash of ${expected_hash} but was ${actual_hash}."
+fi
+actual_hash="$(SCIE=inspect "${SCIE_JUMP}" --launch="${LIFT}" | sha256 - | cut -d' ' -f1)"
+if [[ "${expected_hash}" != "${actual_hash}" ]]; then
+  die "Expected \`SCIE=inspect "${SCIE_JUMP}" --launch="${LIFT}"\` to have a hash of ${expected_hash} but was ${actual_hash}."
 fi
 
 gc "${PWD}/lift.json"
