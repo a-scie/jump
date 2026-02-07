@@ -5,6 +5,7 @@ use std::fmt::Formatter;
 use std::io::Write;
 
 use indexmap::IndexMap;
+use logging_timer::time;
 use semver::Version;
 use serde::de::{Error, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -225,6 +226,14 @@ pub struct Jump {
 }
 
 impl Jump {
+    pub(crate) fn new(size: u32, version: Version) -> Self {
+        Self {
+            size,
+            version,
+            hash: None,
+        }
+    }
+
     pub fn with_hash(&self, hash: String) -> Self {
         Self {
             size: self.size,
@@ -243,7 +252,7 @@ pub struct Boot {
     pub bindings: IndexMap<String, Cmd>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Lift {
     pub name: String,
@@ -260,7 +269,7 @@ pub struct Lift {
     pub load_dotenv: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Scie {
     pub lift: Lift,
@@ -311,7 +320,7 @@ pub struct Other {
     other: IndexMap<String, Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub scie: Scie,
     #[serde(flatten)]
@@ -342,6 +351,7 @@ impl Config {
         Ok(config)
     }
 
+    #[time("debug", "config::{}")]
     pub fn serialize<W: Write>(&self, stream: &mut W, fmt: Fmt) -> Result<(), String> {
         let mut write_bytes = |bytes| {
             stream

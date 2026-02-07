@@ -1,5 +1,13 @@
 # Release Notes
 
+## 1.11.2
+
+This release fixes a performance regression launching traditional scies caused by hashing the
+scie-jump in their tip. This is now only done for unpacked scie-jump `--launch`es as intended.
+
+Also, a long-standing bug where the `{scie.lift}` placeholder would lead to a scie lift manifest
+being extracted that did not perfectly match `SCIE=inspect` output is fixed.
+
 ## 1.11.1
 
 This release further fixes running a bare scie-jump `--launch` against an unpacked scie that

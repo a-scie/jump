@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use jump::config::{ArchiveType, FileType, Fmt};
 use jump::{
-    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, hash_jump,
-    load_jump, load_lift,
+    BOOT_PACK_HELP, File, Jump, Lift, Source, check_is_zip, create_options, fingerprint, load_jump,
+    load_lift,
 };
 use logging_timer::time;
 use proc_exit::{Code, ExitResult};
@@ -16,7 +16,11 @@ use semver::Version;
 use zip::{CompressionMethod, ZipWriter};
 
 #[time("debug", "pack::{}")]
-fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
+fn load_manifest(
+    path: &Path,
+    jump: &Jump,
+    scie_jump_path: &Path,
+) -> Result<(Jump, Lift, PathBuf), String> {
     let manifest_path = if path.is_dir() {
         path.join("lift.json")
     } else {
@@ -28,17 +32,8 @@ fn load_manifest(path: &Path, jump: &Jump) -> Result<(Lift, PathBuf), String> {
             path = path.display()
         ));
     }
-    let (maybe_jump, lift) = load_lift(&manifest_path, true)?;
-    if let Some(ref configured_jump) = maybe_jump
-        && jump != configured_jump
-    {
-        return Err(format!(
-            "The lift manifest {manifest} specifies a scie jump binary of \
-                    {configured_jump:?} that does not match the current of {jump:?}.",
-            manifest = manifest_path.display()
-        ));
-    }
-    Ok((lift, manifest_path))
+    let (jump, lift) = load_lift(&manifest_path, true, jump, scie_jump_path)?;
+    Ok((jump, lift, manifest_path))
 }
 
 #[cfg(windows)]
@@ -114,9 +109,9 @@ impl ScieTote {
 
 #[time("debug", "pack::{}")]
 fn pack(
+    jump: Jump,
     mut lift: Lift,
     manifest_path: &Path,
-    jump: &Jump,
     scie_jump_path: &Path,
     single_line: bool,
 ) -> Result<PathBuf, String> {
@@ -245,11 +240,6 @@ fn pack(
         })?;
         lift.files.push(tote_file);
     }
-    let jump = if let Some(hash) = hash_jump(jump, scie_jump_path)? {
-        jump.with_hash(hash)
-    } else {
-        jump.clone()
-    };
     let config = jump::config(jump, lift);
     // We configure the lift manifest format to allow for easiest inspection via standard tools.
     // In the single line case in particular, this configuration allows for inspection via
@@ -330,19 +320,18 @@ pub(crate) fn set(
                     })?;
             }
             _ => {
-                let (lift, path) = load_manifest(Path::new(arg.as_str()), &jump)
-                    .map_err(|e| Code::FAILURE.with_message(e))?;
-                lifts.push((lift, path));
+                let (jump, lift, path) =
+                    load_manifest(Path::new(arg.as_str()), &jump, &scie_jump_path)
+                        .map_err(|e| Code::FAILURE.with_message(e))?;
+                lifts.push((jump, lift, path));
             }
         }
     }
     if lifts.is_empty()
         && let Ok(cwd) = env::current_dir()
     {
-        if let Ok((lift, path)) =
-            load_manifest(&cwd, &jump).map_err(|e| Code::FAILURE.with_message(e))
-        {
-            lifts.push((lift, path));
+        if let Ok((jump, lift, path)) = load_manifest(&cwd, &jump, &scie_jump_path) {
+            lifts.push((jump, lift, path))
         } else {
             return print_usage(
                 "\
@@ -355,8 +344,8 @@ named `lift.json`.",
 
     let results = lifts
         .into_iter()
-        .map(|(lift, manifest)| {
-            pack(lift, &manifest, &jump, &scie_jump_path, single_line)
+        .map(|(jump, lift, manifest)| {
+            pack(jump, lift, &manifest, &scie_jump_path, single_line)
                 .map(|binary| (manifest, binary))
         })
         .collect::<Result<Vec<_>, _>>()

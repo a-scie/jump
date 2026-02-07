@@ -336,54 +336,46 @@ fn find_current_exe() -> Result<CurrentExe, String> {
 #[time("debug", "jump::{}")]
 pub fn prepare_boot(current_scie_jump_version: &Version) -> Result<BootAction, String> {
     let current_exe = find_current_exe()?;
-    let (jump, lift, mut file_source, scie_exe, argv_skip) = if let Some(jump) =
-        jump::load(&current_exe.exe, current_scie_jump_version)?
-    {
-        if let Some(arg) = env::args().nth(1)
-            && (arg == "-x" || arg == "--launch" || arg.starts_with("--launch="))
-        {
-            let lift_path = Path::new(if arg.len() > "--launch=".len() {
-                &arg["--launch=".len()..]
-            } else {
-                "lift.json"
-            });
-            let (configured_jump, lift) = load_lift(lift_path, false)?;
-            if let Some(expected_jump) = configured_jump
-                && jump != expected_jump
+    let (jump, lift, mut file_source, scie_exe, argv_skip) =
+        if let Some(jump) = jump::load(&current_exe.exe, current_scie_jump_version)? {
+            if let Some(arg) = env::args().nth(1)
+                && (arg == "-x" || arg == "--launch" || arg.starts_with("--launch="))
             {
-                return Err(format!(
-                    "The current scie jump {jump:?} is not the configured scie jump {expected_jump:?}."
-                ));
+                let lift_path = Path::new(if arg.len() > "--launch=".len() {
+                    &arg["--launch=".len()..]
+                } else {
+                    "lift.json"
+                });
+                let (jump, lift) = load_lift(lift_path, false, &jump, &current_exe.exe)?;
+                let directory =
+                    Directory::new(lift_path.parent().map(Path::to_path_buf).unwrap_or(
+                        env::current_dir().map_err(|e| format!("Failed to query CWD: {e}"))?,
+                    ));
+                (
+                    jump,
+                    lift,
+                    FileSource::Directory(directory),
+                    ScieExe::jump(current_exe.exe.clone(), lift_path.to_path_buf()),
+                    2,
+                )
+            } else {
+                return Ok(BootAction::Pack((jump, current_exe.exe.clone(), 1)));
             }
-            let directory =
-                Directory::new(lift_path.parent().map(Path::to_path_buf).unwrap_or(
-                    env::current_dir().map_err(|e| format!("Failed to query CWD: {e}"))?,
-                ));
+        } else {
+            let (jump, lift) = lift::load_scie(&current_exe.exe)?;
+            trace!(
+                "Loaded lift manifest from {current_exe}:\n{lift:#?}",
+                current_exe = current_exe.exe.display()
+            );
+            let scie = Scie::new(&current_exe.exe, &jump)?;
             (
                 jump,
                 lift,
-                FileSource::Directory(directory),
-                ScieExe::jump(current_exe.exe.clone(), lift_path.to_path_buf()),
-                2,
+                FileSource::Scie(scie),
+                ScieExe::scie(current_exe.exe.clone()),
+                1,
             )
-        } else {
-            return Ok(BootAction::Pack((jump, current_exe.exe.clone(), 1)));
-        }
-    } else {
-        let (jump, lift) = lift::load_scie(&current_exe.exe)?;
-        trace!(
-            "Loaded lift manifest from {current_exe}:\n{lift:#?}",
-            current_exe = current_exe.exe.display()
-        );
-        let scie = Scie::new(&current_exe.exe, &jump)?;
-        (
-            jump,
-            lift,
-            FileSource::Scie(scie),
-            ScieExe::scie(current_exe.exe.clone()),
-            1,
-        )
-    };
+        };
 
     if let Some(value) = env::var_os("SCIE") {
         if "boot-pack" == value {

@@ -6,7 +6,7 @@ use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Debug, Formatter};
 use std::fs::Permissions;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Child;
 
@@ -15,12 +15,12 @@ use logging_timer::time;
 
 use crate::atomic::{Target, atomic_path};
 use crate::cmd_env::{ParsedEnv, parse_scie_env_placeholder, prepare_env};
-use crate::config::{Cmd, Fmt};
+use crate::config::{Cmd, Config, Fmt};
 use crate::installer::{FileSource, install};
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
 use crate::process::{EnvVar, Process};
-use crate::{CurrentExe, EnvVars, Jump, Source, config};
+use crate::{CurrentExe, EnvVars, Jump, Source, config, fingerprint};
 
 #[cfg(all(
     target_os = "linux",
@@ -76,14 +76,35 @@ fn path_to_str(path: &Path) -> Result<&str, String> {
 #[derive(Clone, Debug)]
 struct LiftManifest {
     dst: PathBuf,
-    jump: Jump,
-    lift: Lift,
+    config: Config,
+    hash: Option<String>,
 }
 
 impl LiftManifest {
+    fn new(jump: Jump, lift: Lift) -> Self {
+        let config = config(jump, lift);
+        Self {
+            dst: PathBuf::new(),
+            config,
+            hash: None,
+        }
+    }
+
+    fn hash(&mut self) -> Result<&str, String> {
+        if self.hash.is_none() {
+            let mut content: Vec<u8> = Vec::with_capacity(usize::from(u16::MAX));
+            self.serialize(&mut content)?;
+            self.hash = Some(fingerprint::digest(&content));
+        }
+        Ok(self
+            .hash
+            .as_deref()
+            .expect("Hash was calculated above or we never reach here."))
+    }
+
     fn install(&self) -> Result<(), String> {
         atomic_path(&self.dst, Target::File, |path| {
-            config(self.jump.clone(), self.lift.clone()).serialize(
+            self.serialize(
                 &mut std::fs::OpenOptions::new()
                     .write(true)
                     .create_new(true)
@@ -94,10 +115,14 @@ impl LiftManifest {
                             path = self.dst.display()
                         )
                     })?,
-                Fmt::new().trailing_newline(true).pretty(true),
             )
         })?;
         Ok(())
+    }
+
+    fn serialize<W: Write>(&self, dst: &mut W) -> Result<(), String> {
+        self.config
+            .serialize(dst, Fmt::new().trailing_newline(true).pretty(true))
     }
 }
 
@@ -328,11 +353,7 @@ impl<'a> Context<'a> {
             file_source,
             files_by_name,
             replacements: HashSet::new(),
-            lift_manifest: LiftManifest {
-                dst: PathBuf::new(), // N.B.: We replace this empty value below.
-                jump: jump.clone(),
-                lift: lift.clone(),
-            },
+            lift_manifest: LiftManifest::new(jump.clone(), lift.clone()),
             lift_manifest_dependants: HashSet::new(),
             lift_manifest_installed: false,
             scie_jump: ScieJump {
@@ -369,7 +390,10 @@ impl<'a> Context<'a> {
             ));
         }
         context.base = PathBuf::from(parsed_base);
-        context.lift_manifest.dst = context.base.join(&lift.hash).join("lift.json");
+        context.lift_manifest.dst = context
+            .base
+            .join(context.lift_manifest.hash()?)
+            .join("lift.json");
 
         let mut scie_jump_dst = context.base.join("scie-jumps");
         if let Some(hash) = jump.hash.as_deref() {
@@ -588,8 +612,9 @@ impl<'a> Context<'a> {
         self.base.join(&file.hash).join(&file.name)
     }
 
-    fn get_bindings_dir(&self) -> PathBuf {
-        self.base.join(&self.lift.hash).join("bindings")
+    fn get_bindings_dir(&mut self) -> Result<PathBuf, String> {
+        let hash = self.lift_manifest.hash()?;
+        Ok(self.base.join(hash).join("bindings"))
     }
 
     fn maybe_install_lift_manifest(&mut self, process: &Process) -> Result<(), String> {
@@ -637,7 +662,7 @@ impl<'a> Context<'a> {
             let boot_binding = Binding {
                 target: self
                     .base
-                    .join(&self.lift.hash)
+                    .join(self.lift_manifest.hash()?)
                     .join("locks")
                     .join(format!("{name}-{process_hash}")),
                 process,
@@ -756,11 +781,11 @@ impl<'a> Context<'a> {
                     reified.push_str(path_to_str(&self.base)?)
                 }
                 Item::Placeholder(Placeholder::ScieBindings) => {
-                    reified.push_str(path_to_str(self.get_bindings_dir().as_path())?);
+                    reified.push_str(path_to_str(self.get_bindings_dir()?.as_path())?);
                 }
                 Item::Placeholder(Placeholder::ScieBindingCmd(name)) => {
                     self.bind(name)?;
-                    reified.push_str(path_to_str(self.get_bindings_dir().as_path())?);
+                    reified.push_str(path_to_str(self.get_bindings_dir()?.as_path())?);
                 }
                 Item::Placeholder(Placeholder::ScieBindingEnv(ScieBindingEnv {
                     binding,
@@ -837,8 +862,6 @@ mod tests {
                     .unwrap(),
             ),
             load_dotenv: true,
-            size: 137,
-            hash: "abc".to_string(),
             boot: Boot {
                 commands: Default::default(),
                 bindings: Default::default(),
@@ -924,7 +947,7 @@ mod tests {
         assert_eq!(
             (
                 expected_scie_base
-                    .join("abc")
+                    .join(context.lift_manifest.hash().unwrap())
                     .join("lift.json")
                     .to_str()
                     .unwrap()
@@ -1018,8 +1041,6 @@ mod tests {
             description: None,
             base: Some("/tmp/nce".to_string()),
             load_dotenv: true,
-            size: 137,
-            hash: "abc".to_string(),
             boot: Boot {
                 commands: vec![(
                     "".to_owned(),
@@ -1188,8 +1209,6 @@ mod tests {
             description: None,
             base: Some("/tmp/nce".to_string()),
             load_dotenv: true,
-            size: 137,
-            hash: "abc".to_string(),
             boot: Boot {
                 commands: vec![(
                     "".to_owned(),
@@ -1323,8 +1342,6 @@ mod tests {
             description: None,
             base: Some("/tmp/nce".into()),
             load_dotenv: true,
-            size: 137,
-            hash: "abc".into(),
             boot: Boot {
                 commands: vec![(
                     "".to_owned(),
