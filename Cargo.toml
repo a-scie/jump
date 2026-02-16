@@ -28,7 +28,7 @@ semver = {  version = "1.0", features = ["serde"] }
 tempfile = "3.24"
 
 [workspace.dependencies.zip]
-version = "7.4"
+version = "8.0"
 default-features = false
 # We specifically don't include "time" which is otherwise default. Without time, zip creation
 # always uses 1/1/1980 and gives us reproducible zip creation by default.
