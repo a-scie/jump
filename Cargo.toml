@@ -25,7 +25,7 @@ env_logger = { version = "0.11", default-features = false }
 log = "0.4"
 logging_timer = "1.1"
 semver = {  version = "1.0", features = ["serde"] }
-tempfile = "3.24"
+tempfile = "3.25"
 
 [workspace.dependencies.zip]
 version = "8.0"
