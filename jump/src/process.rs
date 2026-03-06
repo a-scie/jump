@@ -311,4 +311,28 @@ mod tests {
             "Expected removal of an env var with a non-utf8 name to succeed."
         );
     }
+
+    #[test]
+    fn test_ordering() {
+        let vars = vec![
+            EnvVar::Default(("PEX_FOO".into(), "bar".into())),
+            EnvVar::Replace(("PEX_ROOT".into(), "42".into())),
+            EnvVar::RemoveMatching(ComparableRegex::try_from("PEX_.*").unwrap()),
+        ];
+        let env_vars = EnvVars { vars }.to_env_vars(
+            [
+                ("PEX_BAZ".into(), "spam".into()),
+                ("PEX_FOO".into(), "eggs".into()),
+            ]
+            .into_iter(),
+            true,
+        );
+        assert_eq!(
+            vec![
+                ("PEX_FOO".into(), "bar".into()),
+                ("PEX_ROOT".into(), "42".into())
+            ],
+            env_vars
+        );
+    }
 }
