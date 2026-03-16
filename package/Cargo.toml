@@ -11,7 +11,7 @@ publish = false
 [dependencies]
 byteorder = { workspace = true }
 cargo_toml = "0.22"
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 jump = { path = "../jump" }
 proc-exit = "2.0"
 sha2 = "0.10"
