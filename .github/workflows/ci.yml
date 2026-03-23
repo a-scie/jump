@@ -72,7 +72,7 @@ jobs:
           - os: windows-11-arm
             name: Windows aarch64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install rustup on Windows ARM
         if: matrix.os == 'windows-11-arm'
         uses: actions-rust-lang/setup-rust-toolchain@v1

@@ -103,11 +103,12 @@ jobs:
     permissions:
       id-token: write
       attestations: write
+      artifact-metadata: write
       contents: write
       discussions: write
     steps:
       - name: Checkout scie-jump ${{ needs.determine-tag.outputs.release-tag }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Install rustup on Windows ARM
@@ -171,7 +172,7 @@ jobs:
             -w /code \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} ./package.sh
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest@v4
         with:
           subject-path: dist/scie-jump*
       - name: Prepare Changelog
