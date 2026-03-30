@@ -14,5 +14,5 @@ cargo_toml = "0.22"
 clap = { version = "4.6", features = ["derive"] }
 jump = { path = "../jump" }
 proc-exit = "2.0"
-sha2 = "0.10"
+sha2 = "0.11"
 which = "8.0.2"
