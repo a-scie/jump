@@ -11,7 +11,7 @@ use std::process::Command;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cargo_toml::{Inheritable, Manifest};
 use clap::Parser;
-use jump::{ARCH, EOF_MAGIC};
+use jump::{ARCH, EOF_MAGIC, hash_reader};
 use proc_exit::{Code, Exit, ExitResult};
 use sha2::{Digest, Sha256};
 
@@ -205,14 +205,14 @@ fn main() -> ExitResult {
     };
 
     add_magic(&src, version.trim_end())?;
-    let mut reader = std::fs::File::open(&src).map_err(|e| {
+    let reader = std::fs::File::open(&src).map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to open {src} for hashing: {e}",
             src = src.display()
         ))
     })?;
     let mut hasher = Sha256::new();
-    std::io::copy(&mut reader, &mut hasher)
+    hash_reader(reader, &mut hasher)
         .map_err(|e| Code::FAILURE.with_message(format!("Failed to digest stream: {e}")))?;
     let digest = hasher.finalize();
 
@@ -242,7 +242,11 @@ fn main() -> ExitResult {
     })?;
 
     let fingerprint_file = dst.with_file_name(format!("{file_name}.sha256"));
-    std::fs::write(&fingerprint_file, format!("{digest:x} *{file_name}\n")).map_err(|e| {
+    std::fs::write(
+        &fingerprint_file,
+        format!("{digest} *{file_name}\n", digest = hex::encode(digest)),
+    )
+    .map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to write fingerprint file {fingerprint_file}: {e}",
             fingerprint_file = fingerprint_file.display()

@@ -124,7 +124,7 @@ impl Process {
             hasher.update(name.as_encoded_bytes());
             hasher.update(value.as_encoded_bytes());
         }
-        Ok(format!("{digest:x}", digest = hasher.finalize()))
+        Ok(hex::encode(hasher.finalize()))
     }
 
     fn as_command(
