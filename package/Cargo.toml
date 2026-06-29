@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 byteorder = { workspace = true }
-cargo_toml = "0.22"
+cargo_toml = "1.0"
 clap = { version = "4.6", features = ["derive"] }
 hex = { workspace = true }
 jump = { path = "../jump" }
