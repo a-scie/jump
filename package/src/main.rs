@@ -204,7 +204,7 @@ fn main() -> ExitResult {
         )));
     };
 
-    add_magic(&src, version.trim_end())?;
+    add_magic(&src, &version.to_string())?;
     let reader = std::fs::File::open(&src).map_err(|e| {
         Code::FAILURE.with_message(format!(
             "Failed to open {src} for hashing: {e}",
