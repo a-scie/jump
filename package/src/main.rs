@@ -180,7 +180,13 @@ fn main() -> ExitResult {
             .env(
                 "PATH",
                 [output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
-            ),
+            )
+            // N.B.: This avoids a spurious warning of this sort:
+            // warning: default toolchain implicitly overridden with `1.96.0-x86_64-unknown-linux-gnu` by rustup toolchain file
+            //   |
+            //   = help: use `cargo +stable install` if you meant to use the stable toolchain
+            //   = note: rustup selects the toolchain based on the parent environment and not the environment of the package being installed
+            .env_remove("RUSTUP_TOOLCHAIN_SOURCE"),
     )?;
     let src = output_bin_dir
         .join(BINARY)
