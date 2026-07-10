@@ -235,7 +235,7 @@ impl Binding {
         F: FnOnce() -> Result<(), String>,
     {
         if let Some(env) = atomic_path(self.target.as_path(), Target::File, |lock| {
-            trace!("Installing boot binding {binding:#?}", binding = &self);
+            trace!("Installing boot binding {binding:#?}", binding = self);
             install_required_files()?;
 
             let result = self
