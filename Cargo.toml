@@ -5,7 +5,7 @@ members = [
 
 [package]
 name = "scie-jump"
-version = "1.11.2"
+version = "1.12.0"
 description = "The self contained interpreted executable launcher."
 authors = [
     "John Sirois <john.sirois@gmail.com>",
@@ -18,6 +18,15 @@ opt-level = "s"
 strip = "symbols"
 lto = "fat"
 codegen-units = 1
+
+[[bin]]
+name = "scie-jump"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "scie-jumpw"
+path = "src/bin/mainw.rs"
+required-features = ["windows"]
 
 [workspace.dependencies]
 byteorder = "1.5"
@@ -48,3 +57,12 @@ proc-exit = "2.0"
 semver = { workspace = true }
 tempfile = { workspace = true }
 zip = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_System_Console", "Win32_UI_WindowsAndMessaging"] }
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3.0"
+
+[features]
+windows = []

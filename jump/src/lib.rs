@@ -280,7 +280,7 @@ pub enum BootAction {
     Inspect((Jump, Lift)),
     Install((ScieExe, Vec<ScieBoot>, usize)),
     List(Vec<ScieBoot>),
-    Pack((Jump, PathBuf, usize)),
+    Pack((Jump, PathBuf, usize, bool)),
     Select(SelectBoot),
     Split((Jump, Lift, PathBuf, usize)),
 }
@@ -359,7 +359,7 @@ pub fn prepare_boot(current_scie_jump_version: &Version) -> Result<BootAction, S
                     2,
                 )
             } else {
-                return Ok(BootAction::Pack((jump, current_exe.exe.clone(), 1)));
+                return Ok(BootAction::Pack((jump, current_exe.exe.clone(), 1, true)));
             }
         } else {
             let (jump, lift) = lift::load_scie(&current_exe.exe)?;
@@ -379,7 +379,7 @@ pub fn prepare_boot(current_scie_jump_version: &Version) -> Result<BootAction, S
 
     if let Some(value) = env::var_os("SCIE") {
         if "boot-pack" == value {
-            return Ok(BootAction::Pack((jump, current_exe.exe, argv_skip)));
+            return Ok(BootAction::Pack((jump, current_exe.exe, argv_skip, false)));
         } else if "help" == value {
             return Ok(BootAction::Help((format!("{help}\n", help = help()), 0)));
         } else if "inspect" == value {
