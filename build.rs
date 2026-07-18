@@ -5,14 +5,14 @@
 fn embed_resources() -> Result<(), String> {
     embed_resource::compile_for(
         r"assets\resources\scie-jump-icon-console.rc",
-        &["scie-jump"],
+        ["scie-jump"],
         embed_resource::NONE,
     )
     .manifest_required()
     .map_err(|err| format!("Failed to compile Windows icon resource: {err}"))?;
     embed_resource::compile_for(
         r"assets\resources\scie-jump-icon-gui.rc",
-        &["scie-jumpw"],
+        ["scie-jumpw"],
         embed_resource::NONE,
     )
     .manifest_required()
