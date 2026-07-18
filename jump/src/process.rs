@@ -127,7 +127,7 @@ impl Process {
         Ok(hex::encode(hasher.finalize()))
     }
 
-    fn as_command(
+    pub fn as_command(
         &self,
         extra_args: impl IntoIterator<Item = impl AsRef<OsStr>>,
         extra_env: impl IntoIterator<Item = (OsString, Option<OsString>)>,

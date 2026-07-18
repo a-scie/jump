@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.12.0
+
+This release adds a `scie-jumpw.exe` binary to use as the scie tip for Windows scies that will 
+launch a windowed application.
+
 ## 1.11.2
 
 This release fixes a performance regression launching traditional scies caused by hashing the

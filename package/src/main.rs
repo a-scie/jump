@@ -1,6 +1,7 @@
 // Copyright 2022 Science project contributors.
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::borrow::Cow;
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
@@ -10,6 +11,7 @@ use std::process::Command;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use cargo_toml::{Inheritable, Manifest};
+use clap::ArgAction::Append;
 use clap::Parser;
 use jump::{ARCH, EOF_MAGIC, hash_reader};
 use proc_exit::{Code, Exit, ExitResult};
@@ -22,6 +24,21 @@ const PATHSEP: &str = ";";
 
 #[cfg(not(windows))]
 const PATHSEP: &str = ":";
+
+#[cfg(windows)]
+fn expected_binaries(output_bin_dir: PathBuf) -> Vec<PathBuf> {
+    vec![
+        output_bin_dir.join(BINARY).with_extension("exe"),
+        output_bin_dir
+            .join(format!("{binary}w", binary = crate::BINARY))
+            .with_extension("exe"),
+    ]
+}
+
+#[cfg(unix)]
+fn expected_binaries(output_bin_dir: PathBuf) -> Vec<PathBuf> {
+    vec![output_bin_dir.join(BINARY)]
+}
 
 fn add_magic(path: &Path, version: &str) -> ExitResult {
     let mut binary = std::fs::OpenOptions::new()
@@ -137,6 +154,12 @@ struct Args {
         default_value_t = SpecifiedPath::new("dist")
     )]
     dest_dir: SpecifiedPath,
+    #[arg(
+        long = "scie-jump",
+        action = Append,
+        help = "Add magic to this scie-jump binary instead of building one."
+    )]
+    scie_jumps: Vec<PathBuf>,
 }
 
 fn main() -> ExitResult {
@@ -148,49 +171,59 @@ fn main() -> ExitResult {
             dest_dir.display()
         )));
     }
+    if !args.scie_jumps.is_empty() && args.target.is_some() {
+        return Err(Code::FAILURE.with_message(
+            "Cannot specify a scie jump to add magic to in combination with a --target.",
+        ));
+    }
 
     let cargo = env!("CARGO");
     let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
-
-    // N.B.: OUT_DIR and TARGET are not normally available under compilation, but our custom build
-    // script forwards them.
-    let out_dir = env!("OUT_DIR");
-    let target = args.target.unwrap_or_else(|| env!("TARGET").to_string());
-
-    // Just in case this target is not already installed.
-    if let Ok(rustup) = which::which("rustup") {
-        execute(Command::new(rustup).args(["target", "add", &target]))?;
-    }
-
     let workspace_root = PathBuf::from(cargo_manifest_dir).join("..");
-    let output_root = PathBuf::from(out_dir).join("dist");
-    let output_bin_dir = output_root.join("bin");
-    execute(
-        Command::new(cargo)
-            .args([
-                "install",
-                "--path",
-                path_as_str(&workspace_root)?,
-                "--target",
-                &target,
-                "--root",
-                path_as_str(&output_root)?,
-            ])
-            // N.B.: This just suppresses a warning about adding this bin dir to your PATH.
-            .env(
-                "PATH",
-                [output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
-            )
-            // N.B.: This avoids a spurious warning of this sort:
-            // warning: default toolchain implicitly overridden with `1.96.0-x86_64-unknown-linux-gnu` by rustup toolchain file
-            //   |
-            //   = help: use `cargo +stable install` if you meant to use the stable toolchain
-            //   = note: rustup selects the toolchain based on the parent environment and not the environment of the package being installed
-            .env_remove("RUSTUP_TOOLCHAIN_SOURCE"),
-    )?;
-    let src = output_bin_dir
-        .join(BINARY)
-        .with_extension(env::consts::EXE_EXTENSION);
+
+    let (srcs, target) = if args.scie_jumps.is_empty() {
+        // N.B.: OUT_DIR and TARGET are not normally available under compilation, but our custom build
+        // script forwards them.
+        let out_dir = env!("OUT_DIR");
+        let target = args.target.unwrap_or_else(|| env!("TARGET").to_string());
+
+        // Just in case this target is not already installed.
+        if let Ok(rustup) = which::which("rustup") {
+            execute(Command::new(rustup).args(["target", "add", &target]))?;
+        }
+        let output_root = PathBuf::from(out_dir).join("dist");
+        let output_bin_dir = output_root.join("bin");
+        let mut command = Command::new(cargo);
+        command.args([
+            "install",
+            "--path",
+            path_as_str(&workspace_root)?,
+            "--target",
+            &target,
+            "--root",
+            path_as_str(&output_root)?,
+        ]);
+        #[cfg(windows)]
+        command.args(["--features", "windows"]);
+        execute(
+            command
+                // N.B.: This just suppresses a warning about adding this bin dir to your PATH.
+                .env(
+                    "PATH",
+                    [output_bin_dir.to_str().unwrap(), env!("PATH")].join(PATHSEP),
+                )
+                // N.B.: This avoids a spurious warning of this sort:
+                // warning: default toolchain implicitly overridden with `1.96.0-x86_64-unknown-linux-gnu` by rustup toolchain file
+                //   |
+                //   = help: use `cargo +stable install` if you meant to use the stable toolchain
+                //   = note: rustup selects the toolchain based on the parent environment and not the environment of the package being installed
+                .env_remove("RUSTUP_TOOLCHAIN_SOURCE"),
+        )?;
+        let srcs = expected_binaries(output_bin_dir);
+        (srcs, Some(target))
+    } else {
+        (args.scie_jumps, None)
+    };
 
     let scie_jump_manifest_path = workspace_root.join("Cargo.toml");
     let scie_jump_manifest = Manifest::from_path(&scie_jump_manifest_path).map_err(|e| {
@@ -210,58 +243,82 @@ fn main() -> ExitResult {
         )));
     };
 
-    add_magic(&src, &version.to_string())?;
-    let reader = std::fs::File::open(&src).map_err(|e| {
-        Code::FAILURE.with_message(format!(
-            "Failed to open {src} for hashing: {e}",
-            src = src.display()
-        ))
-    })?;
-    let mut hasher = Sha256::new();
-    hash_reader(reader, &mut hasher)
-        .map_err(|e| Code::FAILURE.with_message(format!("Failed to digest stream: {e}")))?;
-    let digest = hasher.finalize();
+    for src in srcs {
+        add_magic(&src, &version.to_string())?;
+        let reader = std::fs::File::open(&src).map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to open {src} for hashing: {e}",
+                src = src.display()
+            ))
+        })?;
+        let mut hasher = Sha256::new();
+        hash_reader(reader, &mut hasher)
+            .map_err(|e| Code::FAILURE.with_message(format!("Failed to digest stream: {e}")))?;
+        let digest = hasher.finalize();
 
-    let file_name = format!(
-        "{BINARY}-{suffix}",
-        suffix = args.suffix.unwrap_or_else(|| format!(
-            "{os}-{arch}{exe}",
-            os = env::consts::OS,
-            arch = ARCH,
-            exe = env::consts::EXE_SUFFIX
-        ))
-    );
-    let dst = dest_dir.join(&file_name);
+        let exe_suffix = if let Some(file_name) = src.file_name()
+            && file_name.as_encoded_bytes().ends_with(b"w.exe")
+        {
+            "w.exe"
+        } else if let Some(file_name) = src.file_name()
+            && file_name.as_encoded_bytes().ends_with(b".exe")
+        {
+            ".exe"
+        } else {
+            env::consts::EXE_SUFFIX
+        };
+        let file_name = format!(
+            "{BINARY}-{suffix}",
+            suffix = args
+                .suffix
+                .as_deref()
+                .map(Cow::Borrowed)
+                .unwrap_or_else(|| Cow::Owned(format!(
+                    "{os}-{arch}{exe_suffix}",
+                    os = env::consts::OS,
+                    arch = ARCH,
+                )))
+        );
+        let dst = dest_dir.join(&file_name);
 
-    std::fs::create_dir_all(&dest_dir).map_err(|e| {
-        Code::FAILURE.with_message(format!(
-            "Failed to create dest_dir {dest_dir}: {e}",
-            dest_dir = dest_dir.display()
-        ))
-    })?;
-    std::fs::copy(&src, &dst).map_err(|e| {
-        Code::FAILURE.with_message(format!(
-            "Failed to copy {src} to {dst}: {e}",
-            src = src.display(),
-            dst = dst.display()
-        ))
-    })?;
+        std::fs::create_dir_all(&dest_dir).map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to create dest_dir {dest_dir}: {e}",
+                dest_dir = dest_dir.display()
+            ))
+        })?;
+        std::fs::copy(&src, &dst).map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to copy {src} to {dst}: {e}",
+                src = src.display(),
+                dst = dst.display()
+            ))
+        })?;
 
-    let fingerprint_file = dst.with_file_name(format!("{file_name}.sha256"));
-    std::fs::write(
-        &fingerprint_file,
-        format!("{digest} *{file_name}\n", digest = hex::encode(digest)),
-    )
-    .map_err(|e| {
-        Code::FAILURE.with_message(format!(
-            "Failed to write fingerprint file {fingerprint_file}: {e}",
-            fingerprint_file = fingerprint_file.display()
-        ))
-    })?;
+        let fingerprint_file = dst.with_file_name(format!("{file_name}.sha256"));
+        std::fs::write(
+            &fingerprint_file,
+            format!("{digest} *{file_name}\n", digest = hex::encode(digest)),
+        )
+        .map_err(|e| {
+            Code::FAILURE.with_message(format!(
+                "Failed to write fingerprint file {fingerprint_file}: {e}",
+                fingerprint_file = fingerprint_file.display()
+            ))
+        })?;
 
-    eprintln!(
-        "Wrote the {BINARY} (target: {target}) to {dst}",
-        dst = dst.display()
-    );
+        if let Some(target) = target.as_deref() {
+            eprintln!(
+                "Wrote the {BINARY} (target: {target}) to {dst}",
+                dst = dst.display()
+            );
+        } else {
+            eprintln!(
+                "Wrote the {src} with magic appended to {dst}",
+                src = src.display(),
+                dst = dst.display()
+            );
+        }
+    }
     Code::SUCCESS.ok()
 }

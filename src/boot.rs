@@ -2,19 +2,19 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::env;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use jump::config::Fmt;
-use jump::{Jump, Lift, ScieBoot, ScieExe, SelectBoot};
+use jump::{BootAction, Jump, Lift, Process, ScieBoot, ScieExe, SelectBoot};
 use log::warn;
 use proc_exit::{Code, Exit, ExitResult};
 
 mod pack;
 mod split;
-pub(crate) use pack::set as pack;
-pub(crate) use split::split;
+use crate::VERSION;
 
-pub(crate) fn help(message: String, exit_code: i32) -> ExitResult {
+fn help(message: String, exit_code: i32) -> ExitResult {
     let code = Code::from(exit_code);
     if code.is_err() {
         Err(code.with_message(message))
@@ -24,7 +24,7 @@ pub(crate) fn help(message: String, exit_code: i32) -> ExitResult {
     }
 }
 
-pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
+fn inspect(jump: Jump, lift: Lift) -> ExitResult {
     let config = jump::config(jump, lift);
     let fmt = Fmt::new().pretty(true).trailing_newline(true);
     config
@@ -32,7 +32,7 @@ pub(crate) fn inspect(jump: Jump, lift: Lift) -> ExitResult {
         .map_err(|e| Code::FAILURE.with_message(format!("Failed to serialize lift manifest: {e}")))
 }
 
-pub(crate) fn select(select_boot: SelectBoot) -> ExitResult {
+fn select(select_boot: SelectBoot) -> ExitResult {
     let default_cmd = select_boot
         .boots
         .iter()
@@ -203,11 +203,7 @@ fn install_command(
     Ok(hardlink)
 }
 
-pub(crate) fn install(
-    mut scie_exe: ScieExe,
-    commands: Vec<ScieBoot>,
-    argv_skip: usize,
-) -> ExitResult {
+fn install(mut scie_exe: ScieExe, commands: Vec<ScieBoot>, argv_skip: usize) -> ExitResult {
     if commands.is_empty() {
         return Err(Code::FAILURE.with_message(format!(
             "The {scie} scie is malformed - it has no boot commands.\n\
@@ -250,9 +246,39 @@ pub(crate) fn install(
     Ok(())
 }
 
-pub(crate) fn list(commands: Vec<ScieBoot>) -> ExitResult {
+fn list(commands: Vec<ScieBoot>) -> ExitResult {
     for command in commands {
         println!("{}", command.name);
     }
     Ok(())
+}
+
+pub fn prepare_boot() -> Result<BootAction, Exit> {
+    jump::prepare_boot(&VERSION).map_err(|e| {
+        Code::FAILURE.with_message(format!("Failed to prepare a scie jump action: {e}"))
+    })
+}
+
+pub fn boot(
+    action: BootAction,
+    process_executor: impl FnOnce(Process, usize, Vec<(OsString, Option<OsString>)>) -> ExitResult,
+) -> ExitResult {
+    match action {
+        BootAction::Execute((process, argv_skip, extra_env)) => {
+            process_executor(process, argv_skip, extra_env)
+        }
+        BootAction::Help((message, exit_code)) => help(message, exit_code),
+        BootAction::Inspect((jump, lift)) => inspect(jump, lift),
+        BootAction::Install((scie_exe, commands, argv_skip)) => {
+            install(scie_exe, commands, argv_skip)
+        }
+        BootAction::List(commands) => list(commands),
+        BootAction::Pack((jump, scie_jump_path, argv_skip, _)) => {
+            pack::set(jump, scie_jump_path, &VERSION, argv_skip)
+        }
+        BootAction::Select(select_boot) => select(select_boot),
+        BootAction::Split((jump, lift, scie_path, argv_skip)) => {
+            split::split(jump, lift, scie_path, argv_skip)
+        }
+    }
 }
