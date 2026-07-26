@@ -1,8 +1,16 @@
+use log::LevelFilter;
 use semver::Version;
 
 pub mod boot;
 
-pub const VERSION: Version = Version::new(1, 12, 0);
+pub const VERSION: Version = Version::new(1, 13, 0);
+
+pub fn init_logging() {
+    env_logger::builder()
+        .filter_level(LevelFilter::Warn)
+        .parse_default_env()
+        .init()
+}
 
 #[cfg(test)]
 mod test {

@@ -192,6 +192,15 @@ command can write `<key>=<value>` pairs to on individual lines. These bindings c
 commands using `{scie.bindings.<binding command name>:<key>}`. This facility is similar to the
 GitHub action [`$GITHUB_OUTPUT` facility](
 https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter).
+If any of the `SCIE_BINDING_ENV` represent a path created by the binding, you can have the binding
+re-run if any of these paths no longer meet criteria you choose by specifying a "brakes" property
+for the binding. The "brakes" value is an object whose keys are the keys of the `SCIE_BINDING_ENV`
+paths you wish to check for breaks and whose values are chosen from:
++ "dir": Breaks and re-creates the binding if the path is not a directory.
++ "file": Breaks and re-creates the binding if the path is not a file.
++ "exists": Breaks and re-creates the binding if the path does not exist.
+This facility is mainly useful to guard against any paths created by the binding that are outside
+the SCIE_BASE getting deleted between runs.
 
 N.B.: Since the scie-jump only maintains cooperative control over the contents of the `nce` cache,
 care should be taken when designing boot binding commands. If the scie is run in a Docker container

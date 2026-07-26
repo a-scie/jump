@@ -4,9 +4,9 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::fs::Permissions;
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Child;
 
@@ -15,7 +15,7 @@ use logging_timer::time;
 
 use crate::atomic::{Target, atomic_path};
 use crate::cmd_env::{ParsedEnv, parse_scie_env_placeholder, prepare_env};
-use crate::config::{Cmd, Config, Fmt};
+use crate::config::{Brake, CmdDesc, Config, Fmt};
 use crate::installer::{FileSource, install};
 use crate::lift::{File, Lift};
 use crate::placeholders::{self, Item, Placeholder, ScieBindingEnv};
@@ -225,14 +225,43 @@ pub(crate) enum FileEntry {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Binding {
+    name: String,
     target: PathBuf,
     process: Process,
 }
 
+#[derive(Clone, Debug)]
+enum BindingError {
+    Break(String),
+    Other(String),
+}
+
+impl BindingError {
+    fn into_string(self) -> String {
+        match self {
+            BindingError::Break(msg) | BindingError::Other(msg) => msg,
+        }
+    }
+}
+
+impl Display for BindingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let (prefix, msg) = match self {
+            BindingError::Break(msg) => ("Binding Break", msg),
+            BindingError::Other(msg) => ("Binding Error", msg),
+        };
+        write!(f, "{prefix}: {msg}")
+    }
+}
+
 impl Binding {
-    fn execute<F>(&self, install_required_files: F) -> Result<HashMap<String, String>, String>
+    fn execute<F>(
+        &self,
+        brakes: Option<&IndexMap<String, Brake>>,
+        install_required_files: &mut F,
+    ) -> Result<HashMap<String, String>, String>
     where
-        F: FnOnce() -> Result<(), String>,
+        F: FnMut() -> Result<(), String>,
     {
         if let Some(env) = atomic_path(self.target.as_path(), Target::File, |lock| {
             trace!("Installing boot binding {binding:#?}", binding = self);
@@ -260,24 +289,54 @@ impl Binding {
             }?;
             // We eagerly load the env file before we exit the lock such that malformed env files
             // are detected and the lock is not poisoned.
-            Self::load_env_file(lock)
+            self.load_env_file(lock, brakes)
+                .map_err(BindingError::into_string)
         })? {
             Ok(env)
         } else {
-            self.load_env()
+            self.load_env(brakes, install_required_files)
         }
     }
 
-    fn load_env(&self) -> Result<HashMap<String, String>, String> {
-        Self::load_env_file(self.target.as_path())
+    #[time("debug", "Binding::{}")]
+    fn load_env<F>(
+        &self,
+        brakes: Option<&IndexMap<String, Brake>>,
+        install_required_files: &mut F,
+    ) -> Result<HashMap<String, String>, String>
+    where
+        F: FnMut() -> Result<(), String>,
+    {
+        match self.load_env_file(&self.target, brakes) {
+            Ok(binding) => Ok(binding),
+            Err(BindingError::Other(msg)) => Err(msg),
+            Err(BindingError::Break(msg)) => match std::fs::remove_file(&self.target) {
+                Err(err) if err.kind() != ErrorKind::NotFound => Err(format!(
+                    "Problem re-creating broken binding for {name}: {err}",
+                    name = self.name
+                )),
+                _ => {
+                    debug!(
+                        "Re-creating broken binding for {name}: {msg}",
+                        name = self.name
+                    );
+                    self.execute(brakes, install_required_files)
+                }
+            },
+        }
     }
 
-    fn load_env_file(env_file: &Path) -> Result<HashMap<String, String>, String> {
+    #[time("debug", "Binding::{}")]
+    fn load_env_file(
+        &self,
+        env_file: &Path,
+        brakes: Option<&IndexMap<String, Brake>>,
+    ) -> Result<HashMap<String, String>, BindingError> {
         let contents = std::fs::read_to_string(env_file).map_err(|e| {
-            format!(
+            BindingError::Other(format!(
                 "Failed to read binding env from {env_file}: {e}",
                 env_file = env_file.display()
-            )
+            ))
         })?;
         let mut env = HashMap::new();
         for line in contents.lines() {
@@ -285,9 +344,37 @@ impl Binding {
             if !trimmed.is_empty() {
                 let mut components = trimmed.splitn(2, '=');
                 let key = components.next().ok_or_else(|| {
-                    format!("The non-empty line {line} must contain at least an env var name.")
+                    BindingError::Other(format!(
+                        "The non-empty line {line} must contain at least an env var name."
+                    ))
                 })?;
                 let value = components.next().unwrap_or("");
+                if let Some(brakes) = brakes
+                    && let Some(brake) = brakes.get(key)
+                {
+                    let path = Path::new(value);
+                    let r#break = match brake {
+                        Brake::Dir if !path.is_dir() => Some(format!(
+                            "Breaking binding for {name} because {path} is not a directory.",
+                            name = self.name,
+                            path = path.display()
+                        )),
+                        Brake::File if !path.is_file() => Some(format!(
+                            "Breaking binding for {name} because {path} is not a file.",
+                            name = self.name,
+                            path = path.display()
+                        )),
+                        Brake::Exists if !path.exists() => Some(format!(
+                            "Breaking binding for {name} because {path} does not exist.",
+                            name = self.name,
+                            path = path.display()
+                        )),
+                        _ => None,
+                    };
+                    if let Some(r#break) = r#break {
+                        return Err(BindingError::Break(r#break));
+                    }
+                }
                 env.insert(key.to_string(), value.to_string());
             }
         }
@@ -315,7 +402,7 @@ pub(crate) struct Context<'a> {
     scie_jump: ScieJump,
     scie_jump_dependants: HashSet<Process>,
     scie_jump_installed: bool,
-    bound: HashMap<String, Binding>,
+    bound: HashMap<String, HashMap<String, String>>,
     installed: HashSet<File>,
     ambient_env: IndexMap<OsString, OsString>,
 }
@@ -406,23 +493,23 @@ impl<'a> Context<'a> {
         Ok(context)
     }
 
-    fn prepare_process(&mut self, cmd: &'a Cmd) -> Result<Process, String> {
+    fn prepare_process(&mut self, cmd: &'a impl CmdDesc) -> Result<Process, String> {
         let mut env = prepare_env(cmd, &self.ambient_env)?;
         let mut needs_lift_manifest = false;
         let mut needs_scie_jump = false;
-        let (exe, needs_manifest, needs_jump) = self.reify_string(Some(&env), &cmd.exe)?;
+        let (exe, needs_manifest, needs_jump) = self.reify_string(Some(&env), cmd.exe())?;
         needs_lift_manifest |= needs_manifest;
         needs_scie_jump |= needs_jump;
 
         let mut args = vec![];
-        for arg in &cmd.args {
+        for arg in cmd.args() {
             let (reified_arg, needs_manifest, needs_jump) = self.reify_string(Some(&env), arg)?;
             needs_lift_manifest |= needs_manifest;
             needs_scie_jump |= needs_jump;
             args.push(reified_arg.into());
         }
         let mut vars = vec![];
-        for (key, value) in cmd.env.iter() {
+        for (key, value) in cmd.env().iter() {
             let final_value = match value {
                 Some(val) => {
                     let (reified_value, needs_manifest, needs_jump) =
@@ -465,7 +552,7 @@ impl<'a> Context<'a> {
         Ok(process)
     }
 
-    fn prepare(&mut self, cmd: &'a Cmd) -> Result<(Process, Vec<FileEntry>), String> {
+    fn prepare(&mut self, cmd: &'a impl CmdDesc) -> Result<(Process, Vec<FileEntry>), String> {
         let process = self.prepare_process(cmd)?;
 
         let mut load_entries = vec![];
@@ -648,18 +735,19 @@ impl<'a> Context<'a> {
     }
 
     fn bind(&mut self, name: &str) -> Result<HashMap<String, String>, String> {
-        if let Some(binding) = self.bound.get(name) {
-            binding.load_env()
+        if let Some(bindings) = self.bound.get(name) {
+            Ok(bindings.clone())
         } else {
-            let (process, files) = self.prepare(
-                self.lift
-                    .boot
-                    .bindings
-                    .get(name)
-                    .ok_or_else(|| format!("No boot binding named {name}."))?,
-            )?;
+            let binding = self
+                .lift
+                .boot
+                .bindings
+                .get(name)
+                .ok_or_else(|| format!("No boot binding named {name}."))?;
+            let (process, files) = self.prepare(binding)?;
             let process_hash = process.fingerprint()?;
             let boot_binding = Binding {
+                name: name.to_string(),
                 target: self
                     .base
                     .join(self.lift_manifest.hash()?)
@@ -667,12 +755,14 @@ impl<'a> Context<'a> {
                     .join(format!("{name}-{process_hash}")),
                 process,
             };
-            let binding_env = boot_binding.execute(|| {
+            let mut install_required_files = || {
                 self.maybe_install_lift_manifest(&boot_binding.process)?;
                 self.maybe_install_scie_jump(&boot_binding.process)?;
                 install(self.file_source, files.as_slice())
-            })?;
-            self.bound.insert(name.to_string(), boot_binding);
+            };
+            let binding_env =
+                boot_binding.execute(Some(&binding.brakes), &mut install_required_files)?;
+            self.bound.insert(name.to_string(), binding_env.clone());
             for file_entry in files {
                 match file_entry {
                     FileEntry::Skip(_) => {}
