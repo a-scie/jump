@@ -13,8 +13,9 @@
       "boot": {
         "commands": {
           "": {
-            "exe": "{run.sh}",
+            "exe": "C:\\Program Files\\Git\\usr\\bin\\bash",
             "args": [
+              "{run.sh}",
               "-d",
               "{scie.bindings.bind:BOUND_DIR}",
               "-f",
@@ -26,8 +27,8 @@
         },
         "bindings": {
           "bind": {
-            "exe": "{bind.sh}",
-            "args": ["{scie.env.BIND_BASE_DIR}"],
+            "exe": "C:\\Program Files\\Git\\usr\\bin\\bash",
+            "args": ["{bind.sh}", "{scie.env.BIND_BASE_DIR}"],
             "description": "Stress deprecation of scie boot binding descriptions.",
             "brakes": {
               "BOUND_DIR": "dir",
