@@ -12,13 +12,22 @@ BOUND_DIR="${BIND_BASE_DIR}/dir"
 BOUND_FILE="${BIND_BASE_DIR}/file"
 BOUND_EXISTS="${BIND_BASE_DIR}/exists"
 
-echo "BOUND_DIR: ${BOUND_DIR}" >&2
 mkdir -p "${BOUND_DIR}"
 echo "file" > "${BOUND_FILE}"
 echo "exists" > "${BOUND_EXISTS}"
 
-cat << EOF > "${SCIE_BINDING_ENV}"
+if [ "${BIND_JSON:-0}" = "1" ]; then
+  cat << EOF > "${SCIE_BINDING_JSON}"
+[
+  {"key": "BOUND_DIR", "value": "${BOUND_DIR}", "brake": "exists"},
+  {"key": "BOUND_FILE", "value": "${BOUND_FILE}", "brake": "exists"},
+  {"key": "BOUND_EXISTS", "value": "${BOUND_EXISTS}"}
+]
+EOF
+else
+  cat << EOF > "${SCIE_BINDING_ENV}"
 BOUND_DIR=${BOUND_DIR}
 BOUND_FILE=${BOUND_FILE}
 BOUND_EXISTS=${BOUND_EXISTS}
 EOF
+fi

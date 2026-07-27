@@ -17,33 +17,42 @@ else
   die "Did not observe expected warning in STDERR: ${stderr}"
 fi
 
-SCIE_BASE="$(mktemp -d)"
-gc "${SCIE_BASE}"
-export SCIE_BASE
-
 BIND_BASE_DIR="$(mktemp -d)"
 gc "${BIND_BASE_DIR}"
 export BIND_BASE_DIR
 
 export RUST_LOG=debug
 
-./brakes && echo "Initial run created bindings"
+for bind_json in 0 1; do
+  echo
+  if [ "${bind_json}" = "0" ]; then
+    echo "Using traditional SCIE_BINDING_ENV file bindings."
+  else
+    echo "Using SCIE_BINDING_JSON file bindings."
+  fi
+  echo "==="
 
-echo -e "\n---"
-rm -rf "${BIND_BASE_DIR}"
-./brakes && echo "Second run re-created bindings due to missing dir."
+  export BIND_JSON="${bind_json}"
 
-echo -e "\n---"
-rmdir "${BIND_BASE_DIR}/dir"
-./brakes && echo "Third run re-created bindings due to missing dir."
+  rm -rf "${SCIE_BASE}" "${BIND_BASE_DIR}"
+  ./brakes && echo "Initial run created bindings"
 
-echo -e "\n---"
-rm "${BIND_BASE_DIR}/file"
-./brakes && echo "Fourth run re-created bindings due to missing file."
+  echo -e "\n---"
+  rm -rf "${BIND_BASE_DIR}"
+  ./brakes && echo "Second run re-created bindings due to missing dir."
 
-echo -e "\n---"
-rm "${BIND_BASE_DIR}/exists"
-./brakes && echo "Fifth run re-created bindings due to path not existing."
+  echo -e "\n---"
+  rmdir "${BIND_BASE_DIR}/dir"
+  ./brakes && echo "Third run re-created bindings due to missing dir."
 
-echo -e "\n---"
-./brakes && echo "Sixth run re-used unbroken bindings from fifth run."
+  echo -e "\n---"
+  rm "${BIND_BASE_DIR}/file"
+  ./brakes && echo "Fourth run re-created bindings due to missing file."
+
+  echo -e "\n---"
+  rm "${BIND_BASE_DIR}/exists"
+  ./brakes && echo "Fifth run re-created bindings due to path not existing."
+
+  echo -e "\n---"
+  ./brakes && echo "Sixth run re-used unbroken bindings from fifth run."
+done

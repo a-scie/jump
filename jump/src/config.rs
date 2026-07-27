@@ -235,7 +235,7 @@ impl CmdDesc for Cmd {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Brake {
     #[serde(rename = "dir")]
     Dir,

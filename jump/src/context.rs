@@ -12,6 +12,7 @@ use std::process::Child;
 
 use indexmap::IndexMap;
 use logging_timer::time;
+use serde::Deserialize;
 
 use crate::atomic::{Target, atomic_path};
 use crate::cmd_env::{ParsedEnv, parse_scie_env_placeholder, prepare_env};
@@ -263,13 +264,20 @@ impl Binding {
     where
         F: FnMut() -> Result<(), String>,
     {
-        if let Some(env) = atomic_path(self.target.as_path(), Target::File, |lock| {
+        if let Some(env) = atomic_path(&self.target, Target::File, |env_file| {
             trace!("Installing boot binding {binding:#?}", binding = self);
             install_required_files()?;
 
-            let result = self
-                .process
-                .execute(None, vec![("SCIE_BINDING_ENV".into(), Some(lock.into()))]);
+            let result = self.process.execute(
+                None,
+                vec![
+                    ("SCIE_BINDING_ENV".into(), Some(env_file.into())),
+                    (
+                        "SCIE_BINDING_JSON".into(),
+                        Some(env_file.with_extension("json").into()),
+                    ),
+                ],
+            );
 
             match result {
                 Err(err) => Err(format!("Failed to launch boot binding: {err}")),
@@ -279,17 +287,17 @@ impl Binding {
                 _ => std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(lock)
+                    .open(env_file)
                     .map_err(|e| {
                         format!(
-                            "Failed to touch lock file {path}: {e}",
-                            path = lock.display()
+                            "Failed to touch env file {path}: {e}",
+                            path = env_file.display()
                         )
                     }),
             }?;
             // We eagerly load the env file before we exit the lock such that malformed env files
             // are detected and the lock is not poisoned.
-            self.load_env_file(lock, brakes)
+            self.load_env_file(env_file, brakes)
                 .map_err(BindingError::into_string)
         })? {
             Ok(env)
@@ -317,12 +325,39 @@ impl Binding {
                 )),
                 _ => {
                     debug!(
-                        "Re-creating broken binding for {name}: {msg}",
+                        "Re-creating broken binding for '{name}': {msg}",
                         name = self.name
                     );
                     self.execute(brakes, install_required_files)
                 }
             },
+        }
+    }
+
+    fn apply_brake(&self, key: &str, value: &str, brake: &Brake) -> Result<(), BindingError> {
+        let path = Path::new(&value);
+        let r#break = match brake {
+            Brake::Dir if !path.is_dir() => Some(format!(
+                "Breaking binding for '{name}' because {key}={path} is not a directory.",
+                name = self.name,
+                path = path.display()
+            )),
+            Brake::File if !path.is_file() => Some(format!(
+                "Breaking binding for '{name}' because {key}={path} is not a file.",
+                name = self.name,
+                path = path.display()
+            )),
+            Brake::Exists if !path.exists() => Some(format!(
+                "Breaking binding for '{name}' because {key}={path} does not exist.",
+                name = self.name,
+                path = path.display()
+            )),
+            _ => None,
+        };
+        if let Some(r#break) = r#break {
+            Err(BindingError::Break(r#break))
+        } else {
+            Ok(())
         }
     }
 
@@ -332,50 +367,61 @@ impl Binding {
         env_file: &Path,
         brakes: Option<&IndexMap<String, Brake>>,
     ) -> Result<HashMap<String, String>, BindingError> {
-        let contents = std::fs::read_to_string(env_file).map_err(|e| {
-            BindingError::Other(format!(
-                "Failed to read binding env from {env_file}: {e}",
-                env_file = env_file.display()
-            ))
-        })?;
         let mut env = HashMap::new();
-        for line in contents.lines() {
-            let trimmed = line.trim();
-            if !trimmed.is_empty() {
-                let mut components = trimmed.splitn(2, '=');
-                let key = components.next().ok_or_else(|| {
-                    BindingError::Other(format!(
-                        "The non-empty line {line} must contain at least an env var name."
-                    ))
-                })?;
-                let value = components.next().unwrap_or("");
-                if let Some(brakes) = brakes
-                    && let Some(brake) = brakes.get(key)
+        let json_env_file = env_file.with_extension("json");
+        if json_env_file.is_file() {
+            #[derive(Deserialize)]
+            struct Binding<'a> {
+                key: &'a str,
+                value: &'a str,
+                brake: Option<Brake>,
+            }
+            let contents = std::fs::read_to_string(&json_env_file).map_err(|e| {
+                BindingError::Other(format!(
+                    "Failed to read binding env from {env_file}: {e}",
+                    env_file = json_env_file.display()
+                ))
+            })?;
+            let bindings: Vec<Binding> = serde_json::from_str(&contents).map_err(|err| {
+                BindingError::Other(format!(
+                    "Failed to decode JSON env file {path}: {err}",
+                    path = json_env_file.display()
+                ))
+            })?;
+            for binding in bindings {
+                if let Some(brake) = binding
+                    .brake
+                    .as_ref()
+                    .or_else(|| brakes.and_then(|brakes| brakes.get(binding.key)))
                 {
-                    let path = Path::new(value);
-                    let r#break = match brake {
-                        Brake::Dir if !path.is_dir() => Some(format!(
-                            "Breaking binding for {name} because {path} is not a directory.",
-                            name = self.name,
-                            path = path.display()
-                        )),
-                        Brake::File if !path.is_file() => Some(format!(
-                            "Breaking binding for {name} because {path} is not a file.",
-                            name = self.name,
-                            path = path.display()
-                        )),
-                        Brake::Exists if !path.exists() => Some(format!(
-                            "Breaking binding for {name} because {path} does not exist.",
-                            name = self.name,
-                            path = path.display()
-                        )),
-                        _ => None,
-                    };
-                    if let Some(r#break) = r#break {
-                        return Err(BindingError::Break(r#break));
-                    }
+                    self.apply_brake(binding.key, binding.value, brake)?;
                 }
-                env.insert(key.to_string(), value.to_string());
+                env.insert(binding.key.to_string(), binding.value.to_string());
+            }
+        } else {
+            let contents = std::fs::read_to_string(env_file).map_err(|e| {
+                BindingError::Other(format!(
+                    "Failed to read binding env from {env_file}: {e}",
+                    env_file = env_file.display()
+                ))
+            })?;
+            for line in contents.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    let mut components = trimmed.splitn(2, '=');
+                    let key = components.next().ok_or_else(|| {
+                        BindingError::Other(format!(
+                            "The non-empty line {line} must contain at least an env var name."
+                        ))
+                    })?;
+                    let value = components.next().unwrap_or("");
+                    if let Some(brakes) = brakes
+                        && let Some(brake) = brakes.get(key)
+                    {
+                        self.apply_brake(key, value, brake)?;
+                    }
+                    env.insert(key.to_string(), value.to_string());
+                }
             }
         }
         Ok(env)
