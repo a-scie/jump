@@ -5,7 +5,7 @@ use std::ffi::OsString;
 
 use jump::Process;
 use proc_exit::{Code, ExitResult};
-use scie_jump::boot;
+use scie_jump::{boot, init_logging};
 
 #[cfg(windows)]
 fn exec(
@@ -87,7 +87,7 @@ fn exec(
 }
 
 fn main() -> ExitResult {
-    env_logger::init();
+    init_logging();
     let action = boot::prepare_boot()?;
     boot::boot(action, exec)
 }

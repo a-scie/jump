@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.13.0
+
+This release adds support for scie binding brakes that break and re-bind when a binding's bound
+path variables no longer meet expected criteria. Additionally, a `SCIE_BINDING_JSON` env var
+is now exposed to bindings that can be used as an alternative to the `SCIE_BINDING_ENV` file for
+finer control over brakes.
+
 ## 1.12.0
 
 This release adds a `scie-jumpw.exe` binary to use as the scie tip for Windows scies that will 

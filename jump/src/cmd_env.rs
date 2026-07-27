@@ -5,7 +5,7 @@ use std::ffi::OsString;
 
 use indexmap::IndexMap;
 
-use crate::config::{Cmd, EnvVar};
+use crate::config::{CmdDesc, EnvVar};
 use crate::placeholders;
 use crate::placeholders::{Item, Placeholder, ScieBindingEnv};
 
@@ -169,10 +169,10 @@ impl<'a> EnvParser<'a> {
 }
 
 pub(crate) fn prepare_env(
-    cmd: &Cmd,
+    cmd: &impl CmdDesc,
     ambient_env: &IndexMap<OsString, OsString>,
 ) -> Result<IndexMap<String, String>, String> {
-    EnvParser::new(&cmd.env, ambient_env).parse_env()
+    EnvParser::new(cmd.env(), ambient_env).parse_env()
 }
 
 #[cfg(test)]

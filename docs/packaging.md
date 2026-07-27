@@ -186,12 +186,37 @@ placeholder. The named binding command will be run (successfully) exactly once a
 file maintained by the scie jump. The binding command will generally want to use the
 `{scie.bindings}` to request the path of a directory (housed in the `nce` cache and namespaced by
 the lift manifest hash) set aside for that scie alone. The binding command is guaranteed it will be
-the only command operating against that directory when it is invoked. The binding command will be
-run with access to a `SCIE_BINDING_ENV` environment variable pointing to a file that the binding
-command can write `<key>=<value>` pairs to on individual lines. These bindings can be read by other
-commands using `{scie.bindings.<binding command name>:<key>}`. This facility is similar to the
-GitHub action [`$GITHUB_OUTPUT` facility](
+the only command operating against that directory when it is invoked.
+
+The binding command will be run with access to a `SCIE_BINDING_ENV` environment variable pointing to
+a file that the binding command can write `<key>=<value>` pairs to on individual lines. These
+bindings can be read by other commands using `{scie.bindings.<binding command name>:<key>}`. This
+facility is similar to the GitHub action [`$GITHUB_OUTPUT` facility](
 https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter).
+If any of the `SCIE_BINDING_ENV` represent a path created by the binding, you can have the binding
+re-run if any of these paths no longer meet criteria you choose by specifying a "brakes" property
+for the binding. The "brakes" value is an object whose keys are the keys of the `SCIE_BINDING_ENV`
+paths you wish to check for breaks and whose values are chosen from:
++ "dir": Breaks and re-creates the binding if the path is not a directory.
++ "file": Breaks and re-creates the binding if the path is not a file.
++ "exists": Breaks and re-creates the binding if the path does not exist.
+
+Alternatively, you can bind values using the file pointed at by `SCIE_BINDING_JSON`. The binding can
+write a JSON array of binding objects to that file where each object is structured as follows with
+the `"brake"` property taking the 3 values outlined above and being the only optional property:
+```json
+{
+  "key": "VIRTUAL_ENV",
+  "value": "/tmp/venv",
+  "brake": "dir"
+}
+```
+If no `"brake"` is established in the JSON binding file, a brake is looked for in the "brakes"
+property for the binding. Note that if the `SCIE_BINDING_JSON` file has content, it is used to read
+bindings from and any content in  the `SCIE_BINDING_ENV` file is ignored.
+
+This facility is mainly useful to guard against any paths created by the binding that are outside
+the SCIE_BASE getting deleted between runs.
 
 N.B.: Since the scie-jump only maintains cooperative control over the contents of the `nce` cache,
 care should be taken when designing boot binding commands. If the scie is run in a Docker container

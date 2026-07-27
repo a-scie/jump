@@ -10,7 +10,7 @@ use std::process::exit;
 
 use jump::{BootAction, Process};
 use proc_exit::{Code, ExitResult};
-use scie_jump::{VERSION, boot};
+use scie_jump::{VERSION, boot, init_logging};
 use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExA, DestroyWindow, HWND_MESSAGE, MB_OK, MSG, MessageBoxA, PM_REMOVE, PeekMessageA,
@@ -125,7 +125,7 @@ fn exec(
 
 fn main() -> ExitResult {
     let action = if attach_parent_process_console() {
-        env_logger::init();
+        init_logging();
         let action = boot::prepare_boot()?;
         if matches!(action, BootAction::Pack((_, _, _, bare)) if bare) {
             warn!(

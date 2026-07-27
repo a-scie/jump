@@ -1,0 +1,43 @@
+{
+  "scie": {
+    "lift": {
+      "name": "brakes",
+      "files": [
+        {
+          "name": "bind.sh"
+        },
+        {
+          "name": "run.sh"
+        }
+      ],
+      "boot": {
+        "commands": {
+          "": {
+            "exe": "C:\\Program Files\\Git\\usr\\bin\\bash",
+            "args": [
+              "{run.sh}",
+              "-d",
+              "{scie.bindings.bind:BOUND_DIR}",
+              "-f",
+              "{scie.bindings.bind:BOUND_FILE}",
+              "-e",
+              "{scie.bindings.bind:BOUND_EXISTS}"
+            ]
+          }
+        },
+        "bindings": {
+          "bind": {
+            "exe": "C:\\Program Files\\Git\\usr\\bin\\bash",
+            "args": ["{bind.sh}", "{scie.env.BIND_BASE_DIR}"],
+            "description": "Stress deprecation of scie boot binding descriptions.",
+            "brakes": {
+              "BOUND_DIR": "dir",
+              "BOUND_FILE": "file",
+              "BOUND_EXISTS": "exists"
+            }
+          }
+        }
+      }
+    }
+  }
+}

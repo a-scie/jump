@@ -200,6 +200,12 @@ impl<'de> Deserialize<'de> for EnvVar {
     }
 }
 
+pub(crate) trait CmdDesc {
+    fn exe(&self) -> &str;
+    fn args(&self) -> &Vec<String>;
+    fn env(&self) -> &IndexMap<EnvVar, Option<String>>;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cmd {
@@ -213,6 +219,99 @@ pub struct Cmd {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+impl CmdDesc for Cmd {
+    fn exe(&self) -> &str {
+        &self.exe
+    }
+
+    fn args(&self) -> &Vec<String> {
+        &self.args
+    }
+
+    fn env(&self) -> &IndexMap<EnvVar, Option<String>> {
+        &self.env
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Brake {
+    #[serde(rename = "dir")]
+    Dir,
+    #[serde(rename = "file")]
+    File,
+    #[serde(rename = "exists")]
+    Exists,
+}
+
+struct WarnBindingDescription;
+
+impl Visitor<'_> for WarnBindingDescription {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        write!(formatter, "a binding description string")
+    }
+
+    fn visit_str<E>(self, description: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        warn!("Scie boot binding descriptions are deprecated; ignoring: {description}");
+        Ok(())
+    }
+}
+
+fn warn_binding_description<'de, D>(deserializer: D) -> Result<(), D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_str(WarnBindingDescription)
+}
+
+// N.B.: This allow permits the `_description: ()` field trick without warning.
+#[allow(clippy::manual_non_exhaustive)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Binding {
+    pub exe: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    pub env: IndexMap<EnvVar, Option<String>>,
+
+    // N.B.: The Cmd struct used to be used for both commands and bindings; so, even though the
+    // description field has no use for bindings, it could have been written down in old lift
+    // manifests. This allows the field as input but ignores it to retain backward compatibility
+    // with old manifests.
+    #[serde(
+        rename = "description",
+        default,
+        deserialize_with = "warn_binding_description",
+        skip_serializing
+    )]
+    _description: (),
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    pub brakes: IndexMap<String, Brake>,
+}
+
+impl CmdDesc for Binding {
+    fn exe(&self) -> &str {
+        &self.exe
+    }
+
+    fn args(&self) -> &Vec<String> {
+        &self.args
+    }
+
+    fn env(&self) -> &IndexMap<EnvVar, Option<String>> {
+        &self.env
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -249,7 +348,7 @@ pub struct Boot {
     pub commands: IndexMap<String, Cmd>,
     #[serde(default)]
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    pub bindings: IndexMap<String, Cmd>,
+    pub bindings: IndexMap<String, Binding>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
