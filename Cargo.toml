@@ -40,7 +40,7 @@ sha2 = "0.11"
 tempfile = "3.27"
 
 [workspace.dependencies.zip]
-version = "8.6"
+version = "9.0"
 default-features = false
 # We specifically don't include "time" which is otherwise default. Without time, zip creation
 # always uses 1/1/1980 and gives us reproducible zip creation by default.
