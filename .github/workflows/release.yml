@@ -108,12 +108,12 @@ jobs:
       discussions: write
     steps:
       - name: Checkout scie-jump ${{ needs.determine-tag.outputs.release-tag }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.1.0
         with:
           ref: ${{ needs.determine-tag.outputs.release-tag }}
       - name: Install rustup on Windows ARM
         if: matrix.os == 'windows-11-arm'
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
       - name: Setup QEMU Emulation
         if: matrix.image != ''
         run: docker run --privileged --rm tonistiigi/binfmt --install linux/${{ matrix.arch }}
@@ -172,7 +172,7 @@ jobs:
             -w /code \
             --platform linux/${{ matrix.arch }} ${{ matrix.image }} ./package.sh
       - name: Generate scie-jump ${{ needs.determine-tag.outputs.release-tag }} artifact attestations
-        uses: actions/attest@v4
+        uses: actions/attest@v4.2.2
         with:
           subject-path: dist/scie-jump*
       - name: Prepare Changelog
@@ -182,7 +182,7 @@ jobs:
           changelog-file: ${{ github.workspace }}/CHANGES.md
           version: ${{ needs.determine-tag.outputs.release-version }}
       - name: Create ${{ needs.determine-tag.outputs.release-tag }} Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.2
         with:
           tag_name: ${{ needs.determine-tag.outputs.release-tag }}
           name: scie-jump ${{ needs.determine-tag.outputs.release-version }}
