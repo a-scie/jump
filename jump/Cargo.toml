@@ -30,7 +30,7 @@ tar = "0.4"
 tempfile = { workspace = true }
 xz2 = { version = "0.1", features = ["static"] }
 zip = { workspace = true }
-zstd = "0.13"
+zstd = "0.14"
 walkdir = "2.3"
 
 [dependencies.dotenvs]
