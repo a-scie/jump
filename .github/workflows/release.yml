@@ -45,7 +45,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # N.B.: macos-14 is the oldest non-deprecated ARM Mac runner.
+        # N.B.: macos-15 is the oldest non-deprecated ARM Mac runner.
         include:
           - os: ubuntu-24.04
             name: Linux x86-64 (default)
@@ -93,7 +93,7 @@ jobs:
             arch: ppc64le
           - os: macos-15-intel
             name: macOS x86-64
-          - os: macos-14
+          - os: macos-15
             name: macOS aarch64
           - os: windows-2022
             name: Windows x86-64
