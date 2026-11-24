@@ -53,7 +53,7 @@ env_logger = { workspace = true }
 jump = { path = "jump" }
 log = { workspace = true }
 logging_timer = { workspace = true }
-nix = { version = "0.31" , features = ["process"] }
+nix = { version = "0.32" , features = ["process"] }
 proc-exit = "2.0"
 semver = { workspace = true }
 tempfile = { workspace = true }
